@@ -31,7 +31,7 @@
 
       .box {
         width: 100%;
-        background: #ffffff;
+        background: #1D2739;
         border: 1px solid #dfe5ee;
         border-radius: 18px;
         padding: 18px;
@@ -47,7 +47,7 @@
         display: inline-block;
         padding: 6px 10px;
         border-radius: 999px;
-        background: #eaf2ff;
+        background: #1D2739;
         color: #1a5fd0;
         font-size: 12px;
         font-weight: 700;
