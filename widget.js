@@ -87,7 +87,7 @@
       }
 
       .question::placeholder {
-        color: #7a8799;
+        color: #1D2739;
         opacity: 1;
       }
 
@@ -106,7 +106,7 @@
         border-radius: 12px;
         padding: 12px 18px;
         background: linear-gradient(135deg, #2d7ff9 0%, #1a5fd0 100%);
-        color: #ffffff;
+        color: #1D2739;
         font-size: 15px;
         font-weight: 700;
         line-height: 1.2;
