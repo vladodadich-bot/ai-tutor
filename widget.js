@@ -48,7 +48,7 @@
     #ai-tutor-widget-box {
       display: block !important;
       width: 100% !important;
-      background: #ffffff !important;
+      background: #172133 !important;
       border: 1px solid #dfe5ee !important;
       border-radius: 18px !important;
       padding: 18px !important;
