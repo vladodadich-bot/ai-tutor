@@ -11,6 +11,18 @@
 
   const shadow = host.attachShadow({ mode: "open" });
 
+  // Inject Vercel Speed Insights
+  const speedInsightsScript = document.createElement("script");
+  speedInsightsScript.innerHTML = `
+    window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+  `;
+  document.head.appendChild(speedInsightsScript);
+
+  const speedInsightsLoader = document.createElement("script");
+  speedInsightsLoader.defer = true;
+  speedInsightsLoader.src = "/_vercel/speed-insights/script.js";
+  document.head.appendChild(speedInsightsLoader);
+
   shadow.innerHTML = `
     <style>
       :host {
