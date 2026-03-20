@@ -1,7 +1,27 @@
 
 export default async function handler(req, res) {
   const allowedOrigin = "https://www.lektirko.com"; // zamijeni ako koristiš drugu domenu
+const allowedOrigins = [
+  "https://www.lektirko.com",
+  "https://lektirko.com",
+  "https://lektirko.blogspot.com",
+  "https://www.lektirko.blogspot.com"
+];
 
+const origin = req.headers.origin || "";
+const referer = req.headers.referer || "";
+
+const isAllowed =
+  allowedOrigins.includes(origin) ||
+  allowedOrigins.some(domain => referer.startsWith(domain));
+
+if (!isAllowed) {
+  return res.status(403).json({
+    error: "Access denied",
+    debug: { origin, referer }
+  });
+}
+  
   // CORS headers za sve odgovore
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
