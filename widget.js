@@ -138,7 +138,7 @@
         padding: 14px;
         border: 1px solid #d8e5fb;
         border-radius: 14px;
-        background: #f5f9ff;
+        background: #1D2739;
         color: #1f2d3d;
         display: none;
       }
