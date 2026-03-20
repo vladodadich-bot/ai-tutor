@@ -90,7 +90,7 @@
       font-size: 15px !important;
       line-height: 1.6 !important;
       color: #53627c !important;
-      background: transparent !important;
+      background: #172133 !important;
       text-shadow: none !important;
     }
 
