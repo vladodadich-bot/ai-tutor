@@ -1,35 +1,32 @@
-
 export default async function handler(req, res) {
-  const allowedOrigin = "https://www.lektirko.com"; // zamijeni ako koristiš drugu domenu
-const allowedOrigins = [
-  "https://www.lektirko.com",
-  "https://lektirko.com",
-  "https://lektirko.blogspot.com",
-  "https://www.lektirko.blogspot.com"
-];
+  const allowedOrigins = [
+    "https://www.lektirko.com",
+    "https://lektirko.com",
+    "https://lektirko.blogspot.com",
+    "https://www.lektirko.blogspot.com"
+  ];
 
-const origin = req.headers.origin || "";
-const referer = req.headers.referer || "";
+  const origin = req.headers.origin || "";
+  const referer = req.headers.referer || "";
 
-const isAllowed =
-  allowedOrigins.includes(origin) ||
-  allowedOrigins.some(domain => referer.startsWith(domain));
+  const isAllowed =
+    allowedOrigins.includes(origin) ||
+    allowedOrigins.some((domain) => referer.startsWith(domain));
 
-if (!isAllowed) {
-  return res.status(403).json({
-    error: "Access denied",
-    debug: { origin, referer }
-  });
-}
-  
-  // CORS headers za sve odgovore
-  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  const corsOrigin = isAllowed ? (origin || allowedOrigins[0]) : allowedOrigins[0];
+
+  res.setHeader("Access-Control-Allow-Origin", corsOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // Preflight request
   if (req.method === "OPTIONS") {
     return res.status(200).end();
+  }
+
+  if (!isAllowed) {
+    return res.status(403).json({
+      error: "Access denied"
+    });
   }
 
   if (req.method !== "POST") {
@@ -37,7 +34,7 @@ if (!isAllowed) {
   }
 
   try {
-    const { question } = req.body || {};
+    const { question, history, postTitle } = req.body || {};
 
     if (!question || !question.trim()) {
       return res.status(400).json({ error: "No question" });
@@ -47,6 +44,47 @@ if (!isAllowed) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
     }
 
+    const cleanQuestion = question.trim().slice(0, 300);
+
+    const safeHistory = Array.isArray(history)
+      ? history
+          .slice(-5)
+          .map((item) => ({
+            question: String(item.question || "").slice(0, 300),
+            answer: String(item.answer || "").slice(0, 800)
+          }))
+      : [];
+
+    const historyText = safeHistory.length
+      ? safeHistory
+          .map(
+            (item, index) =>
+              `Razgovor ${index + 1}:\nPitanje: ${item.question}\nOdgovor: ${item.answer}`
+          )
+          .join("\n\n")
+      : "Nema prethodnih pitanja.";
+
+    const prompt = `
+Ti si AI tutor za školske lektire i pomoć u učenju.
+
+Pravila:
+- Odgovaraj samo na pitanja o književnim djelima, lektirama, likovima, temi, poruci djela i pomoći za test.
+- Odgovori moraju biti kratki, jasni i razumljivi učeniku.
+- Piši prirodno, bez nepotrebnog nabrajanja.
+- Odgovor neka bude najviše oko 120 riječi.
+- Ako pitanje nije vezano uz lektiru ili učenje, ljubazno odbij.
+- Ako postoji prethodni razgovor, uzmi ga u obzir.
+
+Naslov posta:
+${postTitle ? postTitle : "Nepoznato djelo"}
+
+Prethodni razgovor:
+${historyText}
+
+Novo pitanje korisnika:
+${cleanQuestion}
+    `.trim();
+
     const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -55,7 +93,7 @@ if (!isAllowed) {
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        input: `Odgovori kratko i jasno učeniku na pitanje o lektiri: ${question}`
+        input: prompt
       })
     });
 
