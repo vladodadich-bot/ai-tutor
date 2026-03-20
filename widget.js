@@ -48,7 +48,7 @@
     #ai-tutor-widget-box {
       display: block !important;
       width: 100% !important;
-      background: #172133 !important;
+      background: #ffffff !important;
       border: 1px solid #dfe5ee !important;
       border-radius: 18px !important;
       padding: 18px !important;
@@ -64,7 +64,7 @@
       display: inline-block !important;
       padding: 6px 10px !important;
       border-radius: 999px !important;
-      background: #172133 !important;
+      background: #eaf2ff !important;
       color: #1a5fd0 !important;
       font-size: 12px !important;
       font-weight: 700 !important;
@@ -79,7 +79,7 @@
       line-height: 1.3 !important;
       font-weight: 700 !important;
       color: #1b2b44 !important;
-      background: #172133 !important;
+      background: transparent !important;
       border: 0 !important;
       text-shadow: none !important;
     }
@@ -90,7 +90,7 @@
       font-size: 15px !important;
       line-height: 1.6 !important;
       color: #53627c !important;
-      background: #172133 !important;
+      background: transparent !important;
       text-shadow: none !important;
     }
 
