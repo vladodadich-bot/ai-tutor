@@ -64,7 +64,7 @@
       display: inline-block !important;
       padding: 6px 10px !important;
       border-radius: 999px !important;
-      background: #eaf2ff !important;
+      background: #172133 !important;
       color: #1a5fd0 !important;
       font-size: 12px !important;
       font-weight: 700 !important;
@@ -79,7 +79,7 @@
       line-height: 1.3 !important;
       font-weight: 700 !important;
       color: #1b2b44 !important;
-      background: transparent !important;
+      background: #172133 !important;
       border: 0 !important;
       text-shadow: none !important;
     }
