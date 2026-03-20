@@ -1,13 +1,4 @@
-const allowedOrigins = [
-  "https://www.lektirko.com",
-  "https://lektirko.com"
-];
 
-const origin = req.headers.origin;
-
-if (!allowedOrigins.includes(origin)) {
-  return res.status(403).json({ error: "Access denied" });
-}
 export default async function handler(req, res) {
   const allowedOrigin = "https://www.lektirko.com"; // zamijeni ako koristiš drugu domenu
 
