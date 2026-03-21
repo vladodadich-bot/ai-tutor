@@ -1,4 +1,19 @@
 export default async function handler(req, res) {
+  const allowedOrigins = [
+    "https://lektirko.com",
+    "https://www.lektirko.com"
+  ];
+
+  const origin = req.headers.origin || "";
+  const referer = req.headers.referer || "";
+
+  const isAllowedOrigin = allowedOrigins.includes(origin);
+  const isAllowedReferer = allowedOrigins.some(url => referer.startsWith(url));
+
+  if (!isAllowedOrigin && !isAllowedReferer) {
+    return res.status(403).json({ error: "Pristup nije dopušten." });
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -7,7 +22,7 @@ export default async function handler(req, res) {
     const { prompt } = req.body;
 
     if (!prompt) {
-      return res.status(400).json({ error: "Prompt is required" });
+      return res.status(400).json({ error: "Prompt je obavezan." });
     }
 
     const response = await fetch("https://api.openai.com/v1/responses", {
