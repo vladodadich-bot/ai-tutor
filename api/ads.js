@@ -43,9 +43,9 @@ export default async function handler(req, res) {
     }
 
     const prompt = `
-Ti si stručnjak za marketing i pisanje oglasa.
+Ti si stručnjak za marketing i pisanje oglasa za male biznise.
 
-Napiši 3 različita oglasa za mali biznis.
+Tvoj zadatak je napisati 3 različite verzije oglasa koje su odmah spremne za objavu.
 
 Podaci:
 Usluga: ${service}
@@ -56,22 +56,34 @@ Ponuda: ${offer || "nije navedeno"}
 Napomena: ${extra || "nema"}
 
 Pravila:
-- svaki oglas 2-3 rečenice
-- jasan, prodajan i prirodan ton
-- koristi emocionalne okidače
-- možeš dodati emoji gdje ima smisla
-- NE piši objašnjenja, samo oglase
+- piši na hrvatskom jeziku
+- oglasi moraju zvučati prirodno, uvjerljivo i profesionalno
+- nemoj da sva 3 oglasa budu slična
+- izbjegavaj pretjerano generičke rečenice
+- ne pretjeruj s uskličnicima i emoji-jima
+- emoji koristi samo ako stvarno odgovara, najviše 1 po oglasu
+- svaki oglas neka ima 2 do 4 kratke rečenice
+- fokus neka bude na koristi za kupca
+- neka svaki oglas ima jasan poziv na akciju
+- ako je lokacija poznata, uključi je prirodno u tekst
+- ako postoji posebna ponuda, istakni je jasno i prirodno
 
-Format:
-Oglas 1:
+Vrste oglasa koje trebaš napisati:
+1. Kratki oglas – sažet i direktan
+2. Prodajni oglas – jači fokus na korist i poziv na akciju
+3. Lokalni oglas – naglasak na lokaciju, povjerenje i ponudu
+
+Vrati odgovor točno u ovom formatu:
+
+Oglas 1 – Kratki:
 ...
 
-Oglas 2:
+Oglas 2 – Prodajni:
 ...
 
-Oglas 3:
+Oglas 3 – Lokalni:
 ...
-    `.trim();
+`.trim();
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
