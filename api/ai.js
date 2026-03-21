@@ -1,4 +1,32 @@
 export default async function handler(req, res) {
+  const allowedOrigins = [
+    "https://www.lektirko.com",
+    "https://lektirko.com",
+    "https://lektirko.blogspot.com",
+    "https://www.lektirko.blogspot.com"
+  ];
+
+  const origin = req.headers.origin || "";
+  const referer = req.headers.referer || "";
+
+  const isAllowed =
+    allowedOrigins.includes(origin) ||
+    allowedOrigins.some((d) => referer.startsWith(d));
+
+  const corsOrigin = isAllowed ? (origin || allowedOrigins[0]) : allowedOrigins[0];
+
+  res.setHeader("Access-Control-Allow-Origin", corsOrigin);
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (!isAllowed) {
+    return res.status(403).json({ error: "Access denied" });
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -6,11 +34,17 @@ export default async function handler(req, res) {
   try {
     const { prompt } = req.body || {};
 
-    if (!prompt || typeof prompt !== "string") {
-      return res.status(400).json({ error: "Prompt je obavezan." });
+    if (!prompt || !String(prompt).trim()) {
+      return res.status(400).json({ error: "Prompt is required" });
     }
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+    }
+
+    const cleanPrompt = String(prompt).trim().slice(0, 12000);
+
+    const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -18,41 +52,42 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        input: prompt
+        input: cleanPrompt
       })
     });
 
-    const data = await openaiResponse.json();
+    const data = await response.json();
 
-    if (!openaiResponse.ok) {
-      return res.status(openaiResponse.status).json({
-        error: data?.error?.message || "Greška pri pozivu OpenAI API-ja."
+    if (!response.ok) {
+      return res.status(500).json({
+        error: "OpenAI error",
+        details: data
       });
     }
 
-    let text = "";
+    let result = data.output_text || "";
 
-    if (Array.isArray(data.output)) {
+    if (!result && data.output && Array.isArray(data.output)) {
+      const parts = [];
       for (const item of data.output) {
-        if (Array.isArray(item.content)) {
-          for (const part of item.content) {
-            if (part.type === "output_text" && part.text) {
-              text += part.text;
+        if (item.content && Array.isArray(item.content)) {
+          for (const c of item.content) {
+            if (c.type === "output_text" && c.text) {
+              parts.push(c.text);
             }
           }
         }
       }
+      result = parts.join("\n");
     }
 
-    if (!text) {
-      text = "Nema odgovora.";
-    }
-
-    return res.status(200).json({ result: text });
-
-  } catch (error) {
+    return res.status(200).json({
+      result: result || "Nema rezultata."
+    });
+  } catch (err) {
     return res.status(500).json({
-      error: error.message || "Server error"
+      error: "Server error",
+      details: String(err)
     });
   }
 }
