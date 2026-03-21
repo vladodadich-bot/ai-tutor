@@ -33,6 +33,7 @@ export default async function handler(req, res) {
 
   try {
     const {
+      platform,
       name,
       phone,
       service,
@@ -51,6 +52,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
     }
 
+    const cleanPlatform = String(platform || "Facebook").trim().slice(0, 50);
     const cleanName = String(name || "").trim().slice(0, 120);
     const cleanPhone = String(phone || "").trim().slice(0, 80);
     const cleanService = String(service || "").trim().slice(0, 200);
@@ -60,12 +62,20 @@ export default async function handler(req, res) {
     const cleanOffer = String(offer || "").trim().slice(0, 200);
     const cleanExtra = String(extra || "").trim().slice(0, 400);
 
+    const platformGuide =
+      cleanPlatform === "Instagram"
+        ? "Oglasi neka budu malo kraći, privlačni i prirodni za Instagram objavu ili caption."
+        : cleanPlatform === "Google"
+        ? "Oglasi neka budu jasni, direktni i vrlo fokusirani na uslugu, korist i akciju, kao za Google oglašavanje."
+        : "Oglasi neka budu prirodni i uvjerljivi, pogodni za Facebook objavu ili promotivni tekst.";
+
     const prompt = `
 Ti si stručnjak za marketing i pisanje oglasa za male biznise.
 
 Tvoj zadatak je napisati 3 različite verzije oglasa koje su odmah spremne za objavu.
 
 Podaci:
+Platforma: ${cleanPlatform}
 Naziv firme: ${cleanName || "nije navedeno"}
 Kontakt: ${cleanPhone || "nije naveden"}
 Usluga: ${cleanService}
@@ -92,6 +102,10 @@ Pravila:
 - ako je naveden naziv firme, uključi ga prirodno u barem 1 ili 2 oglasa
 - ako je naveden kontakt, uključi ga prirodno u barem 1 ili 2 oglasa, najbolje na kraju kao poziv na akciju
 - stil neka bude upotrebljiv za stvarnu objavu malog biznisa
+- prilagodi tekst odabranoj platformi
+
+Dodatna uputa za platformu:
+${platformGuide}
 
 Vrste oglasa koje trebaš napisati:
 1. Kratki oglas – sažet i direktan
