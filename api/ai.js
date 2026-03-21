@@ -1,16 +1,25 @@
 export default async function handler(req, res) {
-  const allowedOrigins = [
-    "https://lektirko.com",
-    "https://www.lektirko.com"
-  ];
+  const allowedHosts = ["lektirko.com", "www.lektirko.com"];
 
   const origin = req.headers.origin || "";
   const referer = req.headers.referer || "";
 
-  const isAllowedOrigin = allowedOrigins.includes(origin);
-  const isAllowedReferer = allowedOrigins.some(url => referer.startsWith(url));
+  let originHost = "";
+  let refererHost = "";
 
-  if (!isAllowedOrigin && !isAllowedReferer) {
+  try {
+    if (origin) originHost = new URL(origin).hostname;
+  } catch (e) {}
+
+  try {
+    if (referer) refererHost = new URL(referer).hostname;
+  } catch (e) {}
+
+  const allowed =
+    allowedHosts.includes(originHost) ||
+    allowedHosts.includes(refererHost);
+
+  if (!allowed) {
     return res.status(403).json({ error: "Pristup nije dopušten." });
   }
 
@@ -19,13 +28,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { prompt } = req.body;
+    const { prompt } = req.body || {};
 
     if (!prompt) {
       return res.status(400).json({ error: "Prompt je obavezan." });
     }
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Authorization": "Bearer " + process.env.OPENAI_API_KEY,
@@ -37,14 +46,23 @@ export default async function handler(req, res) {
       })
     });
 
-    const data = await response.json();
+    const data = await openaiResponse.json();
+
+    if (!openaiResponse.ok) {
+      return res.status(openaiResponse.status).json({
+        error: data?.error?.message || "Greška pri pozivu OpenAI API-ja."
+      });
+    }
 
     const text =
       data.output?.[0]?.content?.[0]?.text ||
       "Nema odgovora.";
 
     return res.status(200).json({ result: text });
+
   } catch (error) {
-    return res.status(500).json({ error: "Server error" });
+    return res.status(500).json({
+      error: "Server error"
+    });
   }
 }
