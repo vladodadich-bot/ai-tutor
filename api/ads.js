@@ -32,9 +32,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { service, location, goal, tone, offer, extra } = req.body || {};
+    const {
+      name,
+      phone,
+      service,
+      location,
+      goal,
+      tone,
+      offer,
+      extra
+    } = req.body || {};
 
-    if (!service) {
+    if (!service || !String(service).trim()) {
       return res.status(400).json({ error: "Missing service" });
     }
 
@@ -42,18 +51,29 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
     }
 
-   const prompt = `
+    const cleanName = String(name || "").trim().slice(0, 120);
+    const cleanPhone = String(phone || "").trim().slice(0, 80);
+    const cleanService = String(service || "").trim().slice(0, 200);
+    const cleanLocation = String(location || "").trim().slice(0, 120);
+    const cleanGoal = String(goal || "").trim().slice(0, 120);
+    const cleanTone = String(tone || "").trim().slice(0, 120);
+    const cleanOffer = String(offer || "").trim().slice(0, 200);
+    const cleanExtra = String(extra || "").trim().slice(0, 400);
+
+    const prompt = `
 Ti si stručnjak za marketing i pisanje oglasa za male biznise.
 
 Tvoj zadatak je napisati 3 različite verzije oglasa koje su odmah spremne za objavu.
 
 Podaci:
-Usluga: ${service}
-Lokacija: ${location || "nije navedeno"}
-Cilj: ${goal}
-Stil: ${tone}
-Ponuda: ${offer || "nije navedeno"}
-Napomena: ${extra || "nema"}
+Naziv firme: ${cleanName || "nije navedeno"}
+Kontakt: ${cleanPhone || "nije naveden"}
+Usluga: ${cleanService}
+Lokacija: ${cleanLocation || "nije navedeno"}
+Cilj: ${cleanGoal || "nije navedeno"}
+Stil: ${cleanTone || "nije navedeno"}
+Ponuda: ${cleanOffer || "nije navedeno"}
+Napomena: ${cleanExtra || "nema"}
 
 Pravila:
 - piši na hrvatskom jeziku
@@ -69,6 +89,8 @@ Pravila:
 - neka svaki oglas ima jasan poziv na akciju
 - ako je lokacija poznata, uključi je prirodno u tekst
 - ako postoji posebna ponuda, istakni je jasno i prirodno
+- ako je naveden naziv firme, uključi ga prirodno u barem 1 ili 2 oglasa
+- ako je naveden kontakt, uključi ga prirodno u barem 1 ili 2 oglasa, najbolje na kraju kao poziv na akciju
 - stil neka bude upotrebljiv za stvarnu objavu malog biznisa
 
 Vrste oglasa koje trebaš napisati:
@@ -86,12 +108,12 @@ Oglas 2 – Prodajni:
 
 Oglas 3 – Lokalni:
 ...
-`.trim();
+    `.trim();
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -111,13 +133,12 @@ Oglas 3 – Lokalni:
 
     let result = data.output_text || "";
 
-    // fallback parsing
-    if (!result && data.output) {
+    if (!result && data.output && Array.isArray(data.output)) {
       const parts = [];
       for (const item of data.output) {
-        if (item.content) {
+        if (item.content && Array.isArray(item.content)) {
           for (const c of item.content) {
-            if (c.type === "output_text") {
+            if (c.type === "output_text" && c.text) {
               parts.push(c.text);
             }
           }
@@ -129,7 +150,6 @@ Oglas 3 – Lokalni:
     return res.status(200).json({
       result: result || "Nema rezultata."
     });
-
   } catch (err) {
     return res.status(500).json({
       error: "Server error",
