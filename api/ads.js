@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
     }
 
-    const prompt = `
+   const prompt = `
 Ti si stručnjak za marketing i pisanje oglasa za male biznise.
 
 Tvoj zadatak je napisati 3 različite verzije oglasa koje su odmah spremne za objavu.
@@ -57,21 +57,24 @@ Napomena: ${extra || "nema"}
 
 Pravila:
 - piši na hrvatskom jeziku
-- oglasi moraju zvučati prirodno, uvjerljivo i profesionalno
-- nemoj da sva 3 oglasa budu slična
-- izbjegavaj pretjerano generičke rečenice
-- ne pretjeruj s uskličnicima i emoji-jima
-- emoji koristi samo ako stvarno odgovara, najviše 1 po oglasu
+- oglasi moraju zvučati prirodno, jasno i profesionalno
+- nemoj izmišljati informacije koje korisnik nije dao
+- ne spominji stručnjake, iskustvo, broj klijenata, kvalitetu ili lokalnu popularnost ako to nije navedeno
+- nemoj dodavati promo kod, broj godina iskustva, garancije ili posebne tvrdnje ako nisu unesene
+- izbjegavaj generičke fraze poput "savršen izgled svaki put", "lokalci nas biraju" i slično
+- nemoj pretjerivati s uskličnicima i emoji-jima
+- emoji koristi samo ako baš prirodno odgovara, najviše 1 po oglasu
 - svaki oglas neka ima 2 do 4 kratke rečenice
 - fokus neka bude na koristi za kupca
 - neka svaki oglas ima jasan poziv na akciju
 - ako je lokacija poznata, uključi je prirodno u tekst
 - ako postoji posebna ponuda, istakni je jasno i prirodno
+- stil neka bude upotrebljiv za stvarnu objavu malog biznisa
 
 Vrste oglasa koje trebaš napisati:
 1. Kratki oglas – sažet i direktan
 2. Prodajni oglas – jači fokus na korist i poziv na akciju
-3. Lokalni oglas – naglasak na lokaciju, povjerenje i ponudu
+3. Lokalni oglas – naglasak na lokaciju i ponudu
 
 Vrati odgovor točno u ovom formatu:
 
