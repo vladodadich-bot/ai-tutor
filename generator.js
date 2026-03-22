@@ -5,10 +5,9 @@
     var CALLBACK_NAME = "smartLektiraHandleData";
 
     var root = document.getElementById("smart-lektira-generator");
-    if (!root) {
-      console.log("SMART generator: root nije pronađen");
-      return;
-    }
+    if (!root) return;
+    if (root.getAttribute("data-init") === "1") return;
+    root.setAttribute("data-init", "1");
 
     var input = document.getElementById("slg-search-input");
     var output = document.getElementById("slg-output");
@@ -23,15 +22,7 @@
     var faqBtn = document.getElementById("slg-show-faq");
     var charactersBtn = document.getElementById("slg-show-characters");
 
-    if (!input || !output || !statusEl || !metaEl || !tabsEl || !searchBtn) {
-      console.log("SMART generator: neki elementi nedostaju");
-      return;
-    }
-
-    if (root.getAttribute("data-init") === "1") {
-      return;
-    }
-    root.setAttribute("data-init", "1");
+    if (!input || !output || !statusEl || !metaEl || !tabsEl || !searchBtn) return;
 
     var currentScript = null;
     var currentData = null;
@@ -352,8 +343,6 @@
     function searchPost() {
       var query = normalizeText(input.value);
 
-      setStatus("Klik je registriran...");
-
       if (!query) {
         currentData = null;
         tabsEl.style.display = "none";
@@ -494,13 +483,8 @@
 
     searchBtn.addEventListener("click", searchPost);
 
-    if (copyBtn) {
-      copyBtn.addEventListener("click", copyCurrent);
-    }
-
-    if (clearBtn) {
-      clearBtn.addEventListener("click", clearAll);
-    }
+    if (copyBtn) copyBtn.addEventListener("click", copyCurrent);
+    if (clearBtn) clearBtn.addEventListener("click", clearAll);
 
     if (summaryBtn) {
       summaryBtn.addEventListener("click", function () {
@@ -530,7 +514,6 @@
       if (e.key === "Enter") searchPost();
     });
 
-    console.log("SMART generator inicijaliziran");
     setStatus("Generator je spreman.");
   }
 
