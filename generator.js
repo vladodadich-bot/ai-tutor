@@ -1,5 +1,5 @@
 (function () {
-  var BLOG_URL = https://www.lektirko.com;
+  var BLOG_URL = "https://www.lektirko.com";
   var MAX_RESULTS = 150;
   var CALLBACK_NAME = "smartLektiraHandleData";
 
