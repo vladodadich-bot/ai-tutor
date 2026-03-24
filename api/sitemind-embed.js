@@ -1,170 +1,100 @@
-<!DOCTYPE html>
-<html lang="hr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SiteMind AI Widget</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #ffffff;
-    }
-    .wrap {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      border-radius: 20px;
-      overflow: hidden;
-      border: 1px solid #e5e7eb;
-      background: #fff;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 16px;
-      background: linear-gradient(135deg, #0f172a, #2563eb);
-      color: #fff;
-    }
-    .title {
-      font-weight: 700;
-      font-size: 15px;
-    }
-    .close {
-      background: transparent;
-      border: 0;
-      color: #fff;
-      font-size: 20px;
-      cursor: pointer;
-    }
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 14px;
-      background: #f8fafc;
-    }
-    .msg {
-      max-width: 85%;
-      padding: 10px 12px;
-      border-radius: 14px;
-      margin-bottom: 10px;
-      line-height: 1.45;
-      font-size: 14px;
-      white-space: pre-wrap;
-    }
-    .bot {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      color: #111827;
-    }
-    .user {
-      margin-left: auto;
-      background: #2563eb;
-      color: #fff;
-    }
-    .inputbar {
-      display: flex;
-      gap: 8px;
-      padding: 12px;
-      border-top: 1px solid #e5e7eb;
-      background: #fff;
-    }
-    textarea {
-      flex: 1;
-      resize: none;
-      min-height: 46px;
-      max-height: 120px;
-      padding: 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 12px;
-      font-size: 14px;
-      outline: none;
-    }
-    button.send {
-      border: 0;
-      border-radius: 12px;
-      padding: 0 16px;
-      background: #111827;
-      color: #fff;
-      cursor: pointer;
-      font-weight: 700;
-    }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="header">
-      <div class="title">SiteMind AI</div>
-      <button class="close" id="closeBtn">✕</button>
-    </div>
+(function () {
+  if (window.SiteMindWidgetLoaded) return;
+  window.SiteMindWidgetLoaded = true;
 
-    <div class="messages" id="messages">
-      <div class="msg bot">Bok! Kako vam mogu pomoći?</div>
-    </div>
+  var config = window.SiteMindConfig || {};
+  var agentId = config.agentId || "demo-agent";
+  var apiBase = config.apiBase || "https://tvoj-api.vercel.app";
+  var position = config.position || "right";
 
-    <div class="inputbar">
-      <textarea id="input" placeholder="Upišite pitanje..."></textarea>
-      <button class="send" id="sendBtn">Pošalji</button>
-    </div>
-  </div>
+  var iframe = document.createElement("iframe");
+  iframe.src =
+    apiBase.replace(/\/$/, "") +
+    "/widget-frame.html?agentId=" +
+    encodeURIComponent(agentId);
 
-  <script>
-    var params = new URLSearchParams(window.location.search);
-    var agentId = params.get("agentId") || "demo-agent";
+  iframe.id = "sitemindai-widget-frame";
+  iframe.title = "SiteMind AI Chat";
+  iframe.style.position = "fixed";
+  iframe.style.bottom = "24px";
+  iframe.style.width = "380px";
+  iframe.style.height = "640px";
+  iframe.style.border = "0";
+  iframe.style.borderRadius = "20px";
+  iframe.style.boxShadow = "0 20px 60px rgba(0,0,0,0.22)";
+  iframe.style.background = "transparent";
+  iframe.style.zIndex = "999999";
+  iframe.style.display = "none";
 
-    var API_URL = "https://tvoj-api.vercel.app/api/ask";
+  if (position === "left") {
+    iframe.style.left = "24px";
+  } else {
+    iframe.style.right = "24px";
+  }
 
-    var messages = document.getElementById("messages");
-    var input = document.getElementById("input");
-    var sendBtn = document.getElementById("sendBtn");
-    var closeBtn = document.getElementById("closeBtn");
+  var button = document.createElement("button");
+  button.id = "sitemindai-widget-button";
+  button.setAttribute("aria-label", "Open chat");
+  button.innerHTML = "💬";
+  button.style.position = "fixed";
+  button.style.bottom = "24px";
+  button.style.width = "64px";
+  button.style.height = "64px";
+  button.style.border = "0";
+  button.style.borderRadius = "999px";
+  button.style.cursor = "pointer";
+  button.style.zIndex = "999999";
+  button.style.boxShadow = "0 12px 30px rgba(0,0,0,0.18)";
+  button.style.background = "linear-gradient(135deg, #0f172a, #2563eb)";
+  button.style.color = "#fff";
+  button.style.fontSize = "28px";
 
-    function addMessage(text, type) {
-      var div = document.createElement("div");
-      div.className = "msg " + type;
-      div.textContent = text;
-      messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
+  if (position === "left") {
+    button.style.left = "24px";
+  } else {
+    button.style.right = "24px";
+  }
+
+  button.addEventListener("click", function () {
+    var isOpen = iframe.style.display === "block";
+    iframe.style.display = isOpen ? "none" : "block";
+    button.innerHTML = isOpen ? "💬" : "✕";
+  });
+
+  window.addEventListener("message", function (event) {
+    if (!event.data) return;
+
+    if (event.data.type === "SITEMIND_CLOSE_WIDGET") {
+      iframe.style.display = "none";
+      button.innerHTML = "💬";
     }
+  });
 
-    async function sendMessage() {
-      var text = input.value.trim();
-      if (!text) return;
+  document.body.appendChild(iframe);
+  document.body.appendChild(button);
 
-      addMessage(text, "user");
-      input.value = "";
-
-      try {
-        var res = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: text,
-            agentId: agentId
-          })
-        });
-
-        var data = await res.json();
-        addMessage(data.answer || "Nema odgovora.", "bot");
-      } catch (err) {
-        addMessage("Dogodila se greška. Pokušajte ponovno.", "bot");
+  function setMobileStyles() {
+    var isMobile = window.innerWidth < 520;
+    if (isMobile) {
+      iframe.style.width = "calc(100vw - 20px)";
+      iframe.style.height = "calc(100vh - 100px)";
+      iframe.style.left = "10px";
+      iframe.style.right = "10px";
+      iframe.style.bottom = "80px";
+    } else {
+      iframe.style.width = "380px";
+      iframe.style.height = "640px";
+      iframe.style.bottom = "24px";
+      if (position === "left") {
+        iframe.style.left = "24px";
+        iframe.style.right = "auto";
+      } else {
+        iframe.style.right = "24px";
+        iframe.style.left = "auto";
       }
     }
+  }
 
-    sendBtn.addEventListener("click", sendMessage);
-
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
-    closeBtn.addEventListener("click", function () {
-      parent.postMessage({ type: "SITEMIND_CLOSE_WIDGET" }, "*");
-    });
-  </script>
-</body>
-</html>
+  setMobileStyles();
+  window.addEventListener("resize", setMobileStyles);
+})();
