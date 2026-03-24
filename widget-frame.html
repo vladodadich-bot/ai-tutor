@@ -166,5 +166,11 @@
       parent.postMessage({ type: "SITEMIND_CLOSE_WIDGET" }, "*");
     });
   </script>
+  <script>
+  const params = new URLSearchParams(window.location.search);
+  const agentId = params.get("agentId") || "demo-agent";
+
+  console.log("Agent ID:", agentId);
+</script>
 </body>
 </html>
