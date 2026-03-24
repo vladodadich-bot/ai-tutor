@@ -100,68 +100,22 @@
       <button id="sendBtn">Pošalji</button>
     </div>
   </div>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const agentId = params.get("agentId") || "demo-agent";
 
-  <script>
-    // uzmi agentId iz URL-a
-    const params = new URLSearchParams(window.location.search);
-    const agentId = params.get("agentId") || "demo-agent";
+  const messages = document.getElementById("messages");
+  const input = document.getElementById("input");
+  const sendBtn = document.getElementById("sendBtn");
 
-    const messages = document.getElementById("messages");
-    const input = document.getElementById("input");
-    const sendBtn = document.getElementById("sendBtn");
+  function addMessage(text, type) {
+    const div = document.createElement("div");
+    div.className = "msg " + type;
+    div.textContent = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  }
 
-    function addMessage(text, type) {
-      const div = document.createElement("div");
-      div.className = "msg " + type;
-      div.textContent = text;
-      messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
-    }
-
-    async function sendMessage(message) {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: message,
-          agentId: agentId
-        })
-      });
-
-      const data = await res.json();
-      return data;
-    }
-
-    sendBtn.addEventListener("click", async function () {
-      const message = input.value.trim();
-      if (!message) return;
-
-      addMessage(message, "user");
-      input.value = "";
-
-      try {
-        const data = await sendMessage(message);
-
-        if (data && data.answer) {
-          addMessage(data.answer, "bot");
-        } else {
-          addMessage("Nema odgovora.", "bot");
-        }
-      } catch (err) {
-        addMessage("Greška u komunikaciji.", "bot");
-      }
-    });
-
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendBtn.click();
-      }
-    });
-  </script>
-  <script>
   async function sendMessage(message) {
     const res = await fetch("/api/chat", {
       method: "POST",
@@ -186,6 +140,35 @@
       };
     }
   }
+
+  sendBtn.addEventListener("click", async function () {
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMessage(message, "user");
+    input.value = "";
+
+    try {
+      const data = await sendMessage(message);
+
+      if (data && data.answer) {
+        addMessage(data.answer, "bot");
+      } else if (data && data.error) {
+        addMessage("API greška: " + data.error, "bot");
+      } else {
+        addMessage("Nema odgovora.", "bot");
+      }
+    } catch (err) {
+      addMessage("Greška u komunikaciji.", "bot");
+    }
+  });
+
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendBtn.click();
+    }
+  });
 </script>
 </body>
 </html>
