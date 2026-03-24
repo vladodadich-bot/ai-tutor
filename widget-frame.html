@@ -161,5 +161,31 @@
       }
     });
   </script>
+  <script>
+  async function sendMessage(message) {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: message,
+        agentId: agentId
+      })
+    });
+
+    const text = await res.text();
+    console.log("RAW API odgovor:", text);
+
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      return {
+        error: "API nije vratio JSON",
+        raw: text
+      };
+    }
+  }
+</script>
 </body>
 </html>
