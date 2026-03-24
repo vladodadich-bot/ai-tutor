@@ -33,9 +33,14 @@ export default async function handler(req, res) {
       input: message
     });
 
-    return res.status(200).json({
-      answer: response.output_text || "Nema odgovora."
-    });
+return res.status(200).json({
+  answer: response.output_text || "Nema odgovora.",
+  agent: {
+    agentName: agent.agentName,
+    welcomeMessage: agent.welcomeMessage,
+    themeColor: agent.themeColor
+  }
+});
   } catch (error) {
     console.error("CHAT API ERROR:", error);
 
