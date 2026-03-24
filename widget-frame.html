@@ -89,7 +89,7 @@
 
 <body>
   <div class="wrap">
-    <div class="header">SiteMind AI</div>
+    <div class="header" id="chat-header">SiteMind AI</div>
 
     <div id="messages" class="messages">
       <div class="msg bot">Bok! Kako vam mogu pomoći?</div>
@@ -101,6 +101,7 @@
     </div>
   </div>
 <script>
+  let agentLoaded = false;
   const params = new URLSearchParams(window.location.search);
   const agentId = params.get("agentId") || "demo-agent";
 
@@ -150,7 +151,19 @@
 
     try {
       const data = await sendMessage(message);
+if (!agentLoaded && data && data.agent) {
+  const header = document.getElementById("chat-header");
 
+  if (header) {
+    header.textContent = data.agent.agentName;
+  }
+
+  if (data.agent.welcomeMessage) {
+    addMessage(data.agent.welcomeMessage, "bot");
+  }
+
+  agentLoaded = true;
+}
       if (data && data.answer) {
         addMessage(data.answer, "bot");
       } else if (data && data.error) {
