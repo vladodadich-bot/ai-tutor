@@ -142,46 +142,53 @@
     }
   }
 
-  sendBtn.addEventListener("click", async function () {
-    const message = input.value.trim();
-    if (!message) return;
+ sendBtn.addEventListener("click", async function () {
+  const message = input.value.trim();
+  if (!message) return;
 
-    addMessage(message, "user");
-    input.value = "";
+  addMessage(message, "user");
+  input.value = "";
 
-    try {
-      const data = await sendMessage(message);
-if (!agentLoaded && data && data.agent) {
-  const header = document.getElementById("chat-header");
+  // 👇 dodaj "typing"
+  const typingDiv = document.createElement("div");
+  typingDiv.className = "msg bot";
+  typingDiv.textContent = "Pišem odgovor...";
+  messages.appendChild(typingDiv);
+  messages.scrollTop = messages.scrollHeight;
 
-  if (header) {
-    header.textContent = data.agent.agentName;
-  }
+  try {
+    const data = await sendMessage(message);
 
-  if (data.agent.welcomeMessage) {
-    addMessage(data.agent.welcomeMessage, "bot");
-  }
+    // makni typing
+    typingDiv.remove();
 
-  agentLoaded = true;
-}
-      if (data && data.answer) {
-        addMessage(data.answer, "bot");
-      } else if (data && data.error) {
-        addMessage("API greška: " + data.error, "bot");
-      } else {
-        addMessage("Nema odgovora.", "bot");
+    if (data && data.agent && !agentLoaded) {
+      const header = document.getElementById("chat-header");
+
+      if (header) {
+        header.textContent = data.agent.agentName;
       }
-    } catch (err) {
-      addMessage("Greška u komunikaciji.", "bot");
-    }
-  });
 
-  input.addEventListener("keydown", function (e) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendBtn.click();
+      if (data.agent.welcomeMessage) {
+        addMessage(data.agent.welcomeMessage, "bot");
+      }
+
+      agentLoaded = true;
     }
-  });
+
+    if (data && data.answer) {
+      addMessage(data.answer, "bot");
+    } else if (data && data.error) {
+      addMessage("API greška: " + data.error, "bot");
+    } else {
+      addMessage("Nema odgovora.", "bot");
+    }
+
+  } catch (err) {
+    typingDiv.remove();
+    addMessage("Greška u komunikaciji.", "bot");
+  }
+});
 </script>
 </body>
 </html>
