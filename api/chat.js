@@ -28,25 +28,20 @@ export default async function handler(req, res) {
     }
 
     const response = await openai.responses.create({
-      model: "gpt-5-mini",
-      input: [
-        {
-          role: "system",
-          content: agent.systemPrompt
-        },
-        {
-          role: "user",
-          content: message
-        }
-      ]
+      model: "gpt-5.4",
+      instructions: agent.systemPrompt,
+      input: message
     });
 
-    const answer = response.output_text || "Nema odgovora.";
-
-    return res.status(200).json({ answer });
+    return res.status(200).json({
+      answer: response.output_text || "Nema odgovora."
+    });
   } catch (error) {
+    console.error("CHAT API ERROR:", error);
+
     return res.status(500).json({
-      error: "Greška na serveru"
+      error: error?.message || "Server error",
+      type: error?.type || null
     });
   }
 }
