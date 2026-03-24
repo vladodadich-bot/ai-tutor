@@ -171,5 +171,28 @@
 
   console.log("Agent ID:", agentId);
 </script>
+  <script>
+  const params = new URLSearchParams(window.location.search);
+  const agentId = params.get("agentId") || "demo-agent";
+
+  async function sendMessage(message) {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: message,
+        agentId: agentId
+      })
+    });
+
+    const data = await res.json();
+
+    console.log("API odgovor:", data);
+
+    return data;
+  }
+</script>
 </body>
 </html>
