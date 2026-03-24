@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SiteMind AI Widget</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, #0f172a, #2563eb);
+      color: #fff;
+    }
+    .title {
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .close {
+      background: transparent;
+      border: 0;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      background: #f8fafc;
+    }
+    .msg {
+      max-width: 85%;
+      padding: 10px 12px;
+      border-radius: 14px;
+      margin-bottom: 10px;
+      line-height: 1.45;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+    .bot {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      color: #111827;
+    }
+    .user {
+      margin-left: auto;
+      background: #2563eb;
+      color: #fff;
+    }
+    .inputbar {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid #e5e7eb;
+      background: #fff;
+    }
+    textarea {
+      flex: 1;
+      resize: none;
+      min-height: 46px;
+      max-height: 120px;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      font-size: 14px;
+      outline: none;
+    }
+    button.send {
+      border: 0;
+      border-radius: 12px;
+      padding: 0 16px;
+      background: #111827;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="title">SiteMind AI</div>
+      <button class="close" id="closeBtn">✕</button>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="msg bot">Bok! Kako vam mogu pomoći?</div>
+    </div>
+
+    <div class="inputbar">
+      <textarea id="input" placeholder="Upišite pitanje..."></textarea>
+      <button class="send" id="sendBtn">Pošalji</button>
+    </div>
+  </div>
+
+  <script>
+    var params = new URLSearchParams(window.location.search);
+    var agentId = params.get("agentId") || "demo-agent";
+
+    var API_URL = "https://tvoj-api.vercel.app/api/ask";
+
+    var messages = document.getElementById("messages");
+    var input = document.getElementById("input");
+    var sendBtn = document.getElementById("sendBtn");
+    var closeBtn = document.getElementById("closeBtn");
+
+    function addMessage(text, type) {
+      var div = document.createElement("div");
+      div.className = "msg " + type;
+      div.textContent = text;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function sendMessage() {
+      var text = input.value.trim();
+      if (!text) return;
+
+      addMessage(text, "user");
+      input.value = "";
+
+      try {
+        var res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            agentId: agentId
+          })
+        });
+
+        var data = await res.json();
+        addMessage(data.answer || "Nema odgovora.", "bot");
+      } catch (err) {
+        addMessage("Dogodila se greška. Pokušajte ponovno.", "bot");
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    closeBtn.addEventListener("click", function () {
+      parent.postMessage({ type: "SITEMIND_CLOSE_WIDGET" }, "*");
+    });
+  </script>
+</body>
+</html>
