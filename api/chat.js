@@ -33,9 +33,9 @@ export default async function handler(req, res) {
       input: message
     });
 
-    return res.status(200).json({
-      answer: response.output_text || "Nema odgovora."
-    });
+   return res.status(200).json({
+  answer: JSON.stringify(response, null, 2)
+});
   } catch (error) {
     console.error("CHAT API ERROR:", error);
 
