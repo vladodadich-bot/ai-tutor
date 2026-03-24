@@ -194,5 +194,38 @@
     return data;
   }
 </script>
+  <script>
+  const params = new URLSearchParams(window.location.search);
+  const agentId = params.get("agentId") || "demo-agent";
+
+  async function sendMessage(message) {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: message,
+        agentId: agentId
+      })
+    });
+
+    const data = await res.json();
+
+    console.log("API odgovor:", data);
+
+    return data;
+  }
+
+  const sendBtn = document.getElementById("sendBtn");
+  const input = document.getElementById("input");
+
+  sendBtn.addEventListener("click", async function () {
+    const message = input.value.trim();
+    if (!message) return;
+
+    await sendMessage(message);
+  });
+</script>
 </body>
 </html>
