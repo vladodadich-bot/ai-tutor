@@ -32,10 +32,17 @@ export default async function handler(req, res) {
       input: `${agent.systemPrompt}\n\nUser: ${message}`
     });
 
-    const answer =
-      response.output_text ||
-      response.output?.[0]?.content?.[0]?.text ||
-      "Nema odgovora.";
+    let answer = "Nema odgovora.";
+
+if (response.output_text) {
+  answer = response.output_text;
+} else if (response.output && response.output.length > 0) {
+  const content = response.output[0].content;
+
+  if (content && content.length > 0 && content[0].text) {
+    answer = content[0].text;
+  }
+}
 
     return res.status(200).json({ answer });
   } catch (error) {
