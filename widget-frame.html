@@ -165,8 +165,7 @@
     closeBtn.addEventListener("click", function () {
       parent.postMessage({ type: "SITEMIND_CLOSE_WIDGET" }, "*");
     });
-  </script>
-  <script>
+
   const params = new URLSearchParams(window.location.search);
   const agentId = params.get("agentId") || "demo-agent";
 
