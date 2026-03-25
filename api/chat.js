@@ -8,7 +8,11 @@ const openai = new OpenAI({
 function normalizeLang(lang) {
   const raw = (lang || "").toLowerCase();
 
-  if (raw.startsWith("hr") || raw.startsWith("bs") || raw.startsWith("sr")) {
+  if (
+    raw.startsWith("hr") ||
+    raw.startsWith("bs") ||
+    raw.startsWith("sr")
+  ) {
     return "hr";
   }
 
@@ -17,6 +21,35 @@ function normalizeLang(lang) {
   }
 
   return "en";
+}
+
+function detectUserLanguageFromMessage(message, fallback) {
+  const m = (message || "").trim().toLowerCase();
+
+  if (!m) return normalizeLang(fallback || "en");
+
+  if (/[čćžšđ]/.test(m)) return "hr";
+  if (/[äöüß]/.test(m)) return "de";
+
+  if (
+    /\b(kako|sto|što|sta|šta|koliko|gdje|gde|moze|može|trebam|zelim|želim|cijena|kontakt|usluga|pomoc|pomoć|stranica|stranici|ovoj|cemu|čemu|radi|ucenje|učenje|njemacki|njemački|lekcije|tečaj|tecaj)\b/.test(m)
+  ) {
+    return "hr";
+  }
+
+  if (
+    /\b(wie|was|worum|seite|inhalt|hilfe|kontakt|preis|deutsch|lektion|lektionen|lernen|kurs|ich|möchte|mochte|bitte|danke)\b/.test(m)
+  ) {
+    return "de";
+  }
+
+  if (
+    /\b(how|what|about|page|content|help|contact|price|course|lesson|lessons|learn|learning|german|service)\b/.test(m)
+  ) {
+    return "en";
+  }
+
+  return normalizeLang(fallback || "en");
 }
 
 function trimText(text, maxLength) {
@@ -53,26 +86,72 @@ function extractAnswerText(response) {
   return chunks.join("\n").trim();
 }
 
-function fallbackAnswer(lang, pageContext) {
+function firstUsefulSnippet(text) {
+  const cleaned = trimText(text || "", 400);
+  if (!cleaned) return "";
+
+  const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean);
+  if (sentences.length > 0) {
+    return trimText(sentences[0], 220);
+  }
+
+  return trimText(cleaned, 220);
+}
+
+function buildContextualFallback(lang, pageContext) {
+  const title = trimText(pageContext.pageTitle || "", 160);
+  const desc = trimText(pageContext.pageDescription || "", 220);
+  const snippet = firstUsefulSnippet(pageContext.pageText || "");
+
   if (lang === "hr") {
-    if (pageContext.pageTitle) {
-      return "Vidim stranicu: " + pageContext.pageTitle + ". Pokušajte postaviti konkretnije pitanje o sadržaju ove stranice.";
+    if (title || desc || snippet) {
+      let out = "Ova stranica ";
+      if (title) {
+        out += "se odnosi na: " + title + ". ";
+      }
+      if (desc) {
+        out += desc + " ";
+      }
+      if (snippet) {
+        out += "Iz sadržaja se vidi: " + snippet;
+      }
+      return out.trim();
     }
-    return "Pokušajte postaviti konkretnije pitanje o sadržaju ove stranice.";
+    return "Vidim ovu stranicu, ali nemam dovoljno jasnog sadržaja za bolji sažetak. Postavite pitanje malo konkretnije.";
   }
 
   if (lang === "de") {
-    if (pageContext.pageTitle) {
-      return "Ich sehe die Seite: " + pageContext.pageTitle + ". Bitte stellen Sie eine konkretere Frage zum Inhalt dieser Seite.";
+    if (title || desc || snippet) {
+      let out = "Diese Seite ";
+      if (title) {
+        out += "handelt wahrscheinlich von: " + title + ". ";
+      }
+      if (desc) {
+        out += desc + " ";
+      }
+      if (snippet) {
+        out += "Aus dem Inhalt ist erkennbar: " + snippet;
+      }
+      return out.trim();
     }
-    return "Bitte stellen Sie eine konkretere Frage zum Inhalt dieser Seite.";
+    return "Ich sehe diese Seite, aber ich habe nicht genug klaren Inhalt für eine bessere Zusammenfassung. Bitte stellen Sie eine etwas konkretere Frage.";
   }
 
-  if (pageContext.pageTitle) {
-    return "I can see the page: " + pageContext.pageTitle + ". Please ask a more specific question about this page.";
+  if (title || desc || snippet) {
+    let out = "This page appears to be about ";
+    if (title) {
+      out += title + ". ";
+    }
+    if (desc) {
+      out += desc + " ";
+    }
+    if (snippet) {
+      out += "From the content, it seems: " + snippet;
+    }
+    return out.trim();
   }
 
-  return "Please ask a more specific question about this page.";
+  return "I can see this page, but I do not have enough clear content for a better summary. Please ask a slightly more specific question.";
 }
 
 export default async function handler(req, res) {
@@ -84,9 +163,8 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    const message = trimText(body.message || "", 500);
+    const message = trimText(body.message || "", 700);
     const agentId = body.agentId || "demo-agent";
-    const userLang = normalizeLang(body.userLang || "en");
     const rawPageContext = body.pageContext || {};
     const agent = getAgentById(agentId);
 
@@ -98,24 +176,31 @@ export default async function handler(req, res) {
 
     const safePageContext = {
       pageUrl: rawPageContext.pageUrl || "",
-      pageTitle: trimText(rawPageContext.pageTitle || "", 160),
-      pageDescription: trimText(rawPageContext.pageDescription || "", 240),
-      pageText: trimText(rawPageContext.pageText || "", 1500),
+      pageTitle: trimText(rawPageContext.pageTitle || "", 180),
+      pageDescription: trimText(rawPageContext.pageDescription || "", 300),
+      pageText: trimText(rawPageContext.pageText || "", 2600),
       lang: normalizeLang(rawPageContext.lang || "en")
     };
 
+    const userLang = normalizeLang(
+      body.userLang || detectUserLanguageFromMessage(message, safePageContext.lang)
+    );
+
     const systemPrompt = `
-Ti si ${agent.agentName || "SiteMind AI"}.
+Ti si ${agent.agentName || "SiteMind AI"}, AI asistent ugrađen na web stranicu.
 
 PRAVILA:
-- odgovaraj kratko, jasno i korisno
-- koristi informacije iz sadržaja stranice kada su dostupne
-- ne izmišljaj podatke koji nisu vidljivi iz konteksta
-- ako nešto nije jasno iz stranice, to iskreno reci
+- odgovaraj prirodno, jasno i korisno
+- koristi sadržaj stranice kao glavni izvor
+- smiješ zaključivati iz konteksta stranice, ne samo tražiti doslovne rečenice
+- ako korisnik pita općenito, npr. "o čemu se radi", "što je ovo", "what is this page about", "worum geht es", sažmi temu stranice
+- ako pitanje nije potpuno precizno, ipak pokušaj pomoći na temelju naslova, opisa i teksta stranice
+- nemoj izmišljati konkretne podatke kao cijene, telefoni, e-mailovi, rokovi ili uvjeti ako nisu jasno vidljivi
+- ako nešto nije jasno, reci to iskreno, ali svejedno pokušaj dati koristan sažetak ili objašnjenje
 - odgovaraj na jeziku korisnikova pitanja
 
 ${buildLanguageInstruction(userLang)}
-${trimText(agent.systemPrompt || "", 500)}
+${trimText(agent.systemPrompt || "", 700)}
 `.trim();
 
     const userPrompt = `
@@ -126,12 +211,13 @@ KONTEKST STRANICE:
 Naslov: ${safePageContext.pageTitle || "-"}
 Opis: ${safePageContext.pageDescription || "-"}
 URL: ${safePageContext.pageUrl || "-"}
-Tekst stranice: ${safePageContext.pageText || "-"}
+Tekst stranice:
+${safePageContext.pageText || "-"}
 `.trim();
 
     const response = await openai.responses.create({
       model: "gpt-5-mini",
-      max_output_tokens: 220,
+      max_output_tokens: 320,
       input: [
         {
           role: "system",
@@ -144,7 +230,8 @@ Tekst stranice: ${safePageContext.pageText || "-"}
       ]
     });
 
-    const answer = extractAnswerText(response) || fallbackAnswer(userLang, safePageContext);
+    const answer =
+      extractAnswerText(response) || buildContextualFallback(userLang, safePageContext);
 
     return res.status(200).json({
       answer,
