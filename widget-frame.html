@@ -351,53 +351,78 @@
       }
     }
 
-    async function handleSend() {
-      const message = input.value.trim();
-      if (!message) return;
+   async function handleSend() {
+  const message = input.value.trim();
+  if (!message) return;
 
-      const userLang = detectUserLanguageFromMessage(message, pageContext.lang);
-      const t = getLocale(userLang);
+  const userLang = detectUserLanguageFromMessage(message, pageContext.lang);
+  const t = getLocale(userLang);
 
-      addMessage(message, "user");
-      input.value = "";
-      input.style.height = "46px";
-      sendBtn.disabled = true;
+  addMessage(message, "user");
+  input.value = "";
+  input.style.height = "46px";
 
-      const typingDiv = addMessage(t.typing, "bot", "typing");
+  // ✅ NORMALIZACIJA PORUKE
+  const m = message.toLowerCase().trim();
 
-      try {
-        const data = await sendMessage(message, userLang);
-        typingDiv.remove();
+  const isShortAck =
+    m === "ok" ||
+    m === "oke" ||
+    m === "okey" ||
+    m === "super" ||
+    m === "hvala" ||
+    m === "thanks" ||
+    m === "thank you" ||
+    m === "danke";
 
-        if (data && data.agent && !agentLoaded) {
-          if (data.agent.agentName) {
-            header.textContent = data.agent.agentName;
-          }
-          agentLoaded = true;
-        }
+  // ✅ AKO JE "OK" → NE ZOVI API
+  if (isShortAck) {
+    let reply = "";
 
-        if (data && data.answer) {
-          addMessage(data.answer, "bot");
-        } else if (data && data.error) {
-          addMessage(t.apiError + data.error, "bot");
-        } else {
-          addMessage(t.noAnswer, "bot");
-        }
-
-        if (data && data.debug) {
-          debugEl.textContent =
-            "Page title: " + (data.debug.pageTitle || "-") +
-            " | Text length: " + data.debug.pageTextLength +
-            " | Lang: " + data.debug.lang;
-        }
-      } catch (err) {
-        typingDiv.remove();
-        addMessage(t.commError, "bot");
-      } finally {
-        sendBtn.disabled = false;
-        input.focus();
-      }
+    if (userLang === "hr") {
+      reply = "Naravno 😊 Zanima li vas još nešto?";
+    } else if (userLang === "de") {
+      reply = "Gerne 😊 Möchten Sie noch etwas wissen?";
+    } else {
+      reply = "Of course 😊 Is there anything else you'd like to know?";
     }
+
+    addMessage(reply, "bot");
+    return; // 🔥 STOP → nema API poziva
+  }
+
+  sendBtn.disabled = true;
+
+  const typingDiv = addMessage(t.typing, "bot", "typing");
+
+  try {
+    const data = await sendMessage(message, userLang);
+
+    typingDiv.remove();
+
+    if (data && data.agent && !agentLoaded) {
+      if (data.agent.agentName) {
+        header.textContent = data.agent.agentName;
+      }
+      agentLoaded = true;
+    }
+
+    if (data && data.answer) {
+      addMessage(data.answer, "bot");
+    } else if (data && data.error) {
+      addMessage(t.apiError + data.error, "bot");
+    } else {
+      addMessage(t.noAnswer, "bot");
+    }
+
+  } catch (err) {
+    typingDiv.remove();
+    addMessage(t.commError, "bot");
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
 
     sendBtn.addEventListener("click", handleSend);
 
