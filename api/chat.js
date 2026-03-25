@@ -28,19 +28,19 @@ function detectUserLanguageFromMessage(message, fallback) {
   if (/[äöüß]/.test(m)) return "de";
 
   if (
-    /\b(kako|sto|što|sta|šta|koliko|gdje|gde|moze|može|trebam|zelim|želim|htjeo|hteo|želio|ugraditi|staviti|widget|pomozi|pomoc|pomoć|stranica|stranicu|mogu li|mozes li|možeš li)\b/.test(m)
+    /\b(kako|sto|što|sta|šta|koliko|gdje|gde|moze|može|trebam|zelim|želim|htjeo|hteo|želio|ugraditi|staviti|widget|pomozi|pomoc|pomoć|stranica|stranicu|mogu li|mozes li|možeš li|builder|postavim|postaviti)\b/.test(m)
   ) {
     return "hr";
   }
 
   if (
-    /\b(wie|was|hilfe|helfen|einbauen|widget|seite|ich|möchte|mochte|bitte|danke|kannst)\b/.test(m)
+    /\b(wie|was|hilfe|helfen|einbauen|widget|seite|ich|möchte|mochte|bitte|danke|kannst|builder)\b/.test(m)
   ) {
     return "de";
   }
 
   if (
-    /\b(how|what|help|can you|embed|widget|website|site|install|add|setup)\b/.test(m)
+    /\b(how|what|help|embed|widget|website|site|install|add|setup|builder|can you)\b/.test(m)
   ) {
     return "en";
   }
@@ -52,79 +52,28 @@ function trimText(text, maxLength) {
   return (text || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
-function extractAnswerText(response) {
-  if (response && response.output_text && String(response.output_text).trim()) {
-    return String(response.output_text).trim();
-  }
-
-  if (!response || !Array.isArray(response.output)) {
-    return "";
-  }
-
-  const chunks = [];
-
-  for (const item of response.output) {
-    if (!item || item.type !== "message" || !Array.isArray(item.content)) continue;
-
-    for (const part of item.content) {
-      if (part && typeof part.text === "string" && part.text.trim()) {
-        chunks.push(part.text.trim());
-      }
-    }
-  }
-
-  return chunks.join("\n").trim();
-}
-
-function buildHardLanguageRule(lang) {
+function buildLanguageRule(lang) {
   if (lang === "hr") {
-    return `
-ODGOVARAJ SAMO NA HRVATSKOM.
-- Ne koristi engleski.
-- Ne koristi njemački.
-- Čak i ako je sadržaj stranice na drugom jeziku, odgovor mora biti potpuno na hrvatskom.
-`.trim();
+    return "Odgovaraj isključivo na hrvatskom jeziku. Ne koristi engleski ni njemački u odgovoru.";
   }
 
   if (lang === "de") {
-    return `
-ANTWORTE NUR AUF DEUTSCH.
-- Verwende kein Kroatisch.
-- Verwende kein Englisch.
-- Auch wenn der Seiteninhalt auf einer anderen Sprache ist, muss die Antwort vollständig auf Deutsch sein.
-`.trim();
+    return "Antworte ausschließlich auf Deutsch. Verwende kein Englisch und kein Kroatisch.";
   }
 
-  return `
-RESPOND ONLY IN ENGLISH.
-- Do not use Croatian.
-- Do not use German.
-- Even if the page content is in another language, the answer must stay fully in English.
-`.trim();
+  return "Respond only in English. Do not use Croatian or German in the answer.";
 }
 
-function buildContextualFallback(lang, pageContext) {
-  const title = trimText(pageContext.pageTitle || "", 180);
-
+function fallbackAnswer(lang) {
   if (lang === "hr") {
-    if (title) {
-      return "Mogu pomoći oko ove stranice. Koliko vidim, riječ je o: " + title + ". Slobodno pitajte što vas konkretno zanima ili što želite napraviti.";
-    }
-    return "Mogu pomoći oko ove stranice. Slobodno pitajte što vas konkretno zanima ili što želite napraviti.";
+    return "Mogu pomoći, ali iz sadržaja koji trenutno vidim nemam još dovoljno jasnih informacija za točan odgovor.";
   }
 
   if (lang === "de") {
-    if (title) {
-      return "Ich kann Ihnen bei dieser Seite helfen. Soweit ich sehe, geht es um: " + title + ". Fragen Sie einfach, was Sie konkret wissen oder tun möchten.";
-    }
-    return "Ich kann Ihnen bei dieser Seite helfen. Fragen Sie einfach, was Sie konkret wissen oder tun möchten.";
+    return "Ich kann helfen, aber aus dem aktuell sichtbaren Inhalt habe ich noch nicht genug klare Informationen für eine genaue Antwort.";
   }
 
-  if (title) {
-    return "I can help with this page. As far as I can tell, it is about: " + title + ". Feel free to ask what you want to know or do.";
-  }
-
-  return "I can help with this page. Feel free to ask what you want to know or do.";
+  return "I can help, but I do not yet have enough clear information from the visible page content for a precise answer.";
 }
 
 export default async function handler(req, res) {
@@ -149,9 +98,9 @@ export default async function handler(req, res) {
 
     const safePageContext = {
       pageUrl: rawPageContext.pageUrl || "",
-      pageTitle: trimText(rawPageContext.pageTitle || "", 180),
-      pageDescription: trimText(rawPageContext.pageDescription || "", 320),
-      pageText: trimText(rawPageContext.pageText || "", 3200),
+      pageTitle: trimText(rawPageContext.pageTitle || "", 200),
+      pageDescription: trimText(rawPageContext.pageDescription || "", 400),
+      pageText: trimText(rawPageContext.pageText || "", 5000),
       lang: normalizeLang(rawPageContext.lang || "en")
     };
 
@@ -163,70 +112,59 @@ export default async function handler(req, res) {
 Ti si ${agent.agentName || "SiteMind AI"}, pametan i prirodan AI asistent na web stranici.
 
 TVOJA ULOGA:
-- razgovaraš s korisnikom kao stvarna, korisna osoba
-- pomažeš korisniku da razumije stranicu, koristi je i napravi sljedeći korak
-- ne ponašaš se kao robot koji samo opisuje naslov stranice
+- razgovaraš s korisnikom kao stvarna osoba
+- pomažeš korisniku razumjeti stranicu i napraviti sljedeći korak
+- ne ponašaš se kao robot koji samo prepričava naslov stranice
 
-NAJVAŽNIJA PRAVILA:
-- uvijek odgovori na stvarnu namjeru korisnika
-- ako korisnik traži pomoć, objasni kako mu možeš pomoći
-- ako korisnik želi nešto napraviti, usmjeri ga prema rješenju
-- ako korisnik pita može li nešto ugraditi, postaviti, kupiti, rezervirati, koristiti ili aktivirati, odgovori praktično
-- ne vraćaj sažetak stranice osim ako korisnik izričito pita o čemu je stranica
-- nemoj samo ponavljati naslov, opis ili tekst stranice
-- koristi sadržaj stranice da razumiješ kontekst, ali ne da mehanički prepričavaš
-- ako korisnik pita općenito "možeš li mi pomoći", reci da možeš i ukratko navedi kako
-- ako korisnik pita za widget, embed, instalaciju, postavljanje ili korištenje, ponašaj se kao podrška koja vodi korisnika kroz korake
-- odgovori trebaju zvučati razgovorno, prirodno i korisno
+NAJVAŽNIJE:
+- odgovori na stvarnu namjeru korisnika
+- ako korisnik traži pomoć, pomozi mu konkretno
+- ako pita kako nešto postaviti, objasni korake
+- ako pita nalazi li se nešto na stranici, procijeni iz sadržaja i odgovori jasno
+- ako odgovor nije potpuno siguran, reci to iskreno, ali ipak daj najbolju moguću procjenu
 
-KAKO ODGOVARATI:
-- za praktična pitanja daj izravan odgovor
-- za pitanja o akciji daj pomoć i sljedeći korak
-- za da/ne pitanja prvo odgovori jasno, pa kratko objasni
-- za pitanja tipa "kako to može biti korisno" objasni korist za korisnika
-- za pitanja tipa "možeš li mi pomoći" nemoj opisivati stranicu, nego reci da možeš i u čemu
+PRAVILA:
+- ne vraćaj samo opis stranice ako korisnik traži praktičnu pomoć
+- ne ponavljaj naslov stranice bez razloga
+- koristi kontekst stranice da razumiješ o čemu je riječ
+- ako korisnik pita:
+  - "možeš li mi pomoći kako da postavim widget na stranicu"
+  tada objasni kako bi to okvirno išlo
+- ako korisnik pita:
+  - "da li se na ovoj stranici nalazi widget builder"
+  tada odgovori jasno vidi li se to ili ne vidi iz sadržaja
+- ako korisnik pita općenito, budi prirodan i koristan
+- budi razgovoran, ali konkretan
 
-ŠTO IZBJEGAVATI:
-- izbjegavaj fraze poput:
-  - "Iz ove stranice se vidi tema..."
-  - "The topic appears to be..."
-  - "Sadržaj upućuje na..."
-  osim ako korisnik baš traži sažetak stranice
-- nemoj odgovarati kao tražilica
-- nemoj biti ukočen
-- nemoj miješati jezike
-- nemoj izmišljati konkretne podatke koji nisu vidljivi
+STIL:
+- kratak do srednje dug
+- prirodan
+- ljudski
+- konkretan
+- koristan
 
-${buildHardLanguageRule(userLang)}
+${buildLanguageRule(userLang)}
 
-DODATNI STIL:
-- budi ljubazan, smiren i prirodan
-- odgovaraj kao dobar support/sales agent
-- ako korisnik traži pomoć, pokaži inicijativu
-- ako korisnik želi rješenje, vodi ga prema rješenju
-- neka odgovori budu kratki do srednje dugi, ne predugi
-
-${trimText(agent.systemPrompt || "", 1000)}
+DODATNE UPUTE AGENTA:
+${trimText(agent.systemPrompt || "", 1200)}
 `.trim();
 
     const userPrompt = `
-USER_LANGUAGE: ${userLang}
-
-USER_MESSAGE:
+KORISNIKOVO PITANJE:
 ${message}
 
-PAGE_CONTEXT:
-Title: ${safePageContext.pageTitle || "-"}
-Description: ${safePageContext.pageDescription || "-"}
+KONTEKST STRANICE:
+Naslov: ${safePageContext.pageTitle || "-"}
+Opis: ${safePageContext.pageDescription || "-"}
 URL: ${safePageContext.pageUrl || "-"}
-Page text:
+Tekst stranice:
 ${safePageContext.pageText || "-"}
 `.trim();
 
-    const response = await openai.responses.create({
+    const completion = await openai.chat.completions.create({
       model: "gpt-5-mini",
-      max_output_tokens: 420,
-      input: [
+      temperature: 0.35,
+      messages: [
         {
           role: "system",
           content: systemPrompt
@@ -235,11 +173,12 @@ ${safePageContext.pageText || "-"}
           role: "user",
           content: userPrompt
         }
-      ]
+      ],
+      max_completion_tokens: 420
     });
 
     const answer =
-      extractAnswerText(response) || buildContextualFallback(userLang, safePageContext);
+      completion?.choices?.[0]?.message?.content?.trim() || fallbackAnswer(userLang);
 
     return res.status(200).json({
       answer,
