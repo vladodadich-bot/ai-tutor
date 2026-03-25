@@ -9,14 +9,14 @@ function normalizeLang(lang) {
   const raw = (lang || "").toLowerCase();
 
   if (
-    raw.indexOf("hr") === 0 ||
-    raw.indexOf("bs") === 0 ||
-    raw.indexOf("sr") === 0
+    raw.startsWith("hr") ||
+    raw.startsWith("bs") ||
+    raw.startsWith("sr")
   ) {
     return "hr";
   }
 
-  if (raw.indexOf("de") === 0) {
+  if (raw.startsWith("de")) {
     return "de";
   }
 
@@ -39,7 +39,7 @@ function detectUserLanguageFromMessage(message, fallback) {
     return "de";
   }
 
-  if (/\b(how|what|price|contact|help|thanks|please|i|want|service)\b/.test(m)) {
+  if (/\b(how|what|price|contact|help|thanks|please|service)\b/.test(m)) {
     return "en";
   }
 
@@ -51,14 +51,8 @@ function trimText(text, maxLength) {
 }
 
 function buildLanguageInstruction(lang) {
-  if (lang === "hr") {
-    return "Odgovaraj isključivo na hrvatskom jeziku.";
-  }
-
-  if (lang === "de") {
-    return "Antworte ausschließlich auf Deutsch.";
-  }
-
+  if (lang === "hr") return "Odgovaraj isključivo na hrvatskom jeziku.";
+  if (lang === "de") return "Antworte ausschließlich auf Deutsch.";
   return "Respond only in English.";
 }
 
@@ -74,37 +68,13 @@ function isAllowedDomain(hostname, allowedDomains) {
   if (!hostname) return false;
   if (!Array.isArray(allowedDomains) || !allowedDomains.length) return true;
 
-  return allowedDomains.some(function (domain) {
+  return allowedDomains.some((domain) => {
     const d = String(domain).toLowerCase();
     return hostname === d || hostname.endsWith("." + d);
   });
 }
 
-function extractTextFromResponse(response) {
-  if (response && response.output_text && String(response.output_text).trim()) {
-    return String(response.output_text).trim();
-  }
-
-  if (!response || !Array.isArray(response.output)) {
-    return "";
-  }
-
-  const chunks = [];
-
-  for (const item of response.output) {
-    if (!item || item.type !== "message" || !Array.isArray(item.content)) continue;
-
-    for (const part of item.content) {
-      if (part && part.type === "output_text" && part.text) {
-        chunks.push(part.text);
-      }
-    }
-  }
-
-  return chunks.join("\n").trim();
-}
-
-function getFallbackAnswer(lang) {
+function fallbackAnswer(lang) {
   if (lang === "hr") {
     return "Trenutno nemam dovoljno informacija za siguran odgovor.";
   }
@@ -156,33 +126,30 @@ export default async function handler(req, res) {
       });
     }
 
-    const languageInstruction = buildLanguageInstruction(userLang);
-
     const systemPrompt = `
 Ti si ${agent.agentName || "SiteMind AI"}.
 
 PRAVILA:
 - odgovaraj kratko, jasno i korisno
 - prvo koristi sadržaj stranice iz konteksta
-- ako sadržaj stranice nije dovoljan, a dopušten je web search, smiješ potražiti dodatne informacije na webu
-- ne izmišljaj cijene, uvjete, kontakte ili obećanja ako to nije potvrđeno
-- ako ni tada nisi siguran, reci to jasno
+- ako sadržaj stranice nije dovoljan, a web search je dopušten, smiješ koristiti web za dodatne informacije
+- ne izmišljaj cijene, uvjete, kontakte ili obećanja ako nisu potvrđeni
+- ako nisi siguran, reci to jasno
 - odgovaraj na jeziku korisnikova pitanja
 
-${languageInstruction}
-${trimText(agent.systemPrompt || "", 500)}
+${buildLanguageInstruction(userLang)}
+${trimText(agent.systemPrompt || "", 400)}
 `.trim();
 
-    const pageContextPrompt = `
-NASLOV: ${safePageContext.pageTitle || "-"}
-OPIS: ${safePageContext.pageDescription || "-"}
-URL: ${safePageContext.pageUrl || "-"}
+    const contextPrompt = `
+NASLOV STRANICE: ${safePageContext.pageTitle || "-"}
+OPIS STRANICE: ${safePageContext.pageDescription || "-"}
+URL STRANICE: ${safePageContext.pageUrl || "-"}
 SADRŽAJ STRANICE: ${safePageContext.pageText || "-"}
 `.trim();
 
     const requestBody = {
       model: "gpt-5-mini",
-      reasoning: { effort: "minimal" },
       max_output_tokens: 180,
       input: [
         {
@@ -191,7 +158,7 @@ SADRŽAJ STRANICE: ${safePageContext.pageText || "-"}
         },
         {
           role: "developer",
-          content: pageContextPrompt
+          content: contextPrompt
         },
         {
           role: "user",
@@ -203,16 +170,17 @@ SADRŽAJ STRANICE: ${safePageContext.pageText || "-"}
     if (agent.allowExternalSearch) {
       requestBody.tools = [
         {
-          type: "web_search_preview",
-          search_context_size: "medium"
+          type: "web_search_preview"
         }
       ];
-
-      requestBody.include = ["web_search_call.action.sources"];
     }
 
     const response = await openai.responses.create(requestBody);
-    const answer = extractTextFromResponse(response) || getFallbackAnswer(userLang);
+
+    const answer =
+      response.output_text && response.output_text.trim()
+        ? response.output_text.trim()
+        : fallbackAnswer(userLang);
 
     return res.status(200).json({
       answer,
