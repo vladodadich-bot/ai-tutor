@@ -1,15 +1,16 @@
 (function () {
+  if (window.SiteMindWidgetLoaded) return;
+  window.SiteMindWidgetLoaded = true;
+
   var style = document.createElement("style");
-style.innerHTML = `
+  style.innerHTML = `
 @keyframes sitemindPulse {
   0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.5); }
   70% { box-shadow: 0 0 0 12px rgba(37,99,235,0); }
   100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
 }
 `;
-document.head.appendChild(style);
-  if (window.SiteMindWidgetLoaded) return;
-  window.SiteMindWidgetLoaded = true;
+  (document.head || document.documentElement).appendChild(style);
 
   var config = window.SiteMindConfig || {};
   var agentId = config.agentId || "demo-agent";
@@ -135,19 +136,24 @@ document.head.appendChild(style);
   button.style.bottom = "20px";
   button.style.width = "64px";
   button.style.height = "64px";
-  button.style.border = "none";
   button.style.borderRadius = "50%";
   button.style.background = "linear-gradient(135deg, #2563eb, #1d4ed8)";
-button.style.color = "#fff";
-button.style.fontSize = "26px";
-button.style.cursor = "pointer";
-button.style.zIndex = "999999";
+  button.style.color = "#fff";
+  button.style.fontSize = "26px";
+  button.style.cursor = "pointer";
+  button.style.zIndex = "999999";
+  button.style.boxShadow = "0 20px 40px rgba(37,99,235,0.45)";
+  button.style.backdropFilter = "blur(10px)";
+  button.style.border = "1px solid rgba(255,255,255,0.15)";
+  button.style.transition = "all 0.25s ease";
+  button.style.animation = "sitemindPulse 3s infinite";
+  button.style.display = "flex";
+  button.style.alignItems = "center";
+  button.style.justifyContent = "center";
+  button.style.padding = "0";
+  button.style.lineHeight = "1";
+  button.setAttribute("aria-label", "Open chat");
 
-/* 🔥 MODERNI STYLE */
-button.style.boxShadow = "0 20px 40px rgba(37,99,235,0.45)";
-button.style.backdropFilter = "blur(10px)";
-button.style.border = "1px solid rgba(255,255,255,0.15)";
-button.style.transition = "all 0.25s ease";
   var iframe = document.createElement("iframe");
   iframe.id = "sitemind-widget-frame";
   iframe.src = baseUrl + "/widget-frame.html?agentId=" + encodeURIComponent(agentId);
@@ -200,16 +206,17 @@ button.style.transition = "all 0.25s ease";
       openWidget();
     }
   });
-button.addEventListener("mouseenter", function () {
-  button.style.transform = "scale(1.08)";
-  button.style.boxShadow = "0 25px 50px rgba(37,99,235,0.6)";
-});
 
-button.addEventListener("mouseleave", function () {
-  button.style.transform = "scale(1)";
-  button.style.boxShadow = "0 20px 40px rgba(37,99,235,0.45)";
-});
-  button.style.animation = "sitemindPulse 3s infinite";
+  button.addEventListener("mouseenter", function () {
+    button.style.transform = "scale(1.08)";
+    button.style.boxShadow = "0 25px 50px rgba(37,99,235,0.6)";
+  });
+
+  button.addEventListener("mouseleave", function () {
+    button.style.transform = "scale(1)";
+    button.style.boxShadow = "0 20px 40px rgba(37,99,235,0.45)";
+  });
+
   iframe.addEventListener("load", function () {
     sendPageContext();
   });
