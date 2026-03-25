@@ -5,7 +5,7 @@
   var style = document.createElement("style");
   style.innerHTML = `
 @keyframes sitemindPulse {
-  0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.5); }
+  0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.50); }
   70% { box-shadow: 0 0 0 12px rgba(37,99,235,0); }
   100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
 }
@@ -14,7 +14,7 @@
 
   var config = window.SiteMindConfig || {};
   var agentId = config.agentId || "demo-agent";
-  var baseUrl = "https://ai-tutor-rouge-theta.vercel.app";
+  var baseUrl = (config.baseUrl || "https://ai-tutor-rouge-theta.vercel.app").replace(/\/$/, "");
 
   var isOpen = false;
 
@@ -37,7 +37,11 @@
     var navLang = navigator.language || "";
     var raw = (htmlLang || ogLocale || navLang || "en").toLowerCase();
 
-    if (raw.indexOf("hr") === 0 || raw.indexOf("bs") === 0 || raw.indexOf("sr") === 0) {
+    if (
+      raw.indexOf("hr") === 0 ||
+      raw.indexOf("bs") === 0 ||
+      raw.indexOf("sr") === 0
+    ) {
       return "hr";
     }
 
@@ -61,11 +65,8 @@
     var parts = [];
 
     var h1 = document.querySelector("h1");
-    if (h1) pushIfUseful(parts, h1.innerText, 180);
-
-    var h2s = document.querySelectorAll("h2");
-    for (var i = 0; i < Math.min(h2s.length, 3); i++) {
-      pushIfUseful(parts, h2s[i].innerText, 140);
+    if (h1) {
+      pushIfUseful(parts, h1.innerText, 120);
     }
 
     var main =
@@ -80,36 +81,36 @@
       document.body;
 
     if (main) {
-      var paragraphs = main.querySelectorAll("p, li");
+      var paragraphs = main.querySelectorAll("p");
       var count = 0;
 
-      for (var j = 0; j < paragraphs.length; j++) {
-        var txt = cleanText(paragraphs[j].innerText || "");
+      for (var i = 0; i < paragraphs.length; i++) {
+        var txt = cleanText(paragraphs[i].innerText || "");
         if (txt.length < 35) continue;
 
-        pushIfUseful(parts, txt, 280);
+        pushIfUseful(parts, txt, 220);
         count += 1;
 
-        if (count >= 8) break;
+        if (count >= 3) break;
       }
     }
 
     var faqCandidates = document.querySelectorAll(
-      '[itemprop="name"], .faq-question, .faq-item, details summary'
+      '[itemprop="name"], .faq-question, details summary'
     );
 
-    for (var k = 0; k < Math.min(faqCandidates.length, 4); k++) {
-      pushIfUseful(parts, faqCandidates[k].innerText, 180);
+    for (var j = 0; j < Math.min(faqCandidates.length, 2); j++) {
+      pushIfUseful(parts, faqCandidates[j].innerText, 120);
     }
 
-    return cleanText(parts.join("\n")).slice(0, 1800);
+    return cleanText(parts.join("\n")).slice(0, 900);
   }
 
   function getPageContext() {
     return {
       pageUrl: window.location.href,
-      pageTitle: document.title || "",
-      pageDescription: getMetaDescription(),
+      pageTitle: cleanText(document.title || "").slice(0, 160),
+      pageDescription: getMetaDescription().slice(0, 240),
       pageText: extractSmartPageText(),
       lang: detectLanguage()
     };
@@ -129,17 +130,21 @@
 
   var button = document.createElement("button");
   button.id = "sitemind-widget-button";
+  button.type = "button";
   button.innerHTML = "💬";
+  button.setAttribute("aria-label", "Open chat");
 
   button.style.position = "fixed";
   button.style.right = "20px";
   button.style.bottom = "20px";
   button.style.width = "64px";
   button.style.height = "64px";
+  button.style.padding = "0";
   button.style.borderRadius = "50%";
   button.style.background = "linear-gradient(135deg, #2563eb, #1d4ed8)";
   button.style.color = "#fff";
   button.style.fontSize = "26px";
+  button.style.lineHeight = "1";
   button.style.cursor = "pointer";
   button.style.zIndex = "999999";
   button.style.boxShadow = "0 20px 40px rgba(37,99,235,0.45)";
@@ -150,25 +155,28 @@
   button.style.display = "flex";
   button.style.alignItems = "center";
   button.style.justifyContent = "center";
-  button.style.padding = "0";
-  button.style.lineHeight = "1";
-  button.setAttribute("aria-label", "Open chat");
 
   var iframe = document.createElement("iframe");
   iframe.id = "sitemind-widget-frame";
-  iframe.src = baseUrl + "/widget-frame.html?agentId=" + encodeURIComponent(agentId);
+  iframe.src =
+    baseUrl +
+    "/widget-frame.html?agentId=" +
+    encodeURIComponent(agentId) +
+    "&baseUrl=" +
+    encodeURIComponent(baseUrl);
 
   iframe.style.position = "fixed";
   iframe.style.right = "20px";
   iframe.style.bottom = "96px";
   iframe.style.width = "380px";
   iframe.style.height = "600px";
-  iframe.style.border = "none";
-  iframe.style.borderRadius = "18px";
-  iframe.style.background = "#fff";
-  iframe.style.boxShadow = "0 20px 60px rgba(0,0,0,0.25)";
+  iframe.style.border = "1px solid rgba(255,255,255,0.08)";
+  iframe.style.borderRadius = "22px";
+  iframe.style.background = "rgba(9, 14, 28, 0.92)";
+  iframe.style.boxShadow = "0 24px 70px rgba(0,0,0,0.35)";
   iframe.style.zIndex = "999998";
   iframe.style.display = "none";
+  iframe.style.overflow = "hidden";
 
   function applyMobileStyles() {
     if (window.innerWidth < 520) {
@@ -176,7 +184,7 @@
       iframe.style.left = "10px";
       iframe.style.bottom = "84px";
       iframe.style.width = "calc(100vw - 20px)";
-      iframe.style.height = "70vh";
+      iframe.style.height = "72vh";
     } else {
       iframe.style.left = "auto";
       iframe.style.right = "20px";
@@ -190,7 +198,7 @@
     iframe.style.display = "block";
     button.innerHTML = "✕";
     isOpen = true;
-    setTimeout(sendPageContext, 120);
+    setTimeout(sendPageContext, 80);
   }
 
   function closeWidget() {
@@ -209,7 +217,7 @@
 
   button.addEventListener("mouseenter", function () {
     button.style.transform = "scale(1.08)";
-    button.style.boxShadow = "0 25px 50px rgba(37,99,235,0.6)";
+    button.style.boxShadow = "0 25px 50px rgba(37,99,235,0.60)";
   });
 
   button.addEventListener("mouseleave", function () {
