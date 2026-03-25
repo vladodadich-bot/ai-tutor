@@ -12,8 +12,6 @@
     :root {
       --bg: #09101d;
       --panel: rgba(13, 19, 34, 0.92);
-      --panel-2: rgba(255, 255, 255, 0.05);
-      --panel-3: rgba(255, 255, 255, 0.08);
       --text: #eef4ff;
       --muted: rgba(238, 244, 255, 0.68);
       --accent: #2563eb;
@@ -115,14 +113,6 @@
     .typing {
       opacity: 0.85;
       font-style: italic;
-      letter-spacing: 0.2px;
-    }
-
-    .meta-note {
-      margin-bottom: 10px;
-      font-size: 11px;
-      color: var(--muted);
-      text-align: center;
     }
 
     .composer {
@@ -190,7 +180,7 @@
   <div class="wrap">
     <div class="header">
       <div class="header-title" id="chat-header">SiteMind AI</div>
-      <div class="header-subtitle" id="chat-subtitle">AI website assistant</div>
+      <div class="header-subtitle" id="chat-subtitle">AI help for this page</div>
     </div>
 
     <div id="messages" class="messages"></div>
@@ -233,7 +223,6 @@
         placeholder: "Upišite pitanje...",
         send: "Pošalji",
         typing: "AI razmišlja...",
-        webSearch: "Provjeravam dodatne izvore...",
         commError: "Greška u komunikaciji.",
         apiError: "API greška: ",
         noAnswer: "Nema odgovora."
@@ -245,7 +234,6 @@
         placeholder: "Type your message...",
         send: "Send",
         typing: "AI is thinking...",
-        webSearch: "Checking additional sources...",
         commError: "Communication error.",
         apiError: "API error: ",
         noAnswer: "No answer."
@@ -257,7 +245,6 @@
         placeholder: "Nachricht eingeben...",
         send: "Senden",
         typing: "KI denkt nach...",
-        webSearch: "Ich prüfe zusätzliche Quellen...",
         commError: "Kommunikationsfehler.",
         apiError: "API-Fehler: ",
         noAnswer: "Keine Antwort."
