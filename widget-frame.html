@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,10 +10,16 @@
       box-sizing: border-box;
     }
 
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
+      height: 100%;
       font-family: Arial, sans-serif;
       background: #f8fafc;
+    }
+
+    body {
+      overflow: hidden;
     }
 
     .wrap {
@@ -30,12 +36,15 @@
       background: linear-gradient(135deg, #0f172a, #2563eb);
       color: #fff;
       font-weight: 700;
+      font-size: 16px;
+      line-height: 1.2;
     }
 
     .messages {
       flex: 1;
       overflow-y: auto;
       padding: 12px;
+      background: #f8fafc;
     }
 
     .msg {
@@ -44,18 +53,27 @@
       border-radius: 12px;
       margin-bottom: 10px;
       font-size: 14px;
-      line-height: 1.4;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
 
     .user {
       margin-left: auto;
       background: #2563eb;
       color: #fff;
+      border-bottom-right-radius: 4px;
     }
 
     .bot {
       background: #e5e7eb;
       color: #111;
+      border-bottom-left-radius: 4px;
+    }
+
+    .typing {
+      opacity: 0.8;
+      font-style: italic;
     }
 
     .inputbar {
@@ -64,6 +82,7 @@
       border-top: 1px solid #ddd;
       gap: 8px;
       background: #fff;
+      align-items: flex-end;
     }
 
     textarea {
@@ -73,16 +92,30 @@
       border-radius: 10px;
       border: 1px solid #ccc;
       font-size: 14px;
+      min-height: 44px;
+      max-height: 120px;
+      font-family: Arial, sans-serif;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: #2563eb;
     }
 
     button {
       padding: 0 16px;
+      height: 44px;
       border: none;
       border-radius: 10px;
       background: #111827;
       color: #fff;
       cursor: pointer;
       font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    button:hover {
+      opacity: 0.96;
     }
   </style>
 </head>
@@ -91,104 +124,220 @@
   <div class="wrap">
     <div class="header" id="chat-header">SiteMind AI</div>
 
-    <div id="messages" class="messages">
-   
-    </div>
+    <div id="messages" class="messages"></div>
 
     <div class="inputbar">
-      <textarea id="input" placeholder="Upišite pitanje..."></textarea>
-      <button id="sendBtn">Pošalji</button>
+      <textarea id="input" placeholder="Type your message..."></textarea>
+      <button id="sendBtn">Send</button>
     </div>
   </div>
-<script>
-  let agentLoaded = false;
-  const params = new URLSearchParams(window.location.search);
-  const agentId = params.get("agentId") || "demo-agent";
 
-  const messages = document.getElementById("messages");
-  const input = document.getElementById("input");
-  const sendBtn = document.getElementById("sendBtn");
+  <script>
+    let agentLoaded = false;
+    let welcomeShown = false;
 
-  function addMessage(text, type) {
-    const div = document.createElement("div");
-    div.className = "msg " + type;
-    div.textContent = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-  }
+    const params = new URLSearchParams(window.location.search);
+    const agentId = params.get("agentId") || "demo-agent";
 
-  async function sendMessage(message) {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
+    const messages = document.getElementById("messages");
+    const input = document.getElementById("input");
+    const sendBtn = document.getElementById("sendBtn");
+    const header = document.getElementById("chat-header");
+
+    var pageContext = {
+      pageUrl: "",
+      pageTitle: "",
+      pageDescription: "",
+      pageText: "",
+      lang: "en"
+    };
+
+    var uiText = {
+      hr: {
+        title: "SiteMind AI",
+        welcome: "Bok! Kako vam mogu pomoći?",
+        placeholder: "Upišite pitanje...",
+        send: "Pošalji",
+        typing: "AI razmišlja...",
+        commError: "Greška u komunikaciji.",
+        apiError: "API greška: ",
+        noAnswer: "Nema odgovora."
       },
-      body: JSON.stringify({
-        message: message,
-        agentId: agentId
-      })
+      en: {
+        title: "SiteMind AI",
+        welcome: "Hi! How can I help you?",
+        placeholder: "Type your message...",
+        send: "Send",
+        typing: "AI is thinking...",
+        commError: "Communication error.",
+        apiError: "API error: ",
+        noAnswer: "No answer."
+      },
+      de: {
+        title: "SiteMind AI",
+        welcome: "Hallo! Wie kann ich helfen?",
+        placeholder: "Nachricht eingeben...",
+        send: "Senden",
+        typing: "KI denkt nach...",
+        commError: "Kommunikationsfehler.",
+        apiError: "API-Fehler: ",
+        noAnswer: "Keine Antwort."
+      }
+    };
+
+    function getLocale(lang) {
+      if (lang === "hr") return uiText.hr;
+      if (lang === "de") return uiText.de;
+      return uiText.en;
+    }
+
+    function normalizeLang(lang) {
+      const raw = (lang || "").toLowerCase();
+
+      if (
+        raw.indexOf("hr") === 0 ||
+        raw.indexOf("bs") === 0 ||
+        raw.indexOf("sr") === 0
+      ) {
+        return "hr";
+      }
+
+      if (raw.indexOf("de") === 0) {
+        return "de";
+      }
+
+      if (raw.indexOf("en") === 0) {
+        return "en";
+      }
+
+      return "en";
+    }
+
+    function applyLanguageToUI() {
+      pageContext.lang = normalizeLang(pageContext.lang);
+      const t = getLocale(pageContext.lang);
+
+      document.documentElement.lang = pageContext.lang;
+      document.title = t.title;
+
+      if (!agentLoaded) {
+        header.textContent = t.title;
+      }
+
+      input.placeholder = t.placeholder;
+      sendBtn.textContent = t.send;
+    }
+
+    function addMessage(text, type, extraClass) {
+      const div = document.createElement("div");
+      div.className = "msg " + type + (extraClass ? " " + extraClass : "");
+      div.textContent = text;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+      return div;
+    }
+
+    function showWelcomeIfNeeded() {
+      if (welcomeShown) return;
+
+      const t = getLocale(pageContext.lang);
+      addMessage(t.welcome, "bot");
+      welcomeShown = true;
+    }
+
+    window.addEventListener("message", function (event) {
+      if (!event.data || event.data.type !== "sitemind_page_context") return;
+
+      pageContext = event.data.payload || pageContext;
+      pageContext.lang = normalizeLang(pageContext.lang);
+
+      applyLanguageToUI();
+      showWelcomeIfNeeded();
     });
 
-    const text = await res.text();
-    console.log("RAW API odgovor:", text);
+    async function sendMessage(message) {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: message,
+          agentId: agentId,
+          pageContext: pageContext
+        })
+      });
 
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      return {
-        error: "API nije vratio JSON",
-        raw: text
-      };
-    }
-  }
+      const text = await res.text();
+      console.log("RAW API odgovor:", text);
 
- sendBtn.addEventListener("click", async function () {
-  const message = input.value.trim();
-  if (!message) return;
-
-  addMessage(message, "user");
-  input.value = "";
-
-  // 👇 dodaj "typing"
-  const typingDiv = document.createElement("div");
-  typingDiv.className = "msg bot";
-  typingDiv.textContent = "Pišem odgovor...";
-  messages.appendChild(typingDiv);
-  messages.scrollTop = messages.scrollHeight;
-
-  try {
-    const data = await sendMessage(message);
-
-    // makni typing
-    typingDiv.remove();
-
-    if (data && data.agent && !agentLoaded) {
-      const header = document.getElementById("chat-header");
-
-      if (header) {
-        header.textContent = data.agent.agentName;
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        return {
+          error: "API nije vratio JSON",
+          raw: text
+        };
       }
+    }
 
-      if (data.agent.welcomeMessage) {
-        addMessage(data.agent.welcomeMessage, "bot");
+    async function handleSend() {
+      const message = input.value.trim();
+      if (!message) return;
+
+      addMessage(message, "user");
+      input.value = "";
+      input.style.height = "44px";
+
+      const t = getLocale(pageContext.lang);
+      const typingDiv = addMessage(t.typing, "bot", "typing");
+
+      try {
+        const data = await sendMessage(message);
+        typingDiv.remove();
+
+        if (data && data.agent && !agentLoaded) {
+          if (data.agent.agentName) {
+            header.textContent = data.agent.agentName;
+          }
+
+          if (data.agent.welcomeMessage && !welcomeShown) {
+            addMessage(data.agent.welcomeMessage, "bot");
+            welcomeShown = true;
+          }
+
+          agentLoaded = true;
+        }
+
+        if (data && data.answer) {
+          addMessage(data.answer, "bot");
+        } else if (data && data.error) {
+          addMessage(t.apiError + data.error, "bot");
+        } else {
+          addMessage(t.noAnswer, "bot");
+        }
+      } catch (err) {
+        typingDiv.remove();
+        addMessage(t.commError, "bot");
       }
-
-      agentLoaded = true;
     }
 
-    if (data && data.answer) {
-      addMessage(data.answer, "bot");
-    } else if (data && data.error) {
-      addMessage("API greška: " + data.error, "bot");
-    } else {
-      addMessage("Nema odgovora.", "bot");
-    }
+    sendBtn.addEventListener("click", handleSend);
 
-  } catch (err) {
-    typingDiv.remove();
-    addMessage("Greška u komunikaciji.", "bot");
-  }
-});
-</script>
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    });
+
+    input.addEventListener("input", function () {
+      input.style.height = "44px";
+      input.style.height = Math.min(input.scrollHeight, 120) + "px";
+    });
+
+    applyLanguageToUI();
+    showWelcomeIfNeeded();
+  </script>
 </body>
 </html>
