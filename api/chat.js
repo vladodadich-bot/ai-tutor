@@ -8,20 +8,12 @@ const openai = new OpenAI({
 function normalizeLang(lang) {
   const raw = (lang || "").toLowerCase();
 
-  if (
-    raw.indexOf("hr") === 0 ||
-    raw.indexOf("bs") === 0 ||
-    raw.indexOf("sr") === 0
-  ) {
+  if (raw.startsWith("hr") || raw.startsWith("bs") || raw.startsWith("sr")) {
     return "hr";
   }
 
-  if (raw.indexOf("de") === 0) {
+  if (raw.startsWith("de")) {
     return "de";
-  }
-
-  if (raw.indexOf("en") === 0) {
-    return "en";
   }
 
   return "en";
@@ -37,37 +29,50 @@ function buildLanguageInstruction(lang) {
   return "Respond only in English.";
 }
 
-function getHostname(url) {
-  try {
-    return new URL(url).hostname.toLowerCase();
-  } catch (e) {
+function extractAnswerText(response) {
+  if (response && response.output_text && String(response.output_text).trim()) {
+    return String(response.output_text).trim();
+  }
+
+  if (!response || !Array.isArray(response.output)) {
     return "";
   }
-}
 
-function isAllowedDomain(hostname, allowedDomains) {
-  if (!hostname) return false;
+  const chunks = [];
 
-  if (!Array.isArray(allowedDomains) || allowedDomains.length === 0) {
-    return true;
+  for (const item of response.output) {
+    if (!item || item.type !== "message" || !Array.isArray(item.content)) continue;
+
+    for (const part of item.content) {
+      if (part && typeof part.text === "string" && part.text.trim()) {
+        chunks.push(part.text.trim());
+      }
+    }
   }
 
-  return allowedDomains.some((domain) => {
-    const d = String(domain).toLowerCase();
-    return hostname === d || hostname.endsWith("." + d);
-  });
+  return chunks.join("\n").trim();
 }
 
-function fallbackAnswer(lang) {
+function fallbackAnswer(lang, pageContext) {
   if (lang === "hr") {
-    return "Trenutno nemam dovoljno informacija za siguran odgovor.";
+    if (pageContext.pageTitle) {
+      return "Vidim stranicu: " + pageContext.pageTitle + ". Pokušajte postaviti konkretnije pitanje o sadržaju ove stranice.";
+    }
+    return "Pokušajte postaviti konkretnije pitanje o sadržaju ove stranice.";
   }
 
   if (lang === "de") {
-    return "Im Moment habe ich nicht genug Informationen für eine sichere Antwort.";
+    if (pageContext.pageTitle) {
+      return "Ich sehe die Seite: " + pageContext.pageTitle + ". Bitte stellen Sie eine konkretere Frage zum Inhalt dieser Seite.";
+    }
+    return "Bitte stellen Sie eine konkretere Frage zum Inhalt dieser Seite.";
   }
 
-  return "I do not have enough information for a reliable answer right now.";
+  if (pageContext.pageTitle) {
+    return "I can see the page: " + pageContext.pageTitle + ". Please ask a more specific question about this page.";
+  }
+
+  return "Please ask a more specific question about this page.";
 }
 
 export default async function handler(req, res) {
@@ -93,64 +98,61 @@ export default async function handler(req, res) {
 
     const safePageContext = {
       pageUrl: rawPageContext.pageUrl || "",
-      pageTitle: trimText(rawPageContext.pageTitle || "", 140),
-      pageDescription: trimText(rawPageContext.pageDescription || "", 220),
-      pageText: trimText(rawPageContext.pageText || "", 900),
+      pageTitle: trimText(rawPageContext.pageTitle || "", 160),
+      pageDescription: trimText(rawPageContext.pageDescription || "", 240),
+      pageText: trimText(rawPageContext.pageText || "", 1500),
       lang: normalizeLang(rawPageContext.lang || "en")
     };
 
-    const hostname = getHostname(safePageContext.pageUrl);
-
-    if (!isAllowedDomain(hostname, agent.allowedDomains)) {
-      return res.status(403).json({
-        error: "Domain not allowed"
-      });
-    }
-
-    const languageInstruction = buildLanguageInstruction(userLang);
-
     const systemPrompt = `
 Ti si ${agent.agentName || "SiteMind AI"}.
-Odgovaraj kratko, jasno i korisno.
-Prvo koristi sadržaj stranice.
-Ne izmišljaj specifične podatke koji nisu na stranici.
-Ako odgovor nije jasno vidljiv na stranici, reci to iskreno i pomozi općenitim savjetom.
-${languageInstruction}
+
+PRAVILA:
+- odgovaraj kratko, jasno i korisno
+- koristi informacije iz sadržaja stranice kada su dostupne
+- ne izmišljaj podatke koji nisu vidljivi iz konteksta
+- ako nešto nije jasno iz stranice, to iskreno reci
+- odgovaraj na jeziku korisnikova pitanja
+
+${buildLanguageInstruction(userLang)}
+${trimText(agent.systemPrompt || "", 500)}
 `.trim();
 
-    const contextPrompt = `
-NASLOV: ${safePageContext.pageTitle || "-"}
-OPIS: ${safePageContext.pageDescription || "-"}
+    const userPrompt = `
+PITANJE KORISNIKA:
+${message}
+
+KONTEKST STRANICE:
+Naslov: ${safePageContext.pageTitle || "-"}
+Opis: ${safePageContext.pageDescription || "-"}
 URL: ${safePageContext.pageUrl || "-"}
-SADRŽAJ: ${safePageContext.pageText || "-"}
+Tekst stranice: ${safePageContext.pageText || "-"}
 `.trim();
 
     const response = await openai.responses.create({
       model: "gpt-5-mini",
-      max_output_tokens: 140,
+      max_output_tokens: 220,
       input: [
         {
           role: "system",
           content: systemPrompt
         },
         {
-          role: "developer",
-          content: contextPrompt
-        },
-        {
           role: "user",
-          content: message
+          content: userPrompt
         }
       ]
     });
 
-    const answer =
-      response.output_text && response.output_text.trim()
-        ? response.output_text.trim()
-        : fallbackAnswer(userLang);
+    const answer = extractAnswerText(response) || fallbackAnswer(userLang, safePageContext);
 
     return res.status(200).json({
       answer,
+      debug: {
+        pageTitle: safePageContext.pageTitle,
+        pageTextLength: safePageContext.pageText.length,
+        lang: userLang
+      },
       agent: {
         agentId: agent.agentId || agentId,
         agentName: agent.agentName || "SiteMind AI",
@@ -160,6 +162,7 @@ SADRŽAJ: ${safePageContext.pageText || "-"}
     });
   } catch (error) {
     console.error("API /api/chat error:", error);
+
     return res.status(500).json({
       error: "Internal server error"
     });
