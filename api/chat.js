@@ -171,8 +171,8 @@ export default async function handler(req, res) {
       body.userLang || detectUserLanguageFromMessage(message, safePageContext.lang)
     );
 
- const systemPrompt = `
-TVOJA ULOGA:
+    const systemPrompt = `
+Ti si ${agent.agentName || "SiteMind AI"}, TVOJA ULOGA:
 Ti si Senior AI Engineer i stručnjak za integracije. Tvoj zadatak je pomoći korisniku da uspije s ovim rješenjem.
 
 IZVORI ZNANJA (Poredaj po važnosti):
