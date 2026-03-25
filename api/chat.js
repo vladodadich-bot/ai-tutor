@@ -9,41 +9,22 @@ function normalizeLang(lang) {
   const raw = (lang || "").toLowerCase();
 
   if (
-    raw.startsWith("hr") ||
-    raw.startsWith("bs") ||
-    raw.startsWith("sr")
+    raw.indexOf("hr") === 0 ||
+    raw.indexOf("bs") === 0 ||
+    raw.indexOf("sr") === 0
   ) {
     return "hr";
   }
 
-  if (raw.startsWith("de")) {
+  if (raw.indexOf("de") === 0) {
     return "de";
   }
 
-  return "en";
-}
-
-function detectUserLanguageFromMessage(message, fallback) {
-  const m = (message || "").trim().toLowerCase();
-
-  if (!m) return normalizeLang(fallback || "en");
-
-  if (/[čćžšđ]/.test(m)) return "hr";
-  if (/[äöüß]/.test(m)) return "de";
-
-  if (/\b(kako|što|sta|koliko|gdje|može|mozes|trebam|želim|zelim|cijena|kontakt|usluga|pomoc)\b/.test(m)) {
-    return "hr";
-  }
-
-  if (/\b(wie|was|preis|hilfe|kontakt|danke|bitte|ich|möchte|mochte|service)\b/.test(m)) {
-    return "de";
-  }
-
-  if (/\b(how|what|price|contact|help|thanks|please|service)\b/.test(m)) {
+  if (raw.indexOf("en") === 0) {
     return "en";
   }
 
-  return normalizeLang(fallback || "en");
+  return "en";
 }
 
 function trimText(text, maxLength) {
@@ -100,6 +81,7 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const message = trimText(body.message || "", 500);
     const agentId = body.agentId || "demo-agent";
+    const userLang = normalizeLang(body.userLang || "en");
     const rawPageContext = body.pageContext || {};
     const agent = getAgentById(agentId);
 
@@ -113,13 +95,9 @@ export default async function handler(req, res) {
       pageUrl: rawPageContext.pageUrl || "",
       pageTitle: trimText(rawPageContext.pageTitle || "", 140),
       pageDescription: trimText(rawPageContext.pageDescription || "", 220),
-      pageText: trimText(rawPageContext.pageText || "", 1200),
+      pageText: trimText(rawPageContext.pageText || "", 900),
       lang: normalizeLang(rawPageContext.lang || "en")
     };
-
-    const userLang = normalizeLang(
-      body.userLang || detectUserLanguageFromMessage(message, safePageContext.lang)
-    );
 
     const hostname = getHostname(safePageContext.pageUrl);
 
@@ -129,31 +107,27 @@ export default async function handler(req, res) {
       });
     }
 
+    const languageInstruction = buildLanguageInstruction(userLang);
+
     const systemPrompt = `
 Ti si ${agent.agentName || "SiteMind AI"}.
-
-PRAVILA:
-- odgovaraj kratko, jasno i korisno
-- prvo koristi sadržaj stranice iz konteksta
-- ako sadržaj stranice nije dovoljan i dostupan je web search, smiješ ga koristiti
-- ne izmišljaj cijene, uvjete, kontakte ili obećanja ako nisu potvrđeni
-- ako nisi siguran, reci to jasno
-- odgovaraj na jeziku korisnikova pitanja
-
-${buildLanguageInstruction(userLang)}
-${trimText(agent.systemPrompt || "", 400)}
+Odgovaraj kratko, jasno i korisno.
+Prvo koristi sadržaj stranice.
+Ne izmišljaj specifične podatke koji nisu na stranici.
+Ako odgovor nije jasno vidljiv na stranici, reci to iskreno i pomozi općenitim savjetom.
+${languageInstruction}
 `.trim();
 
     const contextPrompt = `
-NASLOV STRANICE: ${safePageContext.pageTitle || "-"}
-OPIS STRANICE: ${safePageContext.pageDescription || "-"}
-URL STRANICE: ${safePageContext.pageUrl || "-"}
-SADRŽAJ STRANICE: ${safePageContext.pageText || "-"}
+NASLOV: ${safePageContext.pageTitle || "-"}
+OPIS: ${safePageContext.pageDescription || "-"}
+URL: ${safePageContext.pageUrl || "-"}
+SADRŽAJ: ${safePageContext.pageText || "-"}
 `.trim();
 
-    const requestBody = {
+    const response = await openai.responses.create({
       model: "gpt-5-mini",
-      max_output_tokens: 180,
+      max_output_tokens: 140,
       input: [
         {
           role: "system",
@@ -168,17 +142,7 @@ SADRŽAJ STRANICE: ${safePageContext.pageText || "-"}
           content: message
         }
       ]
-    };
-
-    if (agent.allowExternalSearch) {
-      requestBody.tools = [
-        {
-          type: "web_search"
-        }
-      ];
-    }
-
-    const response = await openai.responses.create(requestBody);
+    });
 
     const answer =
       response.output_text && response.output_text.trim()
@@ -187,7 +151,6 @@ SADRŽAJ STRANICE: ${safePageContext.pageText || "-"}
 
     return res.status(200).json({
       answer,
-      usedWebSearch: !!agent.allowExternalSearch,
       agent: {
         agentId: agent.agentId || agentId,
         agentName: agent.agentName || "SiteMind AI",
@@ -196,8 +159,7 @@ SADRŽAJ STRANICE: ${safePageContext.pageText || "-"}
       }
     });
   } catch (error) {
-    console.error("API /api/chat error FULL:", error);
-
+    console.error("API /api/chat error:", error);
     return res.status(500).json({
       error: "Internal server error"
     });
