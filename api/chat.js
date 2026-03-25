@@ -28,19 +28,19 @@ function detectUserLanguageFromMessage(message, fallback) {
   if (/[äöüß]/.test(m)) return "de";
 
   if (
-    /\b(kako|sto|što|sta|šta|koliko|gdje|gde|moze|može|trebam|zelim|želim|cijena|kontakt|usluga|pomoc|pomoć|stranica|stranici|ovoj|cemu|čemu|radi|ucenje|učenje|njemacki|njemački|lekcije|tecaj|tečaj|prodaja|prodaje|nudi|nudi li)\b/.test(m)
+    /\b(kako|sto|što|sta|šta|koliko|gdje|gde|moze|može|trebam|zelim|želim|cijena|kontakt|usluga|pomoc|pomoć|stranica|stranici|ovoj|cemu|čemu|radi|ucenje|učenje|njemacki|njemački|lekcije|tecaj|tečaj|prodaja|prodaje|nudi|nudi li|mogu li|mogu|zakazati|termin)\b/.test(m)
   ) {
     return "hr";
   }
 
   if (
-    /\b(wie|was|worum|seite|inhalt|hilfe|kontakt|preis|deutsch|lektion|lektionen|lernen|kurs|ich|möchte|mochte|bitte|danke|verkauf|verkauft|bietet)\b/.test(m)
+    /\b(wie|was|worum|seite|inhalt|hilfe|kontakt|preis|deutsch|lektion|lektionen|lernen|kurs|ich|möchte|mochte|bitte|danke|verkauf|verkauft|bietet|termin|buchen)\b/.test(m)
   ) {
     return "de";
   }
 
   if (
-    /\b(how|what|about|page|content|help|contact|price|course|lesson|lessons|learn|learning|german|service|sell|selling|offer|offers)\b/.test(m)
+    /\b(how|what|about|page|content|help|contact|price|course|lesson|lessons|learn|learning|german|service|sell|selling|offer|offers|book|appointment)\b/.test(m)
   ) {
     return "en";
   }
@@ -53,9 +53,15 @@ function trimText(text, maxLength) {
 }
 
 function buildLanguageInstruction(lang) {
-  if (lang === "hr") return "Odgovaraj isključivo na hrvatskom jeziku.";
-  if (lang === "de") return "Antworte ausschließlich auf Deutsch.";
-  return "Respond only in English.";
+  if (lang === "hr") {
+    return "Odgovaraj isključivo na hrvatskom jeziku. Ne miješaj druge jezike u odgovoru.";
+  }
+
+  if (lang === "de") {
+    return "Antworte ausschließlich auf Deutsch. Mische keine anderen Sprachen in die Antwort.";
+  }
+
+  return "Respond only in English. Do not mix other languages in the answer.";
 }
 
 function extractAnswerText(response) {
@@ -88,10 +94,10 @@ function firstUsefulSnippet(text) {
 
   const parts = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean);
   if (parts.length > 0) {
-    return trimText(parts[0], 220);
+    return trimText(parts[0], 240);
   }
 
-  return trimText(cleaned, 220);
+  return trimText(cleaned, 240);
 }
 
 function buildContextualFallback(lang, pageContext) {
@@ -100,34 +106,34 @@ function buildContextualFallback(lang, pageContext) {
   const snippet = firstUsefulSnippet(pageContext.pageText || "");
 
   if (lang === "hr") {
-    let out = "Iz ove stranice ";
+    let out = "Prema sadržaju ove stranice ";
     if (title) {
-      out += "se vidi tema: " + title + ". ";
+      out += "tema je: " + title + ". ";
     }
     if (desc) {
       out += desc + " ";
     }
     if (snippet) {
-      out += "Sadržaj upućuje na: " + snippet;
+      out += "Iz sadržaja se vidi: " + snippet;
     }
     return out.trim();
   }
 
   if (lang === "de") {
-    let out = "Aus dieser Seite ";
+    let out = "Nach dem Inhalt dieser Seite ";
     if (title) {
-      out += "ist das Thema erkennbar: " + title + ". ";
+      out += "scheint das Thema zu sein: " + title + ". ";
     }
     if (desc) {
       out += desc + " ";
     }
     if (snippet) {
-      out += "Der Inhalt deutet darauf hin: " + snippet;
+      out += "Aus dem Inhalt ist erkennbar: " + snippet;
     }
     return out.trim();
   }
 
-  let out = "From this page ";
+  let out = "Based on this page, ";
   if (title) {
     out += "the topic appears to be: " + title + ". ";
   }
@@ -135,7 +141,7 @@ function buildContextualFallback(lang, pageContext) {
     out += desc + " ";
   }
   if (snippet) {
-    out += "The content suggests: " + snippet;
+    out += "From the content, it appears: " + snippet;
   }
   return out.trim();
 }
@@ -149,7 +155,7 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    const message = trimText(body.message || "", 700);
+    const message = trimText(body.message || "", 800);
     const agentId = body.agentId || "demo-agent";
     const rawPageContext = body.pageContext || {};
     const agent = getAgentById(agentId);
@@ -164,7 +170,7 @@ export default async function handler(req, res) {
       pageUrl: rawPageContext.pageUrl || "",
       pageTitle: trimText(rawPageContext.pageTitle || "", 180),
       pageDescription: trimText(rawPageContext.pageDescription || "", 320),
-      pageText: trimText(rawPageContext.pageText || "", 3200),
+      pageText: trimText(rawPageContext.pageText || "", 3400),
       lang: normalizeLang(rawPageContext.lang || "en")
     };
 
@@ -172,100 +178,68 @@ export default async function handler(req, res) {
       body.userLang || detectUserLanguageFromMessage(message, safePageContext.lang)
     );
 
-const systemPrompt = `
-Ti si ${agent.agentName || "SiteMind AI"}, inteligentni AI asistent na web stranici.
+    const systemPrompt = `
+Ti si ${agent.agentName || "SiteMind AI"}, inteligentni AI asistent ugrađen na web stranicu.
 
-TVOJ GLAVNI ZADATAK:
-- razumjeti sadržaj stranice
-- zaključivati što stranica zapravo nudi
-- odgovarati korisniku jasno, konkretno i korisno
+TVOJA ULOGA:
+Ti nisi običan FAQ bot. Ti si digitalni pomoćnik koji razgovara s posjetiteljem prirodno, ljubazno i korisno, kao stvarna osoba koja poznaje ovu web stranicu i želi pomoći klijentu.
 
---------------------------------------------------
+KAKO SE TREBAŠ PONAŠATI:
+- ponašaj se kao ljubazan, profesionalan i prirodan agent
+- odgovaraj kao čovjek koji se dopisuje s klijentom, ne kao robot
+- budi topao, jasan i konkretan
+- ne zvuči ukočeno, mehanički ni previše formalno
+- vodi razgovor prirodno i prijateljski
+- ako korisnik napiše kratku poruku, odgovori kratko i prirodno
+- ako korisnik pita šire pitanje, slobodno objasni malo šire
+- ako korisnik djeluje neodlučno ili samo istražuje, pomozi mu da shvati što stranica nudi
 
-🔒 JEZIK (OBAVEZNO):
-- odgovaraj ISKLJUČIVO na jeziku korisnikovog pitanja
-- nikada nemoj miješati jezike u istom odgovoru
-- ako je pitanje na hrvatskom → odgovaraj samo hrvatski
-- ako je na njemačkom → samo njemački
-- ako je na engleskom → samo engleski
+ŠTO TREBAŠ RAZUMJETI:
+- o čemu je stranica
+- što stranica nudi
+- je li riječ o edukaciji, prodaji, usluzi, rezervaciji, blogu, informativnoj stranici ili nečemu drugom
+- kome je stranica namijenjena
+- što korisnik vjerojatno želi saznati
 
---------------------------------------------------
+KAKO ODGOVARATI:
+- koristi naslov, opis i tekst stranice kao glavni izvor
+- smiješ zaključivati iz konteksta stranice, ne samo tražiti doslovne rečenice
+- ako korisnik pita općenito, sažmi temu stranice svojim riječima
+- ako pita da/ne pitanje, odgovori prvo jasno s da, ne, vjerojatno da ili ne izgleda tako, pa onda objasni zašto
+- ako korisnik pita može li nešto napraviti preko ove stranice, procijeni iz konteksta je li to realno moguće
+- ako stranica očito služi za učenje, blog, informacije ili predstavljanje usluge, reci to jasno
+- ako stranica ne služi za kupnju, rezervaciju ili zakazivanje, reci to jasno
+- ako korisnik pita nešto što nije doslovno napisano, ali se može zaključiti iz sadržaja, daj procjenu
+- koristi formulacije poput:
+  - "Izgleda da..."
+  - "Prema sadržaju..."
+  - "Ova stranica više djeluje kao..."
+  - "Ne izgleda kao..."
+  - "Vjerojatno služi za..."
 
-🧠 LOGIKA ODGOVORA (NAJVAŽNIJE):
+ŠTO TREBAŠ IZBJEGAVATI:
+- nemoj samo ponavljati naslov stranice bez zaključka
+- nemoj vraćati suh opis stranice ako korisnik pita nešto praktično
+- nemoj stalno tražiti konkretnije pitanje ako već možeš pomoći
+- nemoj miješati jezike
+- nemoj izmišljati konkretne podatke kao cijene, telefone, e-mailove, rokove, garancije, uvjete dostave ili popuste ako to nije jasno vidljivo
+- nemoj biti napadan, ali budi koristan
 
-Ako korisnik postavi pitanje tipa:
-- "da li"
-- "mogu li"
-- "jel moguće"
-- "does it"
-- "can I"
-- "is it possible"
-- "kann ich"
-- "bietet diese seite"
+KONVERZACIJSKI STIL:
+- ako korisnik napiše "ok", "super", "hvala" ili slično, odgovori kratko i prirodno
+- ako je korisnik zbunjen, objasni jednostavno
+- ako vidiš da korisnik želi pomoć oko snalaženja na stranici, vodi ga
+- možeš predložiti sljedeći korak, ali nenametljivo
+- odgovori trebaju zvučati kao kratki chat razgovor, ne kao članak
 
-👉 OBAVEZNO:
-
-1. prvo daj JASAN odgovor:
-   - DA / NE / VJEROJATNO DA / NE IZGLEDA TAKO
-
-2. zatim dodaj kratko objašnjenje (1-2 rečenice)
-
---------------------------------------------------
-
-📌 PRIMJERI DOBROG ODGOVORA:
-
-Pitanje:
-"da li ova stranica nudi prodaju?"
-
-Odgovor:
-"Ne, ova stranica ne djeluje kao prodajna stranica. Više izgleda kao edukativna stranica za učenje njemačkog jezika."
-
----
-
-Pitanje:
-"mogu li ovdje zakazati termin kod doktora?"
-
-Odgovor:
-"Ne, ova stranica ne služi za zakazivanje termina. Riječ je o lekciji za učenje njemačkog jezika, a ne o medicinskoj usluzi."
-
---------------------------------------------------
-
-📊 KAKO RAZMIŠLJAŠ:
-
-Na temelju:
-- naslova
-- opisa
-- teksta
-
-procijeni:
-- je li stranica edukativna
-- je li webshop
-- je li servis
-- je li informativna
-- što zapravo nudi
-
---------------------------------------------------
-
-⚠️ VAŽNO:
-
-- NEMOJ samo opisivati stranicu
-- NEMOJ tražiti "postavite konkretnije pitanje"
-- NEMOJ miješati jezike
-- NEMOJ izmišljati podatke
-
---------------------------------------------------
-
-📎 STIL:
-
-- kratak
-- jasan
-- konkretan
-- kao pametan prodajni asistent
-
---------------------------------------------------
+PRIORITETI:
+1. razumij pitanje korisnika
+2. razumij svrhu stranice
+3. spoji to dvoje u koristan odgovor
+4. odgovori prirodno, ljudski i jasno
 
 ${buildLanguageInstruction(userLang)}
-${trimText(agent.systemPrompt || "", 800)}
+${trimText(agent.systemPrompt || "", 1000)}
 `.trim();
 
     const userPrompt = `
@@ -282,7 +256,7 @@ ${safePageContext.pageText || "-"}
 
     const response = await openai.responses.create({
       model: "gpt-5-mini",
-      max_output_tokens: 360,
+      max_output_tokens: 420,
       input: [
         {
           role: "system",
