@@ -4,11 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SiteMind AI</title>
-
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     html, body {
       margin: 0;
@@ -18,9 +15,7 @@
       background: #f8fafc;
     }
 
-    body {
-      overflow: hidden;
-    }
+    body { overflow: hidden; }
 
     .wrap {
       display: flex;
@@ -48,7 +43,7 @@
     }
 
     .msg {
-      max-width: 80%;
+      max-width: 82%;
       padding: 10px 12px;
       border-radius: 12px;
       margin-bottom: 10px;
@@ -113,17 +108,11 @@
       font-weight: 600;
       flex-shrink: 0;
     }
-
-    button:hover {
-      opacity: 0.96;
-    }
   </style>
 </head>
-
 <body>
   <div class="wrap">
     <div class="header" id="chat-header">SiteMind AI</div>
-
     <div id="messages" class="messages"></div>
 
     <div class="inputbar">
@@ -194,20 +183,12 @@
     function normalizeLang(lang) {
       const raw = (lang || "").toLowerCase();
 
-      if (
-        raw.indexOf("hr") === 0 ||
-        raw.indexOf("bs") === 0 ||
-        raw.indexOf("sr") === 0
-      ) {
+      if (raw.indexOf("hr") === 0 || raw.indexOf("bs") === 0 || raw.indexOf("sr") === 0) {
         return "hr";
       }
 
       if (raw.indexOf("de") === 0) {
         return "de";
-      }
-
-      if (raw.indexOf("en") === 0) {
-        return "en";
       }
 
       return "en";
@@ -239,7 +220,6 @@
 
     function showWelcomeIfNeeded() {
       if (welcomeShown) return;
-
       const t = getLocale(pageContext.lang);
       addMessage(t.welcome, "bot");
       welcomeShown = true;
@@ -269,13 +249,12 @@
       });
 
       const text = await res.text();
-      console.log("RAW API odgovor:", text);
 
       try {
         return JSON.parse(text);
       } catch (e) {
         return {
-          error: "API nije vratio JSON",
+          error: "API did not return JSON",
           raw: text
         };
       }
@@ -300,12 +279,6 @@
           if (data.agent.agentName) {
             header.textContent = data.agent.agentName;
           }
-
-          if (data.agent.welcomeMessage && !welcomeShown) {
-            addMessage(data.agent.welcomeMessage, "bot");
-            welcomeShown = true;
-          }
-
           agentLoaded = true;
         }
 
