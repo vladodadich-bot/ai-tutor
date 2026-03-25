@@ -28,19 +28,19 @@ function detectUserLanguageFromMessage(message, fallback) {
   if (/[äöüß]/.test(m)) return "de";
 
   if (
-    /\b(kako|sto|što|sta|šta|koliko|gdje|gde|moze|može|trebam|zelim|želim|cijena|kontakt|usluga|pomoc|pomoć|stranica|stranici|ovoj|cemu|čemu|radi|ucenje|učenje|njemacki|njemački|lekcije|tecaj|tečaj|prodaja|prodaje|nudi|nudi li|mogu li|mogu|zakazati|termin)\b/.test(m)
+    /\b(kako|sto|što|sta|šta|koliko|gdje|gde|moze|može|trebam|zelim|želim|cijena|kontakt|usluga|pomoc|pomoć|stranica|stranici|ovoj|cemu|čemu|radi|ucenje|učenje|njemacki|njemački|lekcije|tecaj|tečaj|prodaja|prodaje|nudi|nudi li)\b/.test(m)
   ) {
     return "hr";
   }
 
   if (
-    /\b(wie|was|worum|seite|inhalt|hilfe|kontakt|preis|deutsch|lektion|lektionen|lernen|kurs|ich|möchte|mochte|bitte|danke|verkauf|verkauft|bietet|termin|buchen)\b/.test(m)
+    /\b(wie|was|worum|seite|inhalt|hilfe|kontakt|preis|deutsch|lektion|lektionen|lernen|kurs|ich|möchte|mochte|bitte|danke|verkauf|verkauft|bietet)\b/.test(m)
   ) {
     return "de";
   }
 
   if (
-    /\b(how|what|about|page|content|help|contact|price|course|lesson|lessons|learn|learning|german|service|sell|selling|offer|offers|book|appointment)\b/.test(m)
+    /\b(how|what|about|page|content|help|contact|price|course|lesson|lessons|learn|learning|german|service|sell|selling|offer|offers)\b/.test(m)
   ) {
     return "en";
   }
@@ -53,15 +53,9 @@ function trimText(text, maxLength) {
 }
 
 function buildLanguageInstruction(lang) {
-  if (lang === "hr") {
-    return "Odgovaraj isključivo na hrvatskom jeziku. Ne miješaj druge jezike u odgovoru.";
-  }
-
-  if (lang === "de") {
-    return "Antworte ausschließlich auf Deutsch. Mische keine anderen Sprachen in die Antwort.";
-  }
-
-  return "Respond only in English. Do not mix other languages in the answer.";
+  if (lang === "hr") return "Odgovaraj isključivo na hrvatskom jeziku.";
+  if (lang === "de") return "Antworte ausschließlich auf Deutsch.";
+  return "Respond only in English.";
 }
 
 function extractAnswerText(response) {
@@ -94,10 +88,10 @@ function firstUsefulSnippet(text) {
 
   const parts = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean);
   if (parts.length > 0) {
-    return trimText(parts[0], 240);
+    return trimText(parts[0], 220);
   }
 
-  return trimText(cleaned, 240);
+  return trimText(cleaned, 220);
 }
 
 function buildContextualFallback(lang, pageContext) {
@@ -106,34 +100,34 @@ function buildContextualFallback(lang, pageContext) {
   const snippet = firstUsefulSnippet(pageContext.pageText || "");
 
   if (lang === "hr") {
-    let out = "Prema sadržaju ove stranice ";
+    let out = "Iz ove stranice ";
     if (title) {
-      out += "tema je: " + title + ". ";
+      out += "se vidi tema: " + title + ". ";
     }
     if (desc) {
       out += desc + " ";
     }
     if (snippet) {
-      out += "Iz sadržaja se vidi: " + snippet;
+      out += "Sadržaj upućuje na: " + snippet;
     }
     return out.trim();
   }
 
   if (lang === "de") {
-    let out = "Nach dem Inhalt dieser Seite ";
+    let out = "Aus dieser Seite ";
     if (title) {
-      out += "scheint das Thema zu sein: " + title + ". ";
+      out += "ist das Thema erkennbar: " + title + ". ";
     }
     if (desc) {
       out += desc + " ";
     }
     if (snippet) {
-      out += "Aus dem Inhalt ist erkennbar: " + snippet;
+      out += "Der Inhalt deutet darauf hin: " + snippet;
     }
     return out.trim();
   }
 
-  let out = "Based on this page, ";
+  let out = "From this page ";
   if (title) {
     out += "the topic appears to be: " + title + ". ";
   }
@@ -141,7 +135,7 @@ function buildContextualFallback(lang, pageContext) {
     out += desc + " ";
   }
   if (snippet) {
-    out += "From the content, it appears: " + snippet;
+    out += "The content suggests: " + snippet;
   }
   return out.trim();
 }
@@ -155,7 +149,7 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    const message = trimText(body.message || "", 800);
+    const message = trimText(body.message || "", 700);
     const agentId = body.agentId || "demo-agent";
     const rawPageContext = body.pageContext || {};
     const agent = getAgentById(agentId);
@@ -170,7 +164,7 @@ export default async function handler(req, res) {
       pageUrl: rawPageContext.pageUrl || "",
       pageTitle: trimText(rawPageContext.pageTitle || "", 180),
       pageDescription: trimText(rawPageContext.pageDescription || "", 320),
-      pageText: trimText(rawPageContext.pageText || "", 3400),
+      pageText: trimText(rawPageContext.pageText || "", 3200),
       lang: normalizeLang(rawPageContext.lang || "en")
     };
 
@@ -178,7 +172,7 @@ export default async function handler(req, res) {
       body.userLang || detectUserLanguageFromMessage(message, safePageContext.lang)
     );
 
-    const systemPrompt = `
+  const systemPrompt = `
 Ti si ${agent.agentName || "SiteMind AI"}, inteligentni AI asistent ugrađen na web stranicu.
 
 TVOJA ULOGA:
@@ -241,7 +235,6 @@ PRIORITETI:
 ${buildLanguageInstruction(userLang)}
 ${trimText(agent.systemPrompt || "", 1000)}
 `.trim();
-
     const userPrompt = `
 PITANJE KORISNIKA:
 ${message}
@@ -256,7 +249,7 @@ ${safePageContext.pageText || "-"}
 
     const response = await openai.responses.create({
       model: "gpt-5-mini",
-      max_output_tokens: 420,
+      max_output_tokens: 360,
       input: [
         {
           role: "system",
