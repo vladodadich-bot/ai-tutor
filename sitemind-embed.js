@@ -1,22 +1,12 @@
 (function () {
-  if (window.SiteMindAIInitialized) return;
-  window.SiteMindAIInitialized = true;
+  if (window.SiteMindWidgetLoaded) return;
+  window.SiteMindWidgetLoaded = true;
 
-  var currentScript = document.currentScript;
-  var agentId =
-    (currentScript && currentScript.getAttribute("data-agent-id")) ||
-    "demo-agent";
+  var config = window.SiteMindConfig || {};
+  var agentId = config.agentId || "demo-agent";
+  var baseUrl = "https://ai-tutor-rouge-theta.vercel.app";
 
-  var apiBase =
-    (currentScript && currentScript.getAttribute("data-api-base")) ||
-    window.location.origin;
-
-  function getMetaDescription() {
-    var meta =
-      document.querySelector('meta[name="description"]') ||
-      document.querySelector('meta[property="og:description"]');
-    return meta ? meta.getAttribute("content") || "" : "";
-  }
+  var isOpen = false;
 
   function cleanText(text) {
     return (text || "")
@@ -25,16 +15,50 @@
       .trim();
   }
 
+  function getMetaDescription() {
+    var meta =
+      document.querySelector('meta[name="description"]') ||
+      document.querySelector('meta[property="og:description"]');
+
+    return meta ? (meta.getAttribute("content") || "").trim() : "";
+  }
+
+  function detectLanguage() {
+    var htmlLang = document.documentElement.getAttribute("lang") || "";
+    var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
+    var ogLocale = ogLocaleMeta ? (ogLocaleMeta.getAttribute("content") || "") : "";
+    var navLang = navigator.language || "";
+
+    var raw = (htmlLang || ogLocale || navLang || "en").toLowerCase();
+
+    if (raw.indexOf("hr") === 0 || raw.indexOf("bs") === 0 || raw.indexOf("sr") === 0) {
+      return "hr";
+    }
+
+    if (raw.indexOf("de") === 0) {
+      return "de";
+    }
+
+    if (raw.indexOf("en") === 0) {
+      return "en";
+    }
+
+    return "en";
+  }
+
   function getMainText() {
     var selectors = [
       "main",
       "article",
       "[role='main']",
-      ".content",
-      ".page-content",
       ".post-body",
       ".entry-content",
+      ".article-content",
+      ".content",
+      ".page-content",
       ".product-description",
+      ".post",
+      ".container",
       "body"
     ];
 
@@ -50,7 +74,6 @@
       }
     }
 
-    // skrati da ne šalješ previše tokena
     return bestText.slice(0, 6000);
   }
 
@@ -60,86 +83,117 @@
       pageTitle: document.title || "",
       pageDescription: getMetaDescription(),
       pageText: getMainText(),
-      lang:
-        document.documentElement.lang ||
-        navigator.language ||
-        "hr"
+      lang: detectLanguage()
     };
   }
 
-  var bubble = document.createElement("button");
-  bubble.type = "button";
-  bubble.innerHTML = "💬";
-  bubble.setAttribute("aria-label", "Open chat");
+  function sendPageContext() {
+    if (!iframe.contentWindow) return;
 
-  bubble.style.position = "fixed";
-  bubble.style.right = "20px";
-  bubble.style.bottom = "20px";
-  bubble.style.width = "60px";
-  bubble.style.height = "60px";
-  bubble.style.borderRadius = "999px";
-  bubble.style.border = "none";
-  bubble.style.cursor = "pointer";
-  bubble.style.background = "#0f172a";
-  bubble.style.color = "#fff";
-  bubble.style.fontSize = "24px";
-  bubble.style.boxShadow = "0 10px 30px rgba(0,0,0,0.18)";
-  bubble.style.zIndex = "999999";
-
-  var panel = document.createElement("div");
-  panel.style.position = "fixed";
-  panel.style.right = "20px";
-  panel.style.bottom = "90px";
-  panel.style.width = "380px";
-  panel.style.maxWidth = "calc(100vw - 24px)";
-  panel.style.height = "620px";
-  panel.style.maxHeight = "calc(100vh - 120px)";
-  panel.style.background = "#fff";
-  panel.style.borderRadius = "18px";
-  panel.style.overflow = "hidden";
-  panel.style.boxShadow = "0 20px 60px rgba(0,0,0,0.2)";
-  panel.style.zIndex = "999998";
-  panel.style.display = "none";
-
-  var iframe = document.createElement("iframe");
-  iframe.src =
-    apiBase.replace(/\/$/, "") +
-    "/widget-frame.html?agentId=" +
-    encodeURIComponent(agentId) +
-    "&apiBase=" +
-    encodeURIComponent(apiBase.replace(/\/$/, ""));
-  iframe.style.width = "100%";
-  iframe.style.height = "100%";
-  iframe.style.border = "0";
-  iframe.setAttribute("title", "SiteMind AI Chat");
-
-  panel.appendChild(iframe);
-  document.body.appendChild(panel);
-  document.body.appendChild(bubble);
-
-  var isOpen = false;
-
-  function sendContextToIframe() {
-    var pageContext = getPageContext();
     iframe.contentWindow.postMessage(
       {
         type: "sitemind_page_context",
-        payload: pageContext
+        payload: getPageContext()
       },
       "*"
     );
   }
 
-  bubble.addEventListener("click", function () {
-    isOpen = !isOpen;
-    panel.style.display = isOpen ? "block" : "none";
+  var button = document.createElement("button");
+  button.id = "sitemind-widget-button";
+  button.innerHTML = "💬";
 
+  button.style.position = "fixed";
+  button.style.right = "20px";
+  button.style.bottom = "20px";
+  button.style.width = "64px";
+  button.style.height = "64px";
+  button.style.border = "none";
+  button.style.borderRadius = "50%";
+  button.style.background = "linear-gradient(135deg, #0f172a, #2563eb)";
+  button.style.color = "#fff";
+  button.style.fontSize = "28px";
+  button.style.cursor = "pointer";
+  button.style.zIndex = "999999";
+  button.style.boxShadow = "0 12px 30px rgba(0,0,0,0.20)";
+
+  var iframe = document.createElement("iframe");
+  iframe.id = "sitemind-widget-frame";
+  iframe.src = baseUrl + "/widget-frame.html?agentId=" + encodeURIComponent(agentId);
+
+  iframe.style.position = "fixed";
+  iframe.style.right = "20px";
+  iframe.style.bottom = "96px";
+  iframe.style.width = "380px";
+  iframe.style.height = "600px";
+  iframe.style.border = "none";
+  iframe.style.borderRadius = "18px";
+  iframe.style.background = "#fff";
+  iframe.style.boxShadow = "0 20px 60px rgba(0,0,0,0.25)";
+  iframe.style.zIndex = "999998";
+  iframe.style.display = "none";
+
+  function applyMobileStyles() {
+    if (window.innerWidth < 520) {
+      iframe.style.right = "10px";
+      iframe.style.left = "10px";
+      iframe.style.bottom = "84px";
+      iframe.style.width = "calc(100vw - 20px)";
+      iframe.style.height = "70vh";
+    } else {
+      iframe.style.left = "auto";
+      iframe.style.right = "20px";
+      iframe.style.bottom = "96px";
+      iframe.style.width = "380px";
+      iframe.style.height = "600px";
+    }
+  }
+
+  function openWidget() {
+    iframe.style.display = "block";
+    button.innerHTML = "✕";
+    isOpen = true;
+
+    setTimeout(function () {
+      sendPageContext();
+    }, 250);
+  }
+
+  function closeWidget() {
+    iframe.style.display = "none";
+    button.innerHTML = "💬";
+    isOpen = false;
+  }
+
+  button.addEventListener("click", function () {
     if (isOpen) {
-      setTimeout(sendContextToIframe, 300);
+      closeWidget();
+    } else {
+      openWidget();
     }
   });
 
   iframe.addEventListener("load", function () {
-    sendContextToIframe();
+    sendPageContext();
   });
+
+  window.addEventListener("resize", applyMobileStyles);
+
+  function appendWidget() {
+    if (!document.getElementById("sitemind-widget-button")) {
+      document.body.appendChild(button);
+    }
+
+    if (!document.getElementById("sitemind-widget-frame")) {
+      document.body.appendChild(iframe);
+    }
+
+    applyMobileStyles();
+  }
+
+  document.addEventListener("DOMContentLoaded", appendWidget);
+
+  if (document.body) {
+    appendWidget();
+  }
 })();
