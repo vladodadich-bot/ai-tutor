@@ -5,7 +5,7 @@
   var style = document.createElement("style");
   style.innerHTML = `
 @keyframes sitemindPulse {
-  0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.50); }
+  0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.5); }
   70% { box-shadow: 0 0 0 12px rgba(37,99,235,0); }
   100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
 }
@@ -19,10 +19,7 @@
   var isOpen = false;
 
   function cleanText(text) {
-    return (text || "")
-      .replace(/\s+/g, " ")
-      .replace(/\u00A0/g, " ")
-      .trim();
+    return (text || "").replace(/\s+/g, " ").trim();
   }
 
   function getMetaDescription() {
@@ -55,16 +52,9 @@
     return "en";
   }
 
-  function isUsefulText(text) {
-    var t = cleanText(text);
-    if (!t) return false;
-    if (t.length < 35) return false;
-    return true;
-  }
-
   function pushIfUseful(parts, text, maxLen) {
     var cleaned = cleanText(text);
-    if (!isUsefulText(cleaned)) return;
+    if (!cleaned) return;
 
     if (cleaned.length > maxLen) {
       cleaned = cleaned.slice(0, maxLen);
@@ -73,16 +63,11 @@
     parts.push(cleaned);
   }
 
-  function extractFromStructuredAreas() {
+  function extractSmartPageText() {
     var parts = [];
 
     var h1 = document.querySelector("h1");
-    if (h1) pushIfUseful(parts, h1.innerText, 140);
-
-    var h2s = document.querySelectorAll("h2");
-    for (var i = 0; i < Math.min(h2s.length, 3); i++) {
-      pushIfUseful(parts, h2s[i].innerText, 120);
-    }
+    if (h1) pushIfUseful(parts, h1.innerText, 120);
 
     var main =
       document.querySelector("main") ||
@@ -93,55 +78,24 @@
       document.querySelector(".article-content") ||
       document.querySelector(".content") ||
       document.querySelector(".page-content") ||
-      document.querySelector(".main-content") ||
-      document.querySelector("#content") ||
       document.body;
 
     if (main) {
-      var blocks = main.querySelectorAll("p, li, h3, h4");
+      var paragraphs = main.querySelectorAll("p");
       var count = 0;
 
-      for (var j = 0; j < blocks.length; j++) {
-        var txt = cleanText(blocks[j].innerText || "");
-        if (!isUsefulText(txt)) continue;
+      for (var j = 0; j < paragraphs.length; j++) {
+        var txt = cleanText(paragraphs[j].innerText || "");
+        if (txt.length < 35) continue;
 
         pushIfUseful(parts, txt, 220);
         count += 1;
 
-        if (count >= 6) break;
+        if (count >= 3) break;
       }
     }
 
-    var faqCandidates = document.querySelectorAll(
-      '[itemprop="name"], .faq-question, details summary'
-    );
-
-    for (var k = 0; k < Math.min(faqCandidates.length, 3); k++) {
-      pushIfUseful(parts, faqCandidates[k].innerText, 120);
-    }
-
-    return cleanText(parts.join("\n")).slice(0, 1200);
-  }
-
-  function extractFromBodyFallback() {
-    var text = cleanText((document.body && document.body.innerText) || "");
-    return text.slice(0, 1200);
-  }
-
-  function extractSmartPageText() {
-    var structured = extractFromStructuredAreas();
-
-    if (structured && structured.length >= 120) {
-      return structured;
-    }
-
-    var bodyFallback = extractFromBodyFallback();
-
-    if (bodyFallback && bodyFallback.length >= 120) {
-      return bodyFallback;
-    }
-
-    return structured || bodyFallback || "";
+    return cleanText(parts.join("\n")).slice(0, 900);
   }
 
   function getPageContext() {
