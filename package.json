@@ -1,8 +1,8 @@
 {
   "name": "ai-tutor",
   "version": "1.0.0",
-  "private": true,
+  "type": "module",
   "dependencies": {
-    "openai": "^6.6.0"
+    "openai": "^4.0.0"
   }
 }
