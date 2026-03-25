@@ -80,12 +80,28 @@ function isAllowedDomain(hostname, allowedDomains) {
   });
 }
 
-function getOutputText(response) {
+function extractTextFromResponse(response) {
   if (response && response.output_text && String(response.output_text).trim()) {
     return String(response.output_text).trim();
   }
 
-  return "";
+  if (!response || !Array.isArray(response.output)) {
+    return "";
+  }
+
+  let collected = [];
+
+  for (const item of response.output) {
+    if (!item || item.type !== "message" || !Array.isArray(item.content)) continue;
+
+    for (const part of item.content) {
+      if (part && part.type === "output_text" && part.text) {
+        collected.push(part.text);
+      }
+    }
+  }
+
+  return collected.join("\n").trim();
 }
 
 function getFallbackAnswer(lang) {
@@ -129,8 +145,7 @@ export default async function handler(req, res) {
     };
 
     const userLang = normalizeLang(
-      body.userLang ||
-      detectUserLanguageFromMessage(message, safePageContext.lang)
+      body.userLang || detectUserLanguageFromMessage(message, safePageContext.lang)
     );
 
     const hostname = getHostname(safePageContext.pageUrl);
@@ -143,25 +158,25 @@ export default async function handler(req, res) {
 
     const languageInstruction = buildLanguageInstruction(userLang);
 
+    const pageContextPrompt = `
+NASLOV: ${safePageContext.pageTitle || "-"}
+OPIS: ${safePageContext.pageDescription || "-"}
+URL: ${safePageContext.pageUrl || "-"}
+SADRŽAJ: ${safePageContext.pageText || "-"}
+`.trim();
+
     const firstPassSystemPrompt = `
 Ti si ${agent.agentName || "SiteMind AI"}.
 
 PRAVILA:
 - odgovaraj kratko, jasno i korisno
-- koristi samo sadržaj stranice iz konteksta ispod
+- koristi samo sadržaj stranice iz konteksta
 - ne izmišljaj podatke koji nisu potvrđeni na stranici
 - ako na temelju sadržaja stranice ne možeš sigurno odgovoriti, vrati točno i samo:
 WEB_FALLBACK
 
 ${languageInstruction}
 ${trimText(agent.systemPrompt || "", 500)}
-`.trim();
-
-    const pageContextPrompt = `
-NASLOV: ${safePageContext.pageTitle || "-"}
-OPIS: ${safePageContext.pageDescription || "-"}
-URL: ${safePageContext.pageUrl || "-"}
-SADRŽAJ: ${safePageContext.pageText || "-"}
 `.trim();
 
     const firstPassResponse = await openai.responses.create({
@@ -184,7 +199,7 @@ SADRŽAJ: ${safePageContext.pageText || "-"}
       ]
     });
 
-    const firstPassAnswer = getOutputText(firstPassResponse);
+    const firstPassAnswer = extractTextFromResponse(firstPassResponse);
 
     if (firstPassAnswer && firstPassAnswer !== "WEB_FALLBACK") {
       return res.status(200).json({
@@ -218,10 +233,10 @@ Ti si ${agent.agentName || "SiteMind AI"}.
 PRAVILA:
 - odgovaraj kratko, jasno i korisno
 - prvo uzmi u obzir sadržaj stranice
-- ako sadržaj stranice nije dovoljan, smiješ koristiti web search
+- zatim koristi web search za dodatnu provjeru ako stranica nije dovoljna
 - ne izmišljaj cijene, uvjete, kontakte ili obećanja ako to nije potvrđeno
 - ako ni nakon dodatne provjere odgovor nije siguran, to jasno reci
-- nemoj spominjati interni proces ili da si prvo radio prvi prolaz
+- nemoj spominjati interni proces
 
 ${languageInstruction}
 ${trimText(agent.systemPrompt || "", 500)}
@@ -231,7 +246,19 @@ ${trimText(agent.systemPrompt || "", 500)}
       model: "gpt-5-mini",
       reasoning: { effort: "minimal" },
       max_output_tokens: 180,
-      tools: [{ type: "web_search" }],
+      tools: [
+        {
+          type: "web_search_preview",
+          search_context_size: "medium"
+        }
+      ],
+      tool_choice: {
+        type: "allowed_tools",
+        mode: "required",
+        tools: [
+          { type: "web_search_preview" }
+        ]
+      },
       input: [
         {
           role: "system",
@@ -248,10 +275,10 @@ ${trimText(agent.systemPrompt || "", 500)}
       ]
     });
 
-    const secondPassAnswer = getOutputText(secondPassResponse) || getFallbackAnswer(userLang);
+    const secondPassAnswer = extractTextFromResponse(secondPassResponse);
 
     return res.status(200).json({
-      answer: secondPassAnswer,
+      answer: secondPassAnswer || getFallbackAnswer(userLang),
       usedWebSearch: true,
       agent: {
         agentId: agent.agentId || agentId,
