@@ -217,7 +217,17 @@ SADRŽAJ: ${safePageContext.pageText || "-"}
         }
       ]
     });
+function detectUserLanguage(message, fallback) {
+  const m = (message || "").toLowerCase();
 
+  if (/[čćžšđ]/.test(m)) return "hr";
+  if (/[äöüß]/.test(m)) return "de";
+
+  if (/\b(der|die|das|und|ist|nicht|ich)\b/.test(m)) return "de";
+  if (/\b(the|and|what|how|is|are)\b/.test(m)) return "en";
+
+  return fallback || "en";
+}
     const answer =
       response.output_text && response.output_text.trim()
         ? response.output_text.trim()
