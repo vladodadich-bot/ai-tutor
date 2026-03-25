@@ -66,11 +66,7 @@ function getHostname(url) {
 
 function isAllowedDomain(hostname, allowedDomains) {
   if (!hostname) return false;
-
-  // Ako je prazno ili nije zadano -> dozvoli sve
-  if (!Array.isArray(allowedDomains) || allowedDomains.length === 0) {
-    return true;
-  }
+  if (!Array.isArray(allowedDomains) || allowedDomains.length === 0) return true;
 
   return allowedDomains.some((domain) => {
     const d = String(domain).toLowerCase();
@@ -88,6 +84,21 @@ function fallbackAnswer(lang) {
   }
 
   return "I do not have enough information for a reliable answer right now.";
+}
+
+function shouldForceWebSearch(pageContext, message) {
+  const pageText = trimText(pageContext.pageText || "", 2000);
+  const q = (message || "").toLowerCase();
+
+  if (!pageText || pageText.length < 120) {
+    return true;
+  }
+
+  if (/today|latest|news|vrijeme|weather|stock|price today|heute|aktuell/.test(q)) {
+    return true;
+  }
+
+  return false;
 }
 
 export default async function handler(req, res) {
@@ -114,7 +125,7 @@ export default async function handler(req, res) {
       pageUrl: rawPageContext.pageUrl || "",
       pageTitle: trimText(rawPageContext.pageTitle || "", 140),
       pageDescription: trimText(rawPageContext.pageDescription || "", 220),
-      pageText: trimText(rawPageContext.pageText || "", 900),
+      pageText: trimText(rawPageContext.pageText || "", 1200),
       lang: normalizeLang(rawPageContext.lang || "en")
     };
 
@@ -136,7 +147,7 @@ Ti si ${agent.agentName || "SiteMind AI"}.
 PRAVILA:
 - odgovaraj kratko, jasno i korisno
 - prvo koristi sadržaj stranice iz konteksta
-- ako sadržaj stranice nije dovoljan, a web search je dopušten, smiješ koristiti web za dodatne informacije
+- ako sadržaj stranice nije dovoljan i web search je dopušten, koristi web search
 - ne izmišljaj cijene, uvjete, kontakte ili obećanja ako nisu potvrđeni
 - ako nisi siguran, reci to jasno
 - odgovaraj na jeziku korisnikova pitanja
@@ -155,6 +166,7 @@ SADRŽAJ STRANICE: ${safePageContext.pageText || "-"}
     const requestBody = {
       model: "gpt-5-mini",
       max_output_tokens: 180,
+      reasoning: { effort: "minimal" },
       input: [
         {
           role: "system",
@@ -172,11 +184,11 @@ SADRŽAJ STRANICE: ${safePageContext.pageText || "-"}
     };
 
     if (agent.allowExternalSearch) {
-      requestBody.tools = [
-        {
-          type: "web_search_preview"
-        }
-      ];
+      requestBody.tools = [{ type: "web_search" }];
+
+      if (shouldForceWebSearch(safePageContext, message)) {
+        requestBody.tool_choice = "required";
+      }
     }
 
     const response = await openai.responses.create(requestBody);
