@@ -19,7 +19,10 @@
   var isOpen = false;
 
   function cleanText(text) {
-    return (text || "").replace(/\s+/g, " ").trim();
+    return (text || "")
+      .replace(/\s+/g, " ")
+      .replace(/\u00A0/g, " ")
+      .trim();
   }
 
   function getMetaDescription() {
@@ -52,21 +55,33 @@
     return "en";
   }
 
+  function isUsefulText(text) {
+    var t = cleanText(text);
+    if (!t) return false;
+    if (t.length < 35) return false;
+    return true;
+  }
+
   function pushIfUseful(parts, text, maxLen) {
     var cleaned = cleanText(text);
-    if (!cleaned) return;
+    if (!isUsefulText(cleaned)) return;
+
     if (cleaned.length > maxLen) {
       cleaned = cleaned.slice(0, maxLen);
     }
+
     parts.push(cleaned);
   }
 
-  function extractSmartPageText() {
+  function extractFromStructuredAreas() {
     var parts = [];
 
     var h1 = document.querySelector("h1");
-    if (h1) {
-      pushIfUseful(parts, h1.innerText, 120);
+    if (h1) pushIfUseful(parts, h1.innerText, 140);
+
+    var h2s = document.querySelectorAll("h2");
+    for (var i = 0; i < Math.min(h2s.length, 3); i++) {
+      pushIfUseful(parts, h2s[i].innerText, 120);
     }
 
     var main =
@@ -78,20 +93,22 @@
       document.querySelector(".article-content") ||
       document.querySelector(".content") ||
       document.querySelector(".page-content") ||
+      document.querySelector(".main-content") ||
+      document.querySelector("#content") ||
       document.body;
 
     if (main) {
-      var paragraphs = main.querySelectorAll("p");
+      var blocks = main.querySelectorAll("p, li, h3, h4");
       var count = 0;
 
-      for (var i = 0; i < paragraphs.length; i++) {
-        var txt = cleanText(paragraphs[i].innerText || "");
-        if (txt.length < 35) continue;
+      for (var j = 0; j < blocks.length; j++) {
+        var txt = cleanText(blocks[j].innerText || "");
+        if (!isUsefulText(txt)) continue;
 
         pushIfUseful(parts, txt, 220);
         count += 1;
 
-        if (count >= 3) break;
+        if (count >= 6) break;
       }
     }
 
@@ -99,11 +116,32 @@
       '[itemprop="name"], .faq-question, details summary'
     );
 
-    for (var j = 0; j < Math.min(faqCandidates.length, 2); j++) {
-      pushIfUseful(parts, faqCandidates[j].innerText, 120);
+    for (var k = 0; k < Math.min(faqCandidates.length, 3); k++) {
+      pushIfUseful(parts, faqCandidates[k].innerText, 120);
     }
 
-    return cleanText(parts.join("\n")).slice(0, 900);
+    return cleanText(parts.join("\n")).slice(0, 1200);
+  }
+
+  function extractFromBodyFallback() {
+    var text = cleanText((document.body && document.body.innerText) || "");
+    return text.slice(0, 1200);
+  }
+
+  function extractSmartPageText() {
+    var structured = extractFromStructuredAreas();
+
+    if (structured && structured.length >= 120) {
+      return structured;
+    }
+
+    var bodyFallback = extractFromBodyFallback();
+
+    if (bodyFallback && bodyFallback.length >= 120) {
+      return bodyFallback;
+    }
+
+    return structured || bodyFallback || "";
   }
 
   function getPageContext() {
