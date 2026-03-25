@@ -66,7 +66,11 @@ function getHostname(url) {
 
 function isAllowedDomain(hostname, allowedDomains) {
   if (!hostname) return false;
-  if (!Array.isArray(allowedDomains) || !allowedDomains.length) return true;
+
+  // Ako je prazno ili nije zadano -> dozvoli sve
+  if (!Array.isArray(allowedDomains) || allowedDomains.length === 0) {
+    return true;
+  }
 
   return allowedDomains.some((domain) => {
     const d = String(domain).toLowerCase();
