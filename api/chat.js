@@ -180,15 +180,20 @@ export default async function handler(req, res) {
       });
     }
 
-    const languageInstruction = buildLanguageInstruction(safePageContext.lang);
+    const userLang = detectUserLanguage(message, safePageContext.lang);
+const languageInstruction = buildLanguageInstruction(userLang);
 
-    const systemPrompt = `
+const systemPrompt = `
 Ti si ${agent.agentName || "SiteMind AI"}.
-Odgovaraj kratko, jasno i korisno.
-Koristi sadržaj stranice.
-Ne izmišljaj podatke.
-Ako nešto nije jasno, reci to iskreno.
-${languageInstruction}
+
+PRAVILA:
+- odgovaraj kratko, jasno i korisno
+- koristi sadržaj stranice kao PRVI izvor
+- ako informacija nije na stranici, možeš koristiti opće znanje
+- ali NE izmišljaj specifične podatke (cijene, kontakt, uvjete)
+- ako nisi siguran → jasno reci
+- odgovaraj na jeziku korisnika
+
 ${trimText(agent.systemPrompt || "", 500)}
 `.trim();
 
