@@ -9,10 +9,7 @@
   var isOpen = false;
 
   function cleanText(text) {
-    return (text || "")
-      .replace(/\s+/g, " ")
-      .replace(/\n+/g, " ")
-      .trim();
+    return (text || "").replace(/\s+/g, " ").trim();
   }
 
   function getMetaDescription() {
@@ -20,7 +17,7 @@
       document.querySelector('meta[name="description"]') ||
       document.querySelector('meta[property="og:description"]');
 
-    return meta ? (meta.getAttribute("content") || "").trim() : "";
+    return meta ? cleanText(meta.getAttribute("content") || "") : "";
   }
 
   function detectLanguage() {
@@ -28,7 +25,6 @@
     var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
     var ogLocale = ogLocaleMeta ? (ogLocaleMeta.getAttribute("content") || "") : "";
     var navLang = navigator.language || "";
-
     var raw = (htmlLang || ogLocale || navLang || "en").toLowerCase();
 
     if (raw.indexOf("hr") === 0 || raw.indexOf("bs") === 0 || raw.indexOf("sr") === 0) {
@@ -39,42 +35,64 @@
       return "de";
     }
 
-    if (raw.indexOf("en") === 0) {
-      return "en";
-    }
-
     return "en";
   }
 
-  function getMainText() {
-    var selectors = [
-      "main",
-      "article",
-      "[role='main']",
-      ".post-body",
-      ".entry-content",
-      ".article-content",
-      ".content",
-      ".page-content",
-      ".product-description",
-      ".post",
-      ".container",
-      "body"
-    ];
+  function pushIfUseful(parts, text, maxLen) {
+    var cleaned = cleanText(text);
+    if (!cleaned) return;
+    if (cleaned.length > maxLen) {
+      cleaned = cleaned.slice(0, maxLen);
+    }
+    parts.push(cleaned);
+  }
 
-    var bestText = "";
+  function extractSmartPageText() {
+    var parts = [];
 
-    for (var i = 0; i < selectors.length; i++) {
-      var el = document.querySelector(selectors[i]);
-      if (el && el.innerText) {
-        var text = cleanText(el.innerText);
-        if (text.length > bestText.length) {
-          bestText = text;
-        }
+    var h1 = document.querySelector("h1");
+    if (h1) pushIfUseful(parts, h1.innerText, 180);
+
+    var h2s = document.querySelectorAll("h2");
+    for (var i = 0; i < Math.min(h2s.length, 3); i++) {
+      pushIfUseful(parts, h2s[i].innerText, 140);
+    }
+
+    var main =
+      document.querySelector("main") ||
+      document.querySelector("article") ||
+      document.querySelector("[role='main']") ||
+      document.querySelector(".post-body") ||
+      document.querySelector(".entry-content") ||
+      document.querySelector(".article-content") ||
+      document.querySelector(".content") ||
+      document.querySelector(".page-content") ||
+      document.body;
+
+    if (main) {
+      var paragraphs = main.querySelectorAll("p, li");
+      var count = 0;
+
+      for (var j = 0; j < paragraphs.length; j++) {
+        var txt = cleanText(paragraphs[j].innerText || "");
+        if (txt.length < 35) continue;
+
+        pushIfUseful(parts, txt, 280);
+        count += 1;
+
+        if (count >= 8) break;
       }
     }
 
-    return bestText.slice(0, 6000);
+    var faqCandidates = document.querySelectorAll(
+      '[itemprop="name"], .faq-question, .faq-item, details summary'
+    );
+
+    for (var k = 0; k < Math.min(faqCandidates.length, 4); k++) {
+      pushIfUseful(parts, faqCandidates[k].innerText, 180);
+    }
+
+    return cleanText(parts.join("\n")).slice(0, 1800);
   }
 
   function getPageContext() {
@@ -82,7 +100,7 @@
       pageUrl: window.location.href,
       pageTitle: document.title || "",
       pageDescription: getMetaDescription(),
-      pageText: getMainText(),
+      pageText: extractSmartPageText(),
       lang: detectLanguage()
     };
   }
@@ -153,10 +171,7 @@
     iframe.style.display = "block";
     button.innerHTML = "✕";
     isOpen = true;
-
-    setTimeout(function () {
-      sendPageContext();
-    }, 250);
+    setTimeout(sendPageContext, 120);
   }
 
   function closeWidget() {
@@ -191,9 +206,9 @@
     applyMobileStyles();
   }
 
-  document.addEventListener("DOMContentLoaded", appendWidget);
-
   if (document.body) {
     appendWidget();
+  } else {
+    document.addEventListener("DOMContentLoaded", appendWidget);
   }
 })();
