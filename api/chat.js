@@ -327,7 +327,15 @@ ${safePageContext.pageText || "-"}
       ]
     });
 
-    const answer = extractAnswerText(response) || fallbackAnswer(userLang, safePageContext);
+  let answer = extractAnswerText(response);
+
+if (!answer) {
+  answer = userLang === "hr"
+    ? "Nisam siguran da sam dobro razumio. Možeš li malo pojasniti što točno trebaš?"
+    : userLang === "de"
+    ? "Ich bin mir nicht ganz sicher, ob ich dich richtig verstanden habe. Kannst du das kurz präzisieren?"
+    : "I'm not sure I fully understood. Could you clarify what you need?";
+}
 
     return res.status(200).json({
       answer,
