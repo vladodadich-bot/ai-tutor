@@ -89,19 +89,19 @@ function extractTextFromResponse(response) {
     return "";
   }
 
-  let collected = [];
+  const chunks = [];
 
   for (const item of response.output) {
     if (!item || item.type !== "message" || !Array.isArray(item.content)) continue;
 
     for (const part of item.content) {
       if (part && part.type === "output_text" && part.text) {
-        collected.push(part.text);
+        chunks.push(part.text);
       }
     }
   }
 
-  return collected.join("\n").trim();
+  return chunks.join("\n").trim();
 }
 
 function getFallbackAnswer(lang) {
@@ -158,35 +158,36 @@ export default async function handler(req, res) {
 
     const languageInstruction = buildLanguageInstruction(userLang);
 
+    const systemPrompt = `
+Ti si ${agent.agentName || "SiteMind AI"}.
+
+PRAVILA:
+- odgovaraj kratko, jasno i korisno
+- prvo koristi sadržaj stranice iz konteksta
+- ako sadržaj stranice nije dovoljan, a dopušten je web search, smiješ potražiti dodatne informacije na webu
+- ne izmišljaj cijene, uvjete, kontakte ili obećanja ako to nije potvrđeno
+- ako ni tada nisi siguran, reci to jasno
+- odgovaraj na jeziku korisnikova pitanja
+
+${languageInstruction}
+${trimText(agent.systemPrompt || "", 500)}
+`.trim();
+
     const pageContextPrompt = `
 NASLOV: ${safePageContext.pageTitle || "-"}
 OPIS: ${safePageContext.pageDescription || "-"}
 URL: ${safePageContext.pageUrl || "-"}
-SADRŽAJ: ${safePageContext.pageText || "-"}
+SADRŽAJ STRANICE: ${safePageContext.pageText || "-"}
 `.trim();
 
-    const firstPassSystemPrompt = `
-Ti si ${agent.agentName || "SiteMind AI"}.
-
-PRAVILA:
-- odgovaraj kratko, jasno i korisno
-- koristi samo sadržaj stranice iz konteksta
-- ne izmišljaj podatke koji nisu potvrđeni na stranici
-- ako na temelju sadržaja stranice ne možeš sigurno odgovoriti, vrati točno i samo:
-WEB_FALLBACK
-
-${languageInstruction}
-${trimText(agent.systemPrompt || "", 500)}
-`.trim();
-
-    const firstPassResponse = await openai.responses.create({
+    const requestBody = {
       model: "gpt-5-mini",
       reasoning: { effort: "minimal" },
-      max_output_tokens: 120,
+      max_output_tokens: 180,
       input: [
         {
           role: "system",
-          content: firstPassSystemPrompt
+          content: systemPrompt
         },
         {
           role: "developer",
@@ -197,89 +198,25 @@ ${trimText(agent.systemPrompt || "", 500)}
           content: message
         }
       ]
-    });
+    };
 
-    const firstPassAnswer = extractTextFromResponse(firstPassResponse);
-
-    if (firstPassAnswer && firstPassAnswer !== "WEB_FALLBACK") {
-      return res.status(200).json({
-        answer: firstPassAnswer,
-        usedWebSearch: false,
-        agent: {
-          agentId: agent.agentId || agentId,
-          agentName: agent.agentName || "SiteMind AI",
-          welcomeMessage: agent.welcomeMessage || "",
-          themeColor: agent.themeColor || "#2563eb"
-        }
-      });
-    }
-
-    if (!agent.allowExternalSearch) {
-      return res.status(200).json({
-        answer: getFallbackAnswer(userLang),
-        usedWebSearch: false,
-        agent: {
-          agentId: agent.agentId || agentId,
-          agentName: agent.agentName || "SiteMind AI",
-          welcomeMessage: agent.welcomeMessage || "",
-          themeColor: agent.themeColor || "#2563eb"
-        }
-      });
-    }
-
-    const secondPassSystemPrompt = `
-Ti si ${agent.agentName || "SiteMind AI"}.
-
-PRAVILA:
-- odgovaraj kratko, jasno i korisno
-- prvo uzmi u obzir sadržaj stranice
-- zatim koristi web search za dodatnu provjeru ako stranica nije dovoljna
-- ne izmišljaj cijene, uvjete, kontakte ili obećanja ako to nije potvrđeno
-- ako ni nakon dodatne provjere odgovor nije siguran, to jasno reci
-- nemoj spominjati interni proces
-
-${languageInstruction}
-${trimText(agent.systemPrompt || "", 500)}
-`.trim();
-
-    const secondPassResponse = await openai.responses.create({
-      model: "gpt-5-mini",
-      reasoning: { effort: "minimal" },
-      max_output_tokens: 180,
-      tools: [
+    if (agent.allowExternalSearch) {
+      requestBody.tools = [
         {
           type: "web_search_preview",
           search_context_size: "medium"
         }
-      ],
-      tool_choice: {
-        type: "allowed_tools",
-        mode: "required",
-        tools: [
-          { type: "web_search_preview" }
-        ]
-      },
-      input: [
-        {
-          role: "system",
-          content: secondPassSystemPrompt
-        },
-        {
-          role: "developer",
-          content: pageContextPrompt
-        },
-        {
-          role: "user",
-          content: message
-        }
-      ]
-    });
+      ];
 
-    const secondPassAnswer = extractTextFromResponse(secondPassResponse);
+      requestBody.include = ["web_search_call.action.sources"];
+    }
+
+    const response = await openai.responses.create(requestBody);
+    const answer = extractTextFromResponse(response) || getFallbackAnswer(userLang);
 
     return res.status(200).json({
-      answer: secondPassAnswer || getFallbackAnswer(userLang),
-      usedWebSearch: true,
+      answer,
+      usedWebSearch: !!agent.allowExternalSearch,
       agent: {
         agentId: agent.agentId || agentId,
         agentName: agent.agentName || "SiteMind AI",
