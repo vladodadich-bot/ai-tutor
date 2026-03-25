@@ -1,6 +1,6 @@
 (function () {
   const API_URL = "https://ai-tutor-rouge-theta.vercel.app/api/ask";
-  const MAX_QUESTIONS = 5;
+  const MAX_QUESTIONS = 10;
 
   const STORAGE_USED = "aiTutorUsed";
   const STORAGE_HISTORY = "aiTutorHistory";
