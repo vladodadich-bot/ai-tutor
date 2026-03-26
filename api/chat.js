@@ -44,17 +44,13 @@ function extractAnswer(data) {
 }
 
 function isDomainAllowed(agent, origin, referer) {
-  const allowed = Array.isArray(agent?.allowed_domains)
-    ? agent.allowed_domains
-    : agent?.site_domain
-      ? [agent.site_domain]
-      : [];
+  const allowed = agent && agent.site_domain ? [String(agent.site_domain).trim()] : [];
 
   if (!allowed.length) return true;
 
   return allowed.some((domain) => {
-    const d = String(domain || "").trim();
-    return (origin && origin.startsWith(d)) || (referer && referer.startsWith(d));
+    if (!domain) return false;
+    return (origin && origin.startsWith(domain)) || (referer && referer.startsWith(domain));
   });
 }
 
