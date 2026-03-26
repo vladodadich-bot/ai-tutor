@@ -1,9 +1,4 @@
-import OpenAI from "openai";
 import { getAgentById } from "../lib/agents.js";
-
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 function cleanText(value, max = 1000) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -22,16 +17,13 @@ function normalizeHistory(history) {
 }
 
 export default async function handler(req, res) {
-  if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    return res.status(200).end();
-  }
-
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -42,16 +34,20 @@ export default async function handler(req, res) {
       message,
       agentId,
       history,
-      pageContext,
       pageTitle,
       pageDescription,
-      pageUrl
+      pageUrl,
+      pageContext
     } = req.body || {};
 
     const userMessage = cleanText(message, 800);
 
     if (!userMessage) {
       return res.status(400).json({ error: "Missing message" });
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
     }
 
     const agent = getAgentById(agentId || "demo-agent");
@@ -62,54 +58,86 @@ export default async function handler(req, res) {
     const safePageUrl = cleanText(pageUrl, 300);
     const safePageContext = cleanText(pageContext, 3500);
 
-    const pageInfoBlock = `
+    const historyText = safeHistory.length
+      ? safeHistory
+          .map((item, index) => {
+            const label = item.role === "assistant" ? "AI" : "Korisnik";
+            return `Poruka ${index + 1} (${label}): ${item.content}`;
+          })
+          .join("\n")
+      : "Nema prethodnih poruka.";
+
+    const prompt = `
+${agent.systemPrompt || ""}
+
 PODACI O STRANICI:
-- URL: ${safePageUrl || "Nije dostupno"}
-- Naslov: ${safePageTitle || "Nije dostupno"}
-- Opis: ${safePageDescription || "Nije dostupno"}
+Naslov: ${safePageTitle || "Nije dostupno"}
+Opis: ${safePageDescription || "Nije dostupno"}
+URL: ${safePageUrl || "Nije dostupno"}
 
 SADRŽAJ STRANICE:
 ${safePageContext || "Sadržaj stranice nije dostupan."}
-    `.trim();
 
-    const systemPrompt = `
-${agent.systemPrompt || ""}
+PRETHODNI RAZGOVOR:
+${historyText}
+
+NOVA PORUKA KORISNIKA:
+${userMessage}
 
 DODATNA PRAVILA:
-- Ako korisnik pita nešto o ovoj stranici, proizvodu, usluzi ili sadržaju stranice, koristi prvenstveno podatke iz bloka "PODACI O STRANICI" i "SADRŽAJ STRANICE".
-- Ako odgovor nije jasno vidljiv iz sadržaja stranice, reci to iskreno.
-- Ne izmišljaj funkcije, cijene, uvjete, kontakte ili tehničke mogućnosti.
-- Ako korisnik postavi opće tehničko pitanje koje nije direktno vezano za stranicu, pomozi kratko i jasno.
-- Uzmi u obzir prethodne poruke iz razgovora i ponašaj se kao da je razgovor kontinuiran.
-- Ako korisnik napiše kratko "ok", "u redu", "može", "nastavi", odgovori u skladu s prethodnim kontekstom.
-- Odgovaraj kratko, jasno i korisno.
-- Idealna dužina odgovora je do 160 riječi, osim ako je za tehničko objašnjenje potrebno malo više.
+- ako korisnik pita o ovoj stranici, odgovaraj prvenstveno iz sadržaja stranice
+- ako nešto nije jasno iz sadržaja stranice, reci to iskreno
+- ne izmišljaj informacije
+- uzmi u obzir prethodne poruke i nastavi razgovor prirodno
+- odgovaraj kratko, jasno i korisno
+`.trim();
 
-${pageInfoBlock}
-    `.trim();
-
-    const messages = [
-      { role: "system", content: systemPrompt },
-      ...safeHistory,
-      { role: "user", content: userMessage }
-    ];
-
-    const completion = await client.chat.completions.create({
-      model: "gpt-5-mini",
-      messages,
-      temperature: 0.4
+    const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-5-mini",
+        input: prompt
+      })
     });
 
-    const answer =
-      completion.choices?.[0]?.message?.content?.trim() || "Trenutno nemam odgovor.";
+    const data = await openaiResponse.json();
+
+    if (!openaiResponse.ok) {
+      return res.status(openaiResponse.status).json({
+        error: "OpenAI API error",
+        details: data
+      });
+    }
+
+    let answer = data.output_text || "";
+
+    if (!answer && data.output && Array.isArray(data.output)) {
+      const parts = [];
+
+      for (const item of data.output) {
+        if (item.content && Array.isArray(item.content)) {
+          for (const c of item.content) {
+            if (c.type === "output_text" && c.text) {
+              parts.push(c.text);
+            }
+          }
+        }
+      }
+
+      answer = parts.join("\n");
+    }
 
     return res.status(200).json({
-      answer
+      answer: answer || "Trenutno nemam odgovora."
     });
   } catch (error) {
     return res.status(500).json({
       error: "Server error",
-      details: String(error?.message || error)
+      details: String(error && error.message ? error.message : error)
     });
   }
 }
