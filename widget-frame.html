@@ -397,9 +397,13 @@
             data = { error: "Neispravan odgovor servera." };
           }
 
-          if (!response.ok) {
-            throw new Error(data.error || "Greška servera.");
-          }
+         if (!response.ok) {
+  throw new Error(
+    data.details
+      ? (typeof data.details === "string" ? data.details : JSON.stringify(data.details))
+      : (data.error || "Greška servera.")
+  );
+}
 
           if (!data.answer) {
             throw new Error("Nema odgovora.");
