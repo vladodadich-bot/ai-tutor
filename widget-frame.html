@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,436 +9,500 @@
       box-sizing: border-box;
     }
 
-    :root {
-      --text: #eef4ff;
-      --muted: rgba(238, 244, 255, 0.68);
-      --accent: #2563eb;
-      --accent-2: #1d4ed8;
-      --border: rgba(255, 255, 255, 0.08);
-      --bubble-bot: rgba(255, 255, 255, 0.06);
-      --bubble-user: linear-gradient(135deg, #2563eb, #1d4ed8);
-    }
-
     html, body {
       margin: 0;
       padding: 0;
+      width: 100%;
       height: 100%;
-      background: transparent;
-      color: var(--text);
-      font-family: Inter, Arial, sans-serif;
+      font-family: Arial, sans-serif;
+      background: #f8fafc;
     }
 
     body {
-      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
-    .wrap {
+    .chat-shell {
       display: flex;
       flex-direction: column;
       height: 100vh;
-      background:
-        radial-gradient(circle at top right, rgba(37, 99, 235, 0.18), transparent 30%),
-        linear-gradient(180deg, #0a1020 0%, #060b16 100%);
-      border-radius: 22px;
+      width: 100%;
+      background: #ffffff;
+      border-radius: 16px;
       overflow: hidden;
-      border: 1px solid var(--border);
-      backdrop-filter: blur(14px);
     }
 
-    .header {
-      padding: 16px 16px 14px;
-      border-bottom: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.03);
+    .chat-header {
+      padding: 14px 16px;
+      color: #ffffff;
+      background: #2563eb;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex-shrink: 0;
     }
 
-    .header-title {
-      font-size: 15px;
+    .chat-title {
+      font-size: 16px;
       font-weight: 700;
       line-height: 1.2;
     }
 
-    .header-subtitle {
-      margin-top: 4px;
+    .chat-subtitle {
       font-size: 12px;
-      color: var(--muted);
+      opacity: 0.9;
+      line-height: 1.3;
     }
 
-    .messages {
+    .chat-messages {
       flex: 1;
       overflow-y: auto;
       padding: 14px;
+      background: #f8fafc;
     }
 
-    .msg {
-      max-width: 86%;
-      padding: 11px 13px;
-      margin-bottom: 10px;
-      border-radius: 16px;
+    .message-row {
+      display: flex;
+      margin-bottom: 12px;
+    }
+
+    .message-row.user {
+      justify-content: flex-end;
+    }
+
+    .message-row.assistant {
+      justify-content: flex-start;
+    }
+
+    .bubble {
+      max-width: 85%;
+      padding: 10px 12px;
+      border-radius: 14px;
       font-size: 14px;
-      line-height: 1.48;
+      line-height: 1.45;
+      word-wrap: break-word;
       white-space: pre-wrap;
-      word-break: break-word;
     }
 
-    .bot {
-      background: var(--bubble-bot);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-bottom-left-radius: 6px;
-    }
-
-    .user {
-      margin-left: auto;
-      background: var(--bubble-user);
-      color: #fff;
+    .message-row.user .bubble {
+      background: #2563eb;
+      color: #ffffff;
       border-bottom-right-radius: 6px;
     }
 
-    .typing {
-      opacity: 0.85;
-      font-style: italic;
+    .message-row.assistant .bubble {
+      background: #e5e7eb;
+      color: #111827;
+      border-bottom-left-radius: 6px;
     }
 
-    .composer {
-      padding: 12px;
-      border-top: 1px solid var(--border);
-      background: rgba(0, 0, 0, 0.14);
+    .chat-status {
+      min-height: 20px;
+      padding: 0 14px 8px;
+      font-size: 12px;
+      color: #6b7280;
+      background: #f8fafc;
+      flex-shrink: 0;
     }
 
-    .composer-inner {
+    .chat-form {
       display: flex;
       gap: 8px;
-      align-items: flex-end;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 8px;
+      padding: 12px;
+      background: #ffffff;
+      border-top: 1px solid #e5e7eb;
+      flex-shrink: 0;
     }
 
-    textarea {
+    .chat-input {
       flex: 1;
       resize: none;
-      min-height: 46px;
+      min-height: 44px;
       max-height: 120px;
-      padding: 12px;
-      border: none;
-      outline: none;
-      background: transparent;
-      color: var(--text);
+      padding: 11px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
       font-size: 14px;
       line-height: 1.4;
-      font-family: Inter, Arial, sans-serif;
+      outline: none;
     }
 
-    textarea::placeholder {
-      color: rgba(238, 244, 255, 0.45);
+    .chat-input:focus {
+      border-color: #2563eb;
     }
 
-    button {
-      height: 44px;
-      min-width: 92px;
-      border: none;
-      border-radius: 14px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    .chat-send {
+      border: 0;
+      border-radius: 12px;
+      background: #2563eb;
       color: #ffffff;
-      font-weight: 700;
-      cursor: pointer;
       padding: 0 16px;
+      font-size: 14px;
+      font-weight: 700;
+      min-width: 86px;
+      cursor: pointer;
     }
 
-    .debug {
-      font-size: 11px;
-      color: var(--muted);
-      padding: 0 14px 8px;
-      display: none;
+    .chat-send:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .typing-dots {
+      display: inline-block;
+      letter-spacing: 2px;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0% { opacity: 0.2; }
+      50% { opacity: 1; }
+      100% { opacity: 0.2; }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="header">
-      <div class="header-title" id="chat-header">SiteMind AI</div>
-      <div class="header-subtitle" id="chat-subtitle">AI help for this page</div>
+  <div class="chat-shell">
+    <div class="chat-header" id="chatHeader">
+      <div class="chat-title" id="chatTitle">SiteMind AI</div>
+      <div class="chat-subtitle" id="chatSubtitle">Postavi pitanje o ovoj stranici.</div>
     </div>
 
-    <div id="messages" class="messages"></div>
-    <div id="debug" class="debug"></div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-status" id="chatStatus"></div>
 
-    <div class="composer">
-      <div class="composer-inner">
-        <textarea id="input" placeholder="Type your message..."></textarea>
-        <button id="sendBtn">Send</button>
-      </div>
-    </div>
+    <form class="chat-form" id="chatForm">
+      <textarea
+        id="chatInput"
+        class="chat-input"
+        placeholder="Napiši pitanje..."
+        rows="1"
+      ></textarea>
+      <button type="submit" id="chatSend" class="chat-send">Pošalji</button>
+    </form>
   </div>
 
   <script>
-    let agentLoaded = false;
-    let welcomeShown = false;
+    (function () {
+      "use strict";
 
-    const params = new URLSearchParams(window.location.search);
-    const agentId = params.get("agentId") || "demo-agent";
-    const baseUrl = (params.get("baseUrl") || window.location.origin).replace(/\/$/, "");
+      var API_URL = "/api/chat";
+      var REQUEST_TIMEOUT = 30000;
+      var MAX_HISTORY_ITEMS = 12;
 
-    const messages = document.getElementById("messages");
-    const input = document.getElementById("input");
-    const sendBtn = document.getElementById("sendBtn");
-    const header = document.getElementById("chat-header");
-    const subtitle = document.getElementById("chat-subtitle");
-    const debugEl = document.getElementById("debug");
+      var chatForm = document.getElementById("chatForm");
+      var chatInput = document.getElementById("chatInput");
+      var chatSend = document.getElementById("chatSend");
+      var chatMessages = document.getElementById("chatMessages");
+      var chatStatus = document.getElementById("chatStatus");
+      var chatTitle = document.getElementById("chatTitle");
+      var chatSubtitle = document.getElementById("chatSubtitle");
+      var chatHeader = document.getElementById("chatHeader");
 
-    let pageContext = {
-      pageUrl: "",
-      pageTitle: "",
-      pageDescription: "",
-      pageText: "",
-      lang: "en"
-    };
+      var params = new URLSearchParams(window.location.search);
+      var agentId = params.get("agentId") || "demo-agent";
 
-    const uiText = {
-      hr: {
-        title: "SiteMind AI",
-        subtitle: "AI pomoć za ovu stranicu",
-        welcome: "Bok! Kako vam mogu pomoći?",
-        placeholder: "Upišite pitanje...",
-        send: "Pošalji",
-        typing: "AI razmišlja...",
-        commError: "Greška u komunikaciji.",
-        apiError: "API greška: ",
-        noAnswer: "Nema odgovora."
-      },
-      en: {
-        title: "SiteMind AI",
-        subtitle: "AI help for this page",
-        welcome: "Hi! How can I help?",
-        placeholder: "Type your message...",
-        send: "Send",
-        typing: "AI is thinking...",
-        commError: "Communication error.",
-        apiError: "API error: ",
-        noAnswer: "No answer."
-      },
-      de: {
-        title: "SiteMind AI",
-        subtitle: "KI-Hilfe für diese Seite",
-        welcome: "Hallo! Wie kann ich helfen?",
-        placeholder: "Nachricht eingeben...",
-        send: "Senden",
-        typing: "KI denkt nach...",
-        commError: "Kommunikationsfehler.",
-        apiError: "API-Fehler: ",
-        noAnswer: "Keine Antwort."
-      }
-    };
+      var pageData = {
+        pageTitle: "",
+        pageDescription: "",
+        pageUrl: "",
+        pageContext: ""
+      };
 
-    function normalizeLang(lang) {
-      const raw = (lang || "").toLowerCase();
+      var agentData = {
+        agentId: agentId,
+        agentName: "SiteMind AI",
+        welcomeMessage: "",
+        themeColor: "#2563eb"
+      };
 
-      if (
-        raw.indexOf("hr") === 0 ||
-        raw.indexOf("bs") === 0 ||
-        raw.indexOf("sr") === 0
-      ) {
-        return "hr";
+      var isSending = false;
+      var activeController = null;
+
+      function getHistoryKey() {
+        return "sitemind_history_" + agentId;
       }
 
-      if (raw.indexOf("de") === 0) {
-        return "de";
+      function escapeHtml(str) {
+        return String(str || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
       }
 
-      return "en";
-    }
-
-    function getLocale(lang) {
-      if (lang === "hr") return uiText.hr;
-      if (lang === "de") return uiText.de;
-      return uiText.en;
-    }
-
-    function detectUserLanguageFromMessage(message, fallback) {
-      const m = (message || "").trim().toLowerCase();
-
-      if (!m) return normalizeLang(fallback || "en");
-
-      if (/[čćžšđ]/.test(m)) return "hr";
-      if (/[äöüß]/.test(m)) return "de";
-
-      if (
-        /\b(kako|sto|što|sta|šta|koliko|gdje|gde|moze|može|trebam|zelim|želim|cijena|kontakt|usluga|pomoc|pomoć|stranica|stranici|ovoj|cemu|čemu|radi|ucenje|učenje|njemacki|njemački|lekcije|tecaj|tečaj)\b/.test(m)
-      ) {
-        return "hr";
+      function setStatus(text) {
+        chatStatus.textContent = text || "";
       }
 
-      if (
-        /\b(wie|was|worum|seite|inhalt|hilfe|kontakt|preis|deutsch|lektion|lektionen|lernen|kurs|ich|möchte|mochte|bitte|danke)\b/.test(m)
-      ) {
-        return "de";
+      function autoResizeTextarea() {
+        chatInput.style.height = "auto";
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + "px";
       }
 
-      if (
-        /\b(how|what|about|page|content|help|contact|price|course|lesson|lessons|learn|learning|german|service)\b/.test(m)
-      ) {
-        return "en";
+      function scrollToBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
-      return normalizeLang(fallback || "en");
-    }
-
-    function applyLanguageToUI() {
-      pageContext.lang = normalizeLang(pageContext.lang);
-      const t = getLocale(pageContext.lang);
-
-      document.documentElement.lang = pageContext.lang;
-      document.title = t.title;
-
-      if (!agentLoaded) {
-        header.textContent = t.title;
+      function setLoading(loading) {
+        isSending = !!loading;
+        chatSend.disabled = loading;
+        chatInput.disabled = loading;
+        chatSend.textContent = loading ? "..." : "Pošalji";
+        setStatus(loading ? "AI razmišlja..." : "");
       }
 
-      subtitle.textContent = t.subtitle;
-      input.placeholder = t.placeholder;
-      sendBtn.textContent = t.send;
-    }
+      function getStoredHistory() {
+        try {
+          var raw = localStorage.getItem(getHistoryKey());
+          var parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return [];
+        }
+      }
 
-    function addMessage(text, type, extraClass) {
-      const div = document.createElement("div");
-      div.className = "msg " + type + (extraClass ? " " + extraClass : "");
-      div.textContent = text;
-      messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
-      return div;
-    }
+      function saveStoredHistory(history) {
+        try {
+          localStorage.setItem(
+            getHistoryKey(),
+            JSON.stringify(history.slice(-MAX_HISTORY_ITEMS))
+          );
+        } catch (e) {}
+      }
 
-    function showWelcomeIfNeeded() {
-      if (welcomeShown) return;
-      const t = getLocale(pageContext.lang);
-      addMessage(t.welcome, "bot");
-      welcomeShown = true;
-    }
+      function normalizeHistory(history) {
+        if (!Array.isArray(history)) return [];
+        return history
+          .map(function (item) {
+            return {
+              role: item && item.role === "assistant" ? "assistant" : "user",
+              content: String(item && item.content ? item.content : "").trim().slice(0, 1500)
+            };
+          })
+          .filter(function (item) {
+            return item.content;
+          })
+          .slice(-MAX_HISTORY_ITEMS);
+      }
 
-    window.addEventListener("message", function (event) {
-      if (!event.data || event.data.type !== "sitemind_page_context") return;
+      function addMessage(role, text) {
+        var row = document.createElement("div");
+        row.className = "message-row " + role;
 
-      pageContext = event.data.payload || pageContext;
-      pageContext.lang = normalizeLang(pageContext.lang);
+        var bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
 
-      applyLanguageToUI();
-      showWelcomeIfNeeded();
-    });
+        row.appendChild(bubble);
+        chatMessages.appendChild(row);
+        scrollToBottom();
 
-    async function sendMessage(message, userLang) {
-      const res = await fetch(baseUrl + "/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: message,
-          agentId: agentId,
-          userLang: userLang,
-          pageContext: pageContext
-        })
+        return row;
+      }
+
+      function updateMessage(row, text) {
+        if (!row) return;
+        var bubble = row.querySelector(".bubble");
+        if (!bubble) return;
+        bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+        scrollToBottom();
+      }
+
+      function renderStoredHistory() {
+        var history = getStoredHistory();
+        if (!history.length) return;
+
+        history.forEach(function (item) {
+          addMessage(item.role, item.content);
+        });
+      }
+
+      function renderWelcomeIfNeeded() {
+        var history = getStoredHistory();
+        if (history.length) return;
+
+        var welcome =
+          agentData.welcomeMessage ||
+          "Bok! Mogu pomoći oko ove stranice, proizvoda, usluge ili općih tehničkih pitanja.";
+
+        addMessage("assistant", welcome);
+      }
+
+      function applyAgentData() {
+        chatTitle.textContent = agentData.agentName || "SiteMind AI";
+        chatHeader.style.background = agentData.themeColor || "#2563eb";
+        chatSend.style.background = agentData.themeColor || "#2563eb";
+      }
+
+      async function fetchAgentConfig() {
+        try {
+          var res = await fetch("/api/agent-config?agentId=" + encodeURIComponent(agentId));
+          if (!res.ok) return;
+          var data = await res.json();
+          if (!data) return;
+
+          agentData.agentId = data.agentId || agentId;
+          agentData.agentName = data.agentName || "SiteMind AI";
+          agentData.welcomeMessage = data.welcomeMessage || "";
+          agentData.themeColor = data.themeColor || "#2563eb";
+
+          applyAgentData();
+        } catch (e) {}
+      }
+
+      async function sendMessageToApi(userMessage) {
+        var history = normalizeHistory(getStoredHistory());
+
+        if (activeController) {
+          try {
+            activeController.abort();
+          } catch (e) {}
+        }
+
+        activeController = new AbortController();
+
+        var timeoutId = setTimeout(function () {
+          try {
+            activeController.abort();
+          } catch (e) {}
+        }, REQUEST_TIMEOUT);
+
+        try {
+          var response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            signal: activeController.signal,
+            body: JSON.stringify({
+              agentId: agentId,
+              message: userMessage,
+              history: history,
+              pageTitle: pageData.pageTitle,
+              pageDescription: pageData.pageDescription,
+              pageUrl: pageData.pageUrl,
+              pageContext: pageData.pageContext
+            })
+          });
+
+          var text = await response.text();
+          var data = {};
+
+          try {
+            data = text ? JSON.parse(text) : {};
+          } catch (e) {
+            data = { error: "Neispravan odgovor servera." };
+          }
+
+          if (!response.ok) {
+            throw new Error(data.error || "Greška servera.");
+          }
+
+          if (!data.answer) {
+            throw new Error("Nema odgovora.");
+          }
+
+          return String(data.answer).trim();
+        } finally {
+          clearTimeout(timeoutId);
+          activeController = null;
+        }
+      }
+
+      async function handleSubmit(event) {
+        event.preventDefault();
+        if (isSending) return;
+
+        var userMessage = String(chatInput.value || "").trim();
+        if (!userMessage) return;
+
+        addMessage("user", userMessage);
+        chatInput.value = "";
+        autoResizeTextarea();
+        setLoading(true);
+
+        var placeholder = addMessage("assistant", "Razmišljam...");
+
+        try {
+          var answer = await sendMessageToApi(userMessage);
+
+          updateMessage(placeholder, answer);
+
+          var history = normalizeHistory(getStoredHistory());
+          history.push({ role: "user", content: userMessage });
+          history.push({ role: "assistant", content: answer });
+          saveStoredHistory(history);
+        } catch (error) {
+          var msg = "Došlo je do greške. Pokušaj ponovno.";
+
+          if (error && error.name === "AbortError") {
+            msg = "Zahtjev je trajao predugo. Pokušaj s kraćim pitanjem.";
+          } else if (error && error.message) {
+            msg = error.message;
+          }
+
+          updateMessage(placeholder, msg);
+        } finally {
+          setLoading(false);
+          chatInput.focus();
+        }
+      }
+
+      window.addEventListener("message", function (event) {
+        if (!event.data || typeof event.data !== "object") return;
+
+        if (event.data.type === "sitemind-page-context") {
+          pageData.pageTitle = String(event.data.pageTitle || "").slice(0, 300);
+          pageData.pageDescription = String(event.data.pageDescription || "").slice(0, 500);
+          pageData.pageUrl = String(event.data.pageUrl || "").slice(0, 500);
+          pageData.pageContext = String(event.data.pageContext || "").slice(0, 5000);
+
+          if (pageData.pageTitle) {
+            chatSubtitle.textContent = "Pitaj nešto o: " + pageData.pageTitle;
+          }
+        }
+
+        if (event.data.type === "sitemind-agent-config") {
+          agentData.agentId = event.data.agentId || agentId;
+          agentData.agentName = event.data.agentName || "SiteMind AI";
+          agentData.welcomeMessage = event.data.welcomeMessage || "";
+          agentData.themeColor = event.data.themeColor || "#2563eb";
+          applyAgentData();
+        }
       });
 
-      const text = await res.text();
+      chatForm.addEventListener("submit", handleSubmit);
 
-      try {
-        return JSON.parse(text);
-      } catch (e) {
-        return {
-          error: "API did not return JSON",
-          raw: text
-        };
+      chatInput.addEventListener("input", autoResizeTextarea);
+
+      chatInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          handleSubmit(event);
+        }
+      });
+
+      renderStoredHistory();
+      applyAgentData();
+      fetchAgentConfig().finally(function () {
+        renderWelcomeIfNeeded();
+      });
+
+      if (window.parent && window.parent !== window) {
+        try {
+          window.parent.postMessage(
+            {
+              type: "sitemind-widget-ready",
+              agentId: agentId
+            },
+            "*"
+          );
+        } catch (e) {}
       }
-    }
-
-   async function handleSend() {
-  const message = input.value.trim();
-  if (!message) return;
-
-  const userLang = detectUserLanguageFromMessage(message, pageContext.lang);
-  const t = getLocale(userLang);
-
-  addMessage(message, "user");
-  input.value = "";
-  input.style.height = "46px";
-
-  // ✅ NORMALIZACIJA PORUKE
-  const m = message.toLowerCase().trim();
-
-  const isShortAck =
-    m === "ok" ||
-    m === "oke" ||
-    m === "okey" ||
-    m === "super" ||
-    m === "hvala" ||
-    m === "thanks" ||
-    m === "thank you" ||
-    m === "danke";
-
-  // ✅ AKO JE "OK" → NE ZOVI API
-  if (isShortAck) {
-    let reply = "";
-
-    if (userLang === "hr") {
-      reply = "Naravno 😊 Zanima li vas još nešto?";
-    } else if (userLang === "de") {
-      reply = "Gerne 😊 Möchten Sie noch etwas wissen?";
-    } else {
-      reply = "Of course 😊 Is there anything else you'd like to know?";
-    }
-
-    addMessage(reply, "bot");
-    return; // 🔥 STOP → nema API poziva
-  }
-
-  sendBtn.disabled = true;
-
-  const typingDiv = addMessage(t.typing, "bot", "typing");
-
-  try {
-    const data = await sendMessage(message, userLang);
-
-    typingDiv.remove();
-
-    if (data && data.agent && !agentLoaded) {
-      if (data.agent.agentName) {
-        header.textContent = data.agent.agentName;
-      }
-      agentLoaded = true;
-    }
-
-    if (data && data.answer) {
-      addMessage(data.answer, "bot");
-    } else if (data && data.error) {
-      addMessage(t.apiError + data.error, "bot");
-    } else {
-      addMessage(t.noAnswer, "bot");
-    }
-
-  } catch (err) {
-    typingDiv.remove();
-    addMessage(t.commError, "bot");
-  } finally {
-    sendBtn.disabled = false;
-    input.focus();
-  }
-}
-
-    sendBtn.addEventListener("click", handleSend);
-
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    });
-
-    input.addEventListener("input", function () {
-      input.style.height = "46px";
-      input.style.height = Math.min(input.scrollHeight, 120) + "px";
-    });
-
-    applyLanguageToUI();
+    })();
   </script>
 </body>
 </html>
