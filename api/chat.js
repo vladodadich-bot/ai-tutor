@@ -43,15 +43,23 @@ function extractAnswer(data) {
   return answer || "Trenutno nemam odgovora.";
 }
 
-function isDomainAllowed(agent, origin, referer) {
-  const allowed = agent && agent.site_domain ? [String(agent.site_domain).trim()] : [];
+function normalizeDomain(url) {
+  return String(url || "")
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .split("/")[0]
+    .trim()
+    .toLowerCase();
+}
 
-  if (!allowed.length) return true;
+function isDomainAllowed(agent, pageUrl) {
+  const allowedDomain = normalizeDomain(agent && agent.site_domain ? agent.site_domain : "");
+  const currentDomain = normalizeDomain(pageUrl);
 
-  return allowed.some((domain) => {
-    if (!domain) return false;
-    return (origin && origin.startsWith(domain)) || (referer && referer.startsWith(domain));
-  });
+  if (!allowedDomain) return true;
+  if (!currentDomain) return false;
+
+  return currentDomain === allowedDomain;
 }
 
 export default async function handler(req, res) {
@@ -119,12 +127,12 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Agent not found" });
     }
 
-    const origin = req.headers.origin || "";
-    const referer = req.headers.referer || "";
-
-    if (!isDomainAllowed(agent, origin, referer)) {
-      return res.status(403).json({ error: "Domain not allowed" });
-    }
+   if (!isDomainAllowed(agent, pageUrl)) {
+  return res.status(403).json({
+    error: "Domain not allowed",
+    details: `Allowed: ${agent.site_domain || "none"}, got: ${pageUrl || "missing pageUrl"}`
+  });
+}
 
     const safeHistory = normalizeHistory(history);
     const safePageTitle = cleanText(pageTitle, 200);
