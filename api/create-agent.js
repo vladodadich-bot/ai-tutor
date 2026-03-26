@@ -6,93 +6,59 @@ function generateAgentId() {
 }
 
 function cleanText(value, max = 500) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, max);
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-export default async function handler(req, res) {
+export default function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    const { agentName, welcomeMessage, themeColor } = req.body || {};
+    const { agentName, welcomeMessage, themeColor, siteDomain } = req.body;
 
-    const safeAgentName = cleanText(agentName, 100);
-    const safeWelcomeMessage = cleanText(welcomeMessage, 300);
-    const safeThemeColor = /^#[0-9A-Fa-f]{6}$/.test(String(themeColor || ""))
-      ? themeColor
-      : "#2563eb";
-
-    if (!safeAgentName) {
+    if (!agentName) {
       return res.status(400).json({ error: "Missing agentName" });
+    }
+
+    if (!siteDomain) {
+      return res.status(400).json({ error: "Missing siteDomain" });
     }
 
     const agentId = generateAgentId();
 
     const newAgent = {
       agentId,
-      agentName: safeAgentName,
-      welcomeMessage: safeWelcomeMessage || "Bok! Kako vam mogu pomoći?",
-      themeColor: safeThemeColor,
-      allowExternalSearch: false,
-      allowedDomains: [],
-      systemPrompt: `
-Ti si SiteMind AI, pametni AI asistent ugrađen na web stranicu.
-
-Tvoj glavni zadatak je pomoći posjetitelju na temelju sadržaja stranice na kojoj se chat nalazi.
-Ako korisnik pita nešto vezano za ovu stranicu, proizvod, uslugu ili sadržaj stranice, to uvijek ima prioritet.
-
-PRAVILA:
-- odgovaraj kratko, jasno i korisno
-- ne izmišljaj informacije
-- koristi sadržaj stranice kada je dostupan
-- ako odgovor nije jasan iz sadržaja stranice, reci to iskreno
-- možeš pomoći i kod općih tehničkih pitanja kratko i konkretno
-- uzmi u obzir prethodni razgovor
-`.trim()
+      agentName: cleanText(agentName),
+      welcomeMessage: cleanText(welcomeMessage) || "Bok! Kako vam mogu pomoći?",
+      themeColor: themeColor || "#2563eb",
+      allowedDomains: [cleanText(siteDomain)],
+      systemPrompt: "Ti si AI asistent za web stranicu."
     };
 
-    const agentsFilePath = path.join(process.cwd(), "lib", "agents-data.json");
+    const filePath = path.join(process.cwd(), "lib", "agents-data.json");
 
-    let existingAgents = {};
+    let data = {};
 
-    if (fs.existsSync(agentsFilePath)) {
-      try {
-        const raw = fs.readFileSync(agentsFilePath, "utf8");
-        existingAgents = raw ? JSON.parse(raw) : {};
-      } catch (err) {
-        existingAgents = {};
-      }
+    if (fs.existsSync(filePath)) {
+      data = JSON.parse(fs.readFileSync(filePath, "utf8"));
     }
 
-    existingAgents[agentId] = newAgent;
+    data[agentId] = newAgent;
 
-    fs.writeFileSync(
-      agentsFilePath,
-      JSON.stringify(existingAgents, null, 2),
-      "utf8"
-    );
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 
     return res.status(200).json({
-      success: true,
       agentId,
       embedCode: `<script src="https://tvojadomena.com/sitemind-embed.js" data-agent-id="${agentId}"><\/script>`
     });
-  } catch (error) {
+
+  } catch (err) {
     return res.status(500).json({
       error: "Server error",
-      details: String(error && error.message ? error.message : error)
+      details: err.message
     });
   }
 }
