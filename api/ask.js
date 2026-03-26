@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       : "Nema prethodnih pitanja.";
 
     const prompt = `
-Ti si AI Tutor učitelj za učenike osnovne i srednje škole. Pomažeš u Pisanju lektire i učenju različitih školskih predmeta: hrvatski jezik, srpski jezik, matematika, fizika, kemija, geografija i povijest.
+Ti si AI Tutor učitelj za učenike osnovne i srednje škole. Pomažeš u Pisanju lektire i učenju različitih školskih predmeta: hrvatski jezik, srpski jezik, matematika, fizika, biologija, kemija, geografija i povijest.
 
 Tvoj cilj je pomoći učeniku da razumije gradivo na jednostavan, jasan i prijateljski način.
 
@@ -96,7 +96,7 @@ koristi jednostavne riječi
 na kraju napiši konačno rješenje
 ako je zadatak složen, podijeli ga na više koraka
 
-PRAVILA ZA FIZIKU I KEMIJU:
+PRAVILA ZA FIZIKU I KEMIJU I BIOLOGIJU
 
 objasni pojmove jednostavno
 koristi primjere iz svakodnevnog života
