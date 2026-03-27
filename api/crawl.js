@@ -15,20 +15,58 @@ function normalizeUrl(url) {
   }
 }
 
-function extractText(html) {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
-    .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
-    .replace(/<img[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
+function decodeHtml(str) {
+  return String(str || '')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
-    .replace(/\s+/g, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
     .trim();
+}
+
+function stripTags(html) {
+  return decodeHtml(
+    String(html || '')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+      .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
+      .replace(/<img[^>]*>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
+function extractTagContent(html, tagName) {
+  const regex = new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'i');
+  const match = html.match(regex);
+  return stripTags(match?.[1] || '');
+}
+
+function extractMetaDescription(html) {
+  const match =
+    html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["'][^>]*>/i) ||
+    html.match(/<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["'][^>]*>/i);
+
+  return decodeHtml(match?.[1] || '');
+}
+
+function extractHeadings(html) {
+  const regex = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi;
+  const headings = [];
+  let match;
+
+  while ((match = regex.exec(html)) !== null) {
+    const text = stripTags(match[1]);
+    if (text && !headings.includes(text)) {
+      headings.push(text);
+    }
+  }
+
+  return headings.slice(0, 20);
 }
 
 function extractLinks(html, baseOrigin) {
@@ -55,11 +93,16 @@ function extractLinks(html, baseOrigin) {
 
       found.add(normalized);
     } catch {
-      // ignore bad URLs
+      // ignore
     }
   }
 
   return Array.from(found);
+}
+
+function extractTextPreview(html) {
+  const text = stripTags(html);
+  return text.slice(0, 1200);
 }
 
 async function fetchPage(url) {
@@ -91,41 +134,48 @@ export default async function handler(req, res) {
     const startUrl = normalizeUrl(url);
     const baseOrigin = new URL(startUrl).origin;
 
-    // 1. Fetch početne stranice
     const startHtml = await fetchPage(startUrl);
+    const discoveredLinks = extractLinks(startHtml, baseOrigin);
 
-    // 2. Nađi interne linkove
-    const links = extractLinks(startHtml, baseOrigin);
+    const urlsToCrawl = [startUrl, ...discoveredLinks.filter(link => link !== startUrl).slice(0, 12)];
 
-    // 3. Uzmi početni URL + prvih nekoliko internih linkova
-    const urlsToCrawl = [startUrl, ...links.filter(link => link !== startUrl).slice(0, 8)];
-
-    let combinedContent = '';
+    const rows = [];
     const crawledUrls = [];
 
     for (const pageUrl of urlsToCrawl) {
       try {
-        const pageHtml = await fetchPage(pageUrl);
-        const pageText = extractText(pageHtml).slice(0, 5000);
+        const html = await fetchPage(pageUrl);
 
-        if (!pageText) continue;
+        const pageTitle = extractTagContent(html, 'title');
+        const metaDescription = extractMetaDescription(html);
+        const headings = extractHeadings(html);
+        const internalLinks = extractLinks(html, baseOrigin).slice(0, 30);
+        const textPreview = extractTextPreview(html);
+        const h1 = headings[0] || '';
 
-        combinedContent += `\n\n--- PAGE: ${pageUrl} ---\n\n${pageText}`;
+        rows.push({
+          agent_id,
+          url: pageUrl,
+          content: textPreview,
+          page_title: pageTitle,
+          meta_description: metaDescription,
+          h1,
+          headings: JSON.stringify(headings),
+          internal_links: JSON.stringify(internalLinks),
+          text_preview: textPreview
+        });
+
         crawledUrls.push(pageUrl);
       } catch (err) {
         console.error('Error crawling page:', pageUrl, err.message);
       }
     }
 
-    if (!combinedContent.trim()) {
-      return res.status(500).json({ error: 'No content extracted from crawled pages' });
+    if (!rows.length) {
+      return res.status(500).json({ error: 'No pages crawled successfully' });
     }
 
-    const { error } = await supabase.from('site_content').insert({
-      agent_id,
-      url: startUrl,
-      content: combinedContent.slice(0, 50000)
-    });
+    const { error } = await supabase.from('site_content').insert(rows);
 
     if (error) {
       return res.status(500).json({ error: error.message });
@@ -134,10 +184,9 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       agent_id,
-      url: startUrl,
-      pages_crawled: crawledUrls.length,
-      crawled_urls: crawledUrls,
-      content_length: combinedContent.length
+      start_url: startUrl,
+      pages_crawled: rows.length,
+      crawled_urls: crawledUrls
     });
   } catch (err) {
     return res.status(500).json({
