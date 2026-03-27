@@ -148,8 +148,16 @@ export default async function handler(req, res) {
           })
           .join("\n")
       : "Nema prethodnih poruka.";
+const { data: contentData } = await supabase
+  .from("site_content")
+  .select("content, url, created_at")
+  .eq("agent_id", agentId)
+  .order("created_at", { ascending: false })
+  .limit(1);
 
-    const prompt = `
+const crawledContent = (contentData?.[0]?.content || "").slice(0, 12000);
+const crawledUrl = contentData?.[0]?.url || "";
+   const prompt = `
 ${agent.system_prompt || "Ti si SiteMind AI asistent za web stranicu."}
 
 PODACI O TRENUTNOJ STRANICI:
@@ -160,6 +168,10 @@ URL: ${safePageUrl || "Nije dostupno"}
 SADRŽAJ TRENUTNE STRANICE:
 ${safePageContext || "Sadržaj stranice nije dostupan."}
 
+CRAWLANI SADRŽAJ WEB STRANICE:
+Izvor URL: ${crawledUrl || "Nije dostupno"}
+${crawledContent || "Crawlani sadržaj nije dostupan."}
+
 PRETHODNI RAZGOVOR:
 ${historyText}
 
@@ -167,8 +179,9 @@ NOVA PORUKA KORISNIKA:
 ${userMessage}
 
 DODATNA PRAVILA:
-- ako korisnik pita o ovoj stranici, koristi prvenstveno sadržaj stranice
-- ako nešto nije jasno iz sadržaja stranice, reci to iskreno
+- ako korisnik pita o ovoj stranici, koristi prvenstveno sadržaj trenutne stranice
+- ako pitanje traži širi kontekst web stranice, koristi crawlani sadržaj
+- ako podatak ne postoji ni u trenutnoj stranici ni u crawlanom sadržaju, reci to iskreno
 - ne izmišljaj informacije
 - uzmi u obzir prethodni razgovor
 - odgovaraj kratko, jasno i korisno
