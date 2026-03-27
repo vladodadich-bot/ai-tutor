@@ -79,22 +79,73 @@ async function loadAgents() {
     const div = document.createElement("div");
     div.className = "card";
 
-    div.innerHTML =
-      '<h3>' + (agent.agent_name || '') + '</h3>' +
-      '<div class="small">' + (agent.site_domain || '') + '</div>' +
+    const title = document.createElement("h3");
+    title.textContent = agent.agent_name || "";
 
-      '<input value="' + (agent.agent_name || '') + '" id="name-' + agent.agent_id + '">' +
-      '<textarea id="welcome-' + agent.agent_id + '">' + (agent.welcome_message || '') + '</textarea>' +
-      '<input value="' + (agent.theme_color || '') + '" id="color-' + agent.agent_id + '">' +
+    const small = document.createElement("div");
+    small.className = "small";
+    small.textContent = agent.site_domain || "";
 
-      '<textarea id="prompt-' + agent.agent_id + '" placeholder="System prompt">' + (agent.system_prompt || '') + '</textarea>' +
+    const nameInput = document.createElement("input");
+    nameInput.id = "name-" + agent.agent_id;
+    nameInput.value = agent.agent_name || "";
 
-      '<div class="agent-actions">' +
-        '<button class="btn-primary" onclick="updateAgent(\'' + agent.agent_id + '\')">Save</button>' +
-        '<button class="btn-danger" onclick="deleteAgent(\'' + agent.agent_id + '\')">Delete</button>' +
-        '<button class="btn-copy" onclick="copyEmbed(\'' + agent.agent_id + '\')">Copy Embed</button>' +
-        '<button class="btn-primary" onclick="crawlSite(\'' + agent.agent_id + '\', \'' + (agent.site_domain || '') + '\')">Crawl</button>' +
-      '</div>';
+    const welcomeTextarea = document.createElement("textarea");
+    welcomeTextarea.id = "welcome-" + agent.agent_id;
+    welcomeTextarea.value = agent.welcome_message || "";
+
+    const colorInput = document.createElement("input");
+    colorInput.id = "color-" + agent.agent_id;
+    colorInput.value = agent.theme_color || "";
+
+    const promptTextarea = document.createElement("textarea");
+    promptTextarea.id = "prompt-" + agent.agent_id;
+    promptTextarea.placeholder = "System prompt";
+    promptTextarea.value = agent.system_prompt || "";
+
+    const actions = document.createElement("div");
+    actions.className = "agent-actions";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "btn-primary";
+    saveBtn.textContent = "Save";
+    saveBtn.onclick = function () {
+      updateAgent(agent.agent_id);
+    };
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "btn-danger";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.onclick = function () {
+      deleteAgent(agent.agent_id);
+    };
+
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "btn-copy";
+    copyBtn.textContent = "Copy Embed";
+    copyBtn.onclick = function () {
+      copyEmbed(agent.agent_id);
+    };
+
+    const crawlBtn = document.createElement("button");
+    crawlBtn.className = "btn-primary";
+    crawlBtn.textContent = "Crawl";
+    crawlBtn.onclick = function () {
+      crawlSite(agent.agent_id, agent.site_domain || "");
+    };
+
+    actions.appendChild(saveBtn);
+    actions.appendChild(deleteBtn);
+    actions.appendChild(copyBtn);
+    actions.appendChild(crawlBtn);
+
+    div.appendChild(title);
+    div.appendChild(small);
+    div.appendChild(nameInput);
+    div.appendChild(welcomeTextarea);
+    div.appendChild(colorInput);
+    div.appendChild(promptTextarea);
+    div.appendChild(actions);
 
     container.appendChild(div);
   });
