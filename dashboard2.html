@@ -152,7 +152,7 @@ async function deleteAgent(id) {
 }
 
 function copyEmbed(id) {
-  const code = '<script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="' + id + '"></script>';
+ const code = '&lt;script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="' + id + '"&gt;&lt;/script&gt;';
   navigator.clipboard.writeText(code);
   alert("Copied!");
 }
