@@ -1,67 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SiteMind Dashboard</title>
 
 <style>
 body {
-  font-family: Arial, sans-serif;
+  font-family: Arial;
   background: #0f172a;
   color: white;
   margin: 0;
 }
-
 .container {
   max-width: 1100px;
   margin: auto;
   padding: 20px;
 }
-
-h1 {
-  margin-bottom: 20px;
-}
-
 .card {
   background: #1e293b;
   padding: 15px;
   border-radius: 10px;
   margin-bottom: 15px;
 }
-
 input, textarea {
   width: 100%;
   padding: 10px;
   margin-top: 5px;
-  border-radius: 6px;
-  border: none;
   background: #334155;
+  border: none;
+  border-radius: 6px;
   color: white;
 }
-
 button {
   margin-top: 10px;
-  padding: 10px 15px;
+  padding: 10px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
 }
-
 .btn-primary { background: #2563eb; color: white; }
 .btn-danger { background: #ef4444; color: white; }
 .btn-copy { background: #10b981; color: white; }
-
-.agent-actions {
-  margin-top: 10px;
-  display: flex;
-  gap: 10px;
-}
-
-.small {
-  font-size: 12px;
-  opacity: 0.7;
-}
+.agent-actions { display: flex; gap: 10px; }
+.small { font-size: 12px; opacity: 0.6; }
 </style>
 </head>
 
@@ -70,60 +52,50 @@ button {
 <div class="container">
   <h1>🚀 SiteMind Dashboard</h1>
 
-  <!-- CREATE -->
   <div class="card">
     <h3>Create Agent</h3>
-
-    <input id="name" placeholder="Agent name"/>
-    <input id="domain" placeholder="https://example.com"/>
-    <input id="color" placeholder="#2563eb"/>
+    <input id="name" placeholder="Agent name">
+    <input id="domain" placeholder="https://example.com">
+    <input id="color" placeholder="#2563eb">
     <textarea id="welcome" placeholder="Welcome message"></textarea>
-
     <button class="btn-primary" onclick="createAgent()">Create</button>
   </div>
 
-  <!-- LIST -->
   <div id="agents"></div>
-
 </div>
 
 <script>
 const API = "https://ai-tutor-rouge-theta.vercel.app/api";
 
 async function loadAgents() {
-  try {
-    const res = await fetch(API + "/get-agents");
-    const data = await res.json();
+  const res = await fetch(API + "/get-agents");
+  const data = await res.json();
 
-    const container = document.getElementById("agents");
-    container.innerHTML = "";
+  const container = document.getElementById("agents");
+  container.innerHTML = "";
 
-    data.forEach(agent => {
-      const div = document.createElement("div");
-      div.className = "card";
+  data.forEach(agent => {
+    const div = document.createElement("div");
+    div.className = "card";
 
-      div.innerHTML =
-        '<h3>' + agent.agent_name + '</h3>' +
-        '<div class="small">' + agent.site_domain + '</div>' +
+    div.innerHTML =
+      '<h3>' + agent.agent_name + '</h3>' +
+      '<div class="small">' + agent.site_domain + '</div>' +
 
-        '<input value="' + (agent.agent_name || '') + '" id="name-' + agent.agent_id + '">' +
-        '<textarea id="welcome-' + agent.agent_id + '">' + (agent.welcome_message || '') + '</textarea>' +
-        '<input value="' + (agent.theme_color || '') + '" id="color-' + agent.agent_id + '">' +
+      '<input value="' + (agent.agent_name || '') + '" id="name-' + agent.agent_id + '">' +
+      '<textarea id="welcome-' + agent.agent_id + '">' + (agent.welcome_message || '') + '</textarea>' +
+      '<input value="' + (agent.theme_color || '') + '" id="color-' + agent.agent_id + '">' +
 
-        '<textarea id="prompt-' + agent.agent_id + '" placeholder="System prompt">' + (agent.system_prompt || '') + '</textarea>' +
+      '<textarea id="prompt-' + agent.agent_id + '">' + (agent.system_prompt || '') + '</textarea>' +
 
-        '<div class="agent-actions">' +
-          '<button class="btn-primary" onclick="updateAgent(\'' + agent.agent_id + '\')">Save</button>' +
-          '<button class="btn-danger" onclick="deleteAgent(\'' + agent.agent_id + '\')">Delete</button>' +
-          '<button class="btn-copy" onclick="copyEmbed(\'' + agent.agent_id + '\')">Copy Embed</button>' +
-        '</div>';
+      '<div class="agent-actions">' +
+        '<button class="btn-primary" onclick="updateAgent(\'' + agent.agent_id + '\')">Save</button>' +
+        '<button class="btn-danger" onclick="deleteAgent(\'' + agent.agent_id + '\')">Delete</button>' +
+        '<button class="btn-copy" onclick="copyEmbed(\'' + agent.agent_id + '\')">Copy Embed</button>' +
+      '</div>';
 
-      container.appendChild(div);
-    });
-
-  } catch (err) {
-    console.error("Load error:", err);
-  }
+    container.appendChild(div);
+  });
 }
 
 async function createAgent() {
@@ -134,7 +106,7 @@ async function createAgent() {
 
   await fetch(API + "/create-agent", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {"Content-Type":"application/json"},
     body: JSON.stringify({
       agent_name: name,
       site_domain: domain,
@@ -147,14 +119,14 @@ async function createAgent() {
 }
 
 async function updateAgent(id) {
-  const name = document.getElementById("name-" + id).value;
-  const welcome = document.getElementById("welcome-" + id).value;
-  const color = document.getElementById("color-" + id).value;
-  const prompt = document.getElementById("prompt-" + id).value;
+  const name = document.getElementById("name-"+id).value;
+  const welcome = document.getElementById("welcome-"+id).value;
+  const color = document.getElementById("color-"+id).value;
+  const prompt = document.getElementById("prompt-"+id).value;
 
   await fetch(API + "/update-agent", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {"Content-Type":"application/json"},
     body: JSON.stringify({
       agent_id: id,
       agent_name: name,
@@ -172,7 +144,7 @@ async function deleteAgent(id) {
 
   await fetch(API + "/delete-agent", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ agent_id: id })
   });
 
