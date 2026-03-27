@@ -117,9 +117,9 @@ async function loadAgents() {
         <button class="btn-copy" onclick="copyEmbed('${agent.agent_id}')">Copy Embed</button>
       </div>
 
-      <pre id="embed-${agent.agent_id}" style="display:none;">
+    <pre style="display:none;">
 &lt;script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="${agent.agent_id}"&gt;&lt;/script&gt;
-      </pre>
+</pre>
     `;
 
     container.appendChild(div);
@@ -181,7 +181,7 @@ async function deleteAgent(id) {
 }
 
 function copyEmbed(id) {
-  const code = `<script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="${id}"></script>`;
+  const code = '<script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="' + id + '"></script>';
   navigator.clipboard.writeText(code);
   alert("Copied!");
 }
