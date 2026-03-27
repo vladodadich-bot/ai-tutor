@@ -38,14 +38,12 @@ function stripTags(html) {
 
   text = decodeHtml(text);
 
-  text = text
+  const lines = text
     .split('\n')
     .map(line => line.trim())
     .filter(line => {
       if (!line) return false;
       if (line.length < 25) return false;
-
-      const lower = line.toLowerCase();
 
       if (line.startsWith('@')) return false;
       if (line.includes('{') || line.includes('}')) return false;
@@ -54,9 +52,15 @@ function stripTags(html) {
       if (line.includes('var ') || line.includes('let ') || line.includes('const ')) return false;
       if (line.includes('.wp-') || line.includes('--wp--')) return false;
       if (line.includes('charset')) return false;
-      if (line.includes('display:') || line.includes('font-size:') || line.includes('margin:') || line.includes('padding:')) return false;
-      if (line.match(/^[.#][a-z0-9\-_]+/i)) return false;
-      if (line.match(/^[a-z\-]+\s*:/i) && line.length < 120) return false;
+      if (
+        line.includes('display:') ||
+        line.includes('font-size:') ||
+        line.includes('margin:') ||
+        line.includes('padding:')
+      ) return false;
+
+      if (/^[.#][a-z0-9\-_]+/i.test(line)) return false;
+      if (/^[a-z\-]+\s*:/i.test(line) && line.length < 120) return false;
 
       const specialChars = (line.match(/[:;{}<>]/g) || []).length;
       if (specialChars > 8) return false;
@@ -64,29 +68,48 @@ function stripTags(html) {
       return true;
     });
 
-  return text.join(' ').replace(/\s+/g, ' ').trim();
+  return lines.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 function extractTagContent(html, tagName) {
-  const regex = new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'i');
-  const match = html.match(regex);
-  return stripTags(match?.[1] || '');
+  const openTag = '<' + tagName;
+  const closeTag = '</' + tagName + '>';
+  const lowerHtml = String(html || '');
+  const start = lowerHtml.toLowerCase().indexOf(openTag.toLowerCase());
+
+  if (start === -1) return '';
+
+  const openEnd = lowerHtml.indexOf('>', start);
+  if (openEnd === -1) return '';
+
+  const end = lowerHtml.toLowerCase().indexOf(closeTag.toLowerCase(), openEnd);
+  if (end === -1) return '';
+
+  return stripTags(lowerHtml.slice(openEnd + 1, end));
 }
 
 function extractMetaDescription(html) {
-  const match =
-    html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["'][^>]*>/i) ||
-    html.match(/<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["'][^>]*>/i);
+  const str = String(html || '');
+  const patterns = [
+    /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["'][^>]*>/i,
+    /<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["'][^>]*>/i
+  ];
 
-  return decodeHtml(match?.[1] || '');
+  for (const pattern of patterns) {
+    const match = str.match(pattern);
+    if (match && match[1]) return decodeHtml(match[1]);
+  }
+
+  return '';
 }
 
 function extractHeadings(html) {
+  const str = String(html || '');
   const regex = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi;
   const headings = [];
   let match;
 
-  while ((match = regex.exec(html)) !== null) {
+  while ((match = regex.exec(str)) !== null) {
     const text = stripTags(match[1]);
     if (text && !headings.includes(text)) {
       headings.push(text);
@@ -97,11 +120,12 @@ function extractHeadings(html) {
 }
 
 function extractLinks(html, baseOrigin) {
+  const str = String(html || '');
   const regex = /href=["']([^"'#]+)["']/gi;
   const found = new Set();
   let match;
 
-  while ((match = regex.exec(html)) !== null) {
+  while ((match = regex.exec(str)) !== null) {
     const raw = match[1];
 
     try {
@@ -119,13 +143,15 @@ function extractLinks(html, baseOrigin) {
         normalized.includes('/category/') ||
         normalized.includes('/author/') ||
         normalized.includes('/page/') ||
-        normalized.match(/\.(jpg|jpeg|png|webp|gif|pdf|xml|zip|mp4|mp3)$/i)
+        /\.(jpg|jpeg|png|webp|gif|pdf|xml|zip|mp4|mp3)$/i.test(normalized)
       ) {
         continue;
       }
 
       found.add(normalized);
-    } catch {}
+    } catch {
+      // ignore bad URLs
+    }
   }
 
   return Array.from(found);
@@ -163,7 +189,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { url, agent_id } = req.body || {};
+    const body = req.body || {};
+    const url = body.url;
+    const agent_id = body.agent_id;
 
     if (!url || !agent_id) {
       return res.status(400).json({ error: 'Missing url or agent_id' });
@@ -174,7 +202,6 @@ export default async function handler(req, res) {
 
     const startHtml = await fetchPage(startUrl);
     const discoveredLinks = extractLinks(startHtml, baseOrigin);
-
     const urlsToCrawl = [startUrl, ...discoveredLinks.filter(link => link !== startUrl).slice(0, 12)];
 
     const rows = [];
