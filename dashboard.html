@@ -118,10 +118,22 @@ async function loadAgents() {
   </div>
 `;
 
-    <pre style="display:none;">
-&lt;script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="${agent.agent_id}"&gt;&lt;/script&gt;
-</pre>
-    `;
+  div.innerHTML = `
+  <h3>${agent.agent_name}</h3>
+  <div class="small">${agent.site_domain}</div>
+
+  <input value="${agent.agent_name}" id="name-${agent.agent_id}">
+  <textarea id="welcome-${agent.agent_id}">${agent.welcome_message || ""}</textarea>
+  <input value="${agent.theme_color || ""}" id="color-${agent.agent_id}">
+
+  <textarea id="prompt-${agent.agent_id}" placeholder="System prompt">${agent.system_prompt || ""}</textarea>
+
+  <div class="agent-actions">
+    <button class="btn-primary" onclick="updateAgent('${agent.agent_id}')">Save</button>
+    <button class="btn-danger" onclick="deleteAgent('${agent.agent_id}')">Delete</button>
+    <button class="btn-copy" onclick="copyEmbed('${agent.agent_id}')">Copy Embed</button>
+  </div>
+`;
 
     container.appendChild(div);
   });
