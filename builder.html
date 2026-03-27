@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SiteMind AI Builder</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.box {
+  background: #1e293b;
+  padding: 30px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 6px;
+  border: none;
+  background: #334155;
+  color: white;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 15px;
+  background: #2563eb;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+}
+
+.code {
+  margin-top: 15px;
+  background: black;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  word-break: break-all;
+}
+</style>
+</head>
+
+<body>
+
+<div class="box">
+  <h2>🚀 Create your AI Chat</h2>
+
+  <input id="name" placeholder="Your company name">
+  <input id="url" placeholder="https://yourwebsite.com">
+
+  <button onclick="create()">Generate</button>
+
+  <div id="result"></div>
+</div>
+
+<script>
+const API = "https://ai-tutor-rouge-theta.vercel.app/api";
+
+async function create() {
+  const name = document.getElementById("name").value;
+  const url = document.getElementById("url").value;
+
+  const res = await fetch(API + "/create-agent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      agent_name: name,
+      site_domain: url,
+      welcome_message: "Hi! How can I help you?",
+      theme_color: "#2563eb"
+    })
+  });
+
+  const data = await res.json();
+
+  const code = `<script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="${data.agent_id}"></script>`;
+
+  document.getElementById("result").innerHTML = `
+    <p>✅ Your AI is ready</p>
+    <div class="code">${code}</div>
+  `;
+}
+</script>
+
+</body>
+</html>
