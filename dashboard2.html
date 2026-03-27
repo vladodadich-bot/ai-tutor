@@ -156,6 +156,7 @@ function copyEmbed(id) {
  const code = '&lt;script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="' + id + '"&gt;&lt;/script&gt;';
   navigator.clipboard.writeText(code);
   alert("Copied!");
+  loadAgents();
 }
 async function crawlSite(agentId, defaultUrl) {
   const url = prompt("Enter URL to crawl:", defaultUrl || "");
@@ -184,8 +185,7 @@ async function crawlSite(agentId, defaultUrl) {
     alert("Crawl failed: " + err.message);
   }
 }
-loadAgents();
-</script>
 
+</script>
 </body>
 </html>
