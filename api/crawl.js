@@ -27,17 +27,50 @@ function decodeHtml(str) {
 }
 
 function stripTags(html) {
-  return decodeHtml(
-    String(html || '')
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
-      .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
-      .replace(/<img[^>]*>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-  );
+  let text = String(html || '');
+
+  text = text.replace(/<script[\s\S]*?<\/script>/gi, ' ');
+  text = text.replace(/<style[\s\S]*?<\/style>/gi, ' ');
+  text = text.replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ');
+  text = text.replace(/<svg[\s\S]*?<\/svg>/gi, ' ');
+  text = text.replace(/<img[^>]*>/gi, ' ');
+
+  text = text.replace(/<[^>]+>/g, '\n');
+
+  text = decodeHtml(text);
+
+  text = text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => {
+      if (!line) return false;
+      if (line.length < 25) return false;
+
+      const lower = line.toLowerCase();
+
+      // izbaci css / js / tehnički šum
+      if (line.startsWith('@')) return false;
+      if (line.includes('{') || line.includes('}')) return false;
+      if (line.includes('function(') || line.includes('function ')) return false;
+      if (line.includes('=>')) return false;
+      if (line.includes('var ') || line.includes('let ') || line.includes('const ')) return false;
+      if (line.includes('.wp-') || line.includes('--wp--')) return false;
+      if (line.includes('charset')) return false;
+      if (line.includes('display:') || line.includes('font-size:') || line.includes('margin:') || line.includes('padding:')) return false;
+      if (line.match(/^[.#][a-z0-9\-_]+/i)) return false;
+      if (line.match(/^[a-z\-]+\s*:/i) && line.length < 120) return false;
+
+      // izbaci previše "kodaste" linije
+      const specialChars = (line.match(/[:;{}<>]/g) || []).length;
+      if (specialChars > 8) return false;
+
+      return true;
+    });
+
+  text = text.join(' ');
+  text = text.replace(/\s+/g, ' ').trim();
+
+  return text;
 }
 
 function extractTagContent(html, tagName) {
@@ -82,18 +115,24 @@ function extractLinks(html, baseOrigin) {
       const normalized = normalizeUrl(absolute);
 
       if (!normalized.startsWith(baseOrigin)) continue;
+
       if (
         normalized.includes('/search') ||
         normalized.includes('/feeds') ||
         normalized.includes('/?m=1') ||
-        normalized.match(/\.(jpg|jpeg|png|webp|gif|pdf|xml|zip)$/i)
+        normalized.includes('/wp-json') ||
+        normalized.includes('/tag/') ||
+        normalized.includes('/category/') ||
+        normalized.includes('/author/') ||
+        normalized.includes('/page/') ||
+        normalized.match(/\.(jpg|jpeg|png|webp|gif|pdf|xml|zip|mp4|mp3)$/i)
       ) {
         continue;
       }
 
       found.add(normalized);
     } catch {
-      // ignore
+      // ignore bad URLs
     }
   }
 
@@ -137,6 +176,7 @@ export default async function handler(req, res) {
     const startHtml = await fetchPage(startUrl);
     const discoveredLinks = extractLinks(startHtml, baseOrigin);
 
+    // početna + još do 12 internih linkova
     const urlsToCrawl = [startUrl, ...discoveredLinks.filter(link => link !== startUrl).slice(0, 12)];
 
     const rows = [];
@@ -175,10 +215,21 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'No pages crawled successfully' });
     }
 
-    const { error } = await supabase.from('site_content').insert(rows);
+    const { error: deleteError } = await supabase
+      .from('site_content')
+      .delete()
+      .eq('agent_id', agent_id);
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
+    if (deleteError) {
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    const { error: insertError } = await supabase
+      .from('site_content')
+      .insert(rows);
+
+    if (insertError) {
+      return res.status(500).json({ error: insertError.message });
     }
 
     return res.status(200).json({
