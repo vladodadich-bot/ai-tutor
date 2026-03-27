@@ -34,7 +34,6 @@ function stripTags(html) {
   text = text.replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ');
   text = text.replace(/<svg[\s\S]*?<\/svg>/gi, ' ');
   text = text.replace(/<img[^>]*>/gi, ' ');
-
   text = text.replace(/<[^>]+>/g, '\n');
 
   text = decodeHtml(text);
@@ -48,7 +47,6 @@ function stripTags(html) {
 
       const lower = line.toLowerCase();
 
-      // izbaci css / js / tehnički šum
       if (line.startsWith('@')) return false;
       if (line.includes('{') || line.includes('}')) return false;
       if (line.includes('function(') || line.includes('function ')) return false;
@@ -60,17 +58,13 @@ function stripTags(html) {
       if (line.match(/^[.#][a-z0-9\-_]+/i)) return false;
       if (line.match(/^[a-z\-]+\s*:/i) && line.length < 120) return false;
 
-      // izbaci previše "kodaste" linije
       const specialChars = (line.match(/[:;{}<>]/g) || []).length;
       if (specialChars > 8) return false;
 
       return true;
     });
 
-  text = text.join(' ');
-  text = text.replace(/\s+/g, ' ').trim();
-
-  return text;
+  return text.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 function extractTagContent(html, tagName) {
@@ -131,17 +125,14 @@ function extractLinks(html, baseOrigin) {
       }
 
       found.add(normalized);
-    } catch {
-      // ignore bad URLs
-    }
+    } catch {}
   }
 
   return Array.from(found);
 }
 
 function extractTextPreview(html) {
-  const text = stripTags(html);
-  return text.slice(0, 1200);
+  return stripTags(html).slice(0, 1200);
 }
 
 async function fetchPage(url) {
@@ -159,6 +150,14 @@ async function fetchPage(url) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -176,7 +175,6 @@ export default async function handler(req, res) {
     const startHtml = await fetchPage(startUrl);
     const discoveredLinks = extractLinks(startHtml, baseOrigin);
 
-    // početna + još do 12 internih linkova
     const urlsToCrawl = [startUrl, ...discoveredLinks.filter(link => link !== startUrl).slice(0, 12)];
 
     const rows = [];
