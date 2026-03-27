@@ -10,13 +10,13 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Missing SUPABASE_URL' });
     }
 
-    if (!process.env.SUPABASE_KEY) {
-      return res.status(500).json({ error: 'Missing SUPABASE_KEY' });
+    if (!process.env.SUPABASE_ANON_KEY) {
+      return res.status(500).json({ error: 'Missing SUPABASE_ANON_KEY' });
     }
 
     const supabase = createClient(
       process.env.SUPABASE_URL,
-      process.env.SUPABASE_KEY
+      process.env.SUPABASE_ANON_KEY
     );
 
     const { data, error } = await supabase
