@@ -91,52 +91,39 @@ button {
 const API = "https://ai-tutor-rouge-theta.vercel.app/api";
 
 async function loadAgents() {
-  const res = await fetch(API + "/get-agents");
-  const data = await res.json();
+  try {
+    const res = await fetch(API + "/get-agents");
+    const data = await res.json();
 
-  const container = document.getElementById("agents");
-  container.innerHTML = "";
+    const container = document.getElementById("agents");
+    container.innerHTML = "";
 
-  data.forEach(agent => {
-    const div = document.createElement("div");
-    div.className = "card";
+    data.forEach(agent => {
+      const div = document.createElement("div");
+      div.className = "card";
 
-    div.innerHTML = `
-  <h3>${agent.agent_name}</h3>
-  <div class="small">${agent.site_domain}</div>
+      div.innerHTML =
+        '<h3>' + agent.agent_name + '</h3>' +
+        '<div class="small">' + agent.site_domain + '</div>' +
 
-  <input value="${agent.agent_name}" id="name-${agent.agent_id}">
-  <textarea id="welcome-${agent.agent_id}">${agent.welcome_message || ""}</textarea>
-  <input value="${agent.theme_color || ""}" id="color-${agent.agent_id}">
+        '<input value="' + (agent.agent_name || '') + '" id="name-' + agent.agent_id + '">' +
+        '<textarea id="welcome-' + agent.agent_id + '">' + (agent.welcome_message || '') + '</textarea>' +
+        '<input value="' + (agent.theme_color || '') + '" id="color-' + agent.agent_id + '">' +
 
-  <textarea id="prompt-${agent.agent_id}" placeholder="System prompt">${agent.system_prompt || ""}</textarea>
+        '<textarea id="prompt-' + agent.agent_id + '" placeholder="System prompt">' + (agent.system_prompt || '') + '</textarea>' +
 
-  <div class="agent-actions">
-    <button class="btn-primary" onclick="updateAgent('${agent.agent_id}')">Save</button>
-    <button class="btn-danger" onclick="deleteAgent('${agent.agent_id}')">Delete</button>
-    <button class="btn-copy" onclick="copyEmbed('${agent.agent_id}')">Copy Embed</button>
-  </div>
-`;
+        '<div class="agent-actions">' +
+          '<button class="btn-primary" onclick="updateAgent(\'' + agent.agent_id + '\')">Save</button>' +
+          '<button class="btn-danger" onclick="deleteAgent(\'' + agent.agent_id + '\')">Delete</button>' +
+          '<button class="btn-copy" onclick="copyEmbed(\'' + agent.agent_id + '\')">Copy Embed</button>' +
+        '</div>';
 
-  div.innerHTML = `
-  <h3>${agent.agent_name}</h3>
-  <div class="small">${agent.site_domain}</div>
+      container.appendChild(div);
+    });
 
-  <input value="${agent.agent_name}" id="name-${agent.agent_id}">
-  <textarea id="welcome-${agent.agent_id}">${agent.welcome_message || ""}</textarea>
-  <input value="${agent.theme_color || ""}" id="color-${agent.agent_id}">
-
-  <textarea id="prompt-${agent.agent_id}" placeholder="System prompt">${agent.system_prompt || ""}</textarea>
-
-  <div class="agent-actions">
-    <button class="btn-primary" onclick="updateAgent('${agent.agent_id}')">Save</button>
-    <button class="btn-danger" onclick="deleteAgent('${agent.agent_id}')">Delete</button>
-    <button class="btn-copy" onclick="copyEmbed('${agent.agent_id}')">Copy Embed</button>
-  </div>
-`;
-
-    container.appendChild(div);
-  });
+  } catch (err) {
+    console.error("Load error:", err);
+  }
 }
 
 async function createAgent() {
@@ -145,7 +132,7 @@ async function createAgent() {
   const color = document.getElementById("color").value;
   const welcome = document.getElementById("welcome").value;
 
-  const res = await fetch(API + "/create-agent", {
+  await fetch(API + "/create-agent", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -156,15 +143,14 @@ async function createAgent() {
     })
   });
 
-  await res.json();
   loadAgents();
 }
 
 async function updateAgent(id) {
-  const name = document.getElementById(`name-${id}`).value;
-  const welcome = document.getElementById(`welcome-${id}`).value;
-  const color = document.getElementById(`color-${id}`).value;
-  const prompt = document.getElementById(`prompt-${id}`).value;
+  const name = document.getElementById("name-" + id).value;
+  const welcome = document.getElementById("welcome-" + id).value;
+  const color = document.getElementById("color-" + id).value;
+  const prompt = document.getElementById("prompt-" + id).value;
 
   await fetch(API + "/update-agent", {
     method: "POST",
