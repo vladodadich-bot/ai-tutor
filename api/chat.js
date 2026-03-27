@@ -157,7 +157,44 @@ const { data: contentData } = await supabase
 
 const crawledContent = (contentData?.[0]?.content || "").slice(0, 12000);
 const crawledUrl = contentData?.[0]?.url || "";
-   const prompt = `
+   const { data: crawledPages, error: crawledError } = await supabase
+  .from('site_content')
+  .select('url, page_title, meta_description, h1, headings, internal_links, text_preview')
+  .eq('agent_id', agentId)
+  .order('created_at', { ascending: false })
+  .limit(12);
+
+const crawledSummary = (crawledPages || [])
+  .map((page, index) => {
+    let headings = [];
+    let internalLinks = [];
+
+    try {
+      headings = JSON.parse(page.headings || '[]');
+    } catch (e) {
+      headings = [];
+    }
+
+    try {
+      internalLinks = JSON.parse(page.internal_links || '[]');
+    } catch (e) {
+      internalLinks = [];
+    }
+
+    return `
+STRANICA ${index + 1}
+URL: ${page.url || "Nije dostupno"}
+TITLE: ${page.page_title || "Nije dostupno"}
+META OPIS: ${page.meta_description || "Nije dostupno"}
+H1: ${page.h1 || "Nije dostupno"}
+NASLOVI: ${headings.slice(0, 8).join(' | ') || "Nije dostupno"}
+VAŽNI LINKOVI: ${internalLinks.slice(0, 10).join(' | ') || "Nije dostupno"}
+KRATKI SADRŽAJ: ${page.text_preview || "Nije dostupno"}
+`.trim();
+  })
+  .join('\n\n----------------------\n\n');
+    
+    const prompt = `
 ${agent.system_prompt || "Ti si SiteMind AI asistent za web stranicu."}
 
 PODACI O TRENUTNOJ STRANICI:
@@ -168,9 +205,8 @@ URL: ${safePageUrl || "Nije dostupno"}
 SADRŽAJ TRENUTNE STRANICE:
 ${safePageContext || "Sadržaj stranice nije dostupan."}
 
-CRAWLANI SADRŽAJ WEB STRANICE:
-Izvor URL: ${crawledUrl || "Nije dostupno"}
-${crawledContent || "Crawlani sadržaj nije dostupan."}
+CRAWLANI PREGLED WEB STRANICE:
+${crawledSummary || "Crawlani sadržaj nije dostupan."}
 
 PRETHODNI RAZGOVOR:
 ${historyText}
@@ -179,14 +215,16 @@ NOVA PORUKA KORISNIKA:
 ${userMessage}
 
 DODATNA PRAVILA:
-- ako korisnik pita o ovoj stranici, koristi prvenstveno sadržaj trenutne stranice
-- ako pitanje traži širi kontekst web stranice, koristi crawlani sadržaj
-- ako podatak ne postoji ni u trenutnoj stranici ni u crawlanom sadržaju, reci to iskreno
+- koristi prvenstveno podatke sa trenutne stranice ako korisnik pita baš o toj stranici
+- koristi crawlani pregled stranica za širi kontekst o cijelom websiteu
+- oslanjaj se posebno na title, meta opis, naslove i važne linkove
+- ako ne znaš odgovor iz dostupnih podataka, reci to iskreno
 - ne izmišljaj informacije
 - uzmi u obzir prethodni razgovor
 - odgovaraj kratko, jasno i korisno
+- ako korisnik pita gdje nešto može pronaći, pokušaj ga uputiti prema odgovarajućoj stranici ili linku iz crawlanih podataka
 `.trim();
-
+    
     const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
