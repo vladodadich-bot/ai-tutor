@@ -31,6 +31,7 @@ input, textarea {
   border: none;
   border-radius: 6px;
   color: white;
+  box-sizing: border-box;
 }
 button {
   margin-top: 10px;
@@ -42,7 +43,7 @@ button {
 .btn-primary { background: #2563eb; color: white; }
 .btn-danger { background: #ef4444; color: white; }
 .btn-copy { background: #10b981; color: white; }
-.agent-actions { display: flex; gap: 10px; }
+.agent-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .small { font-size: 12px; opacity: 0.6; }
 </style>
 </head>
@@ -79,21 +80,21 @@ async function loadAgents() {
     div.className = "card";
 
     div.innerHTML =
-      '<h3>' + agent.agent_name + '</h3>' +
-      '<div class="small">' + agent.site_domain + '</div>' +
+      '<h3>' + (agent.agent_name || '') + '</h3>' +
+      '<div class="small">' + (agent.site_domain || '') + '</div>' +
 
       '<input value="' + (agent.agent_name || '') + '" id="name-' + agent.agent_id + '">' +
       '<textarea id="welcome-' + agent.agent_id + '">' + (agent.welcome_message || '') + '</textarea>' +
       '<input value="' + (agent.theme_color || '') + '" id="color-' + agent.agent_id + '">' +
 
-      '<textarea id="prompt-' + agent.agent_id + '">' + (agent.system_prompt || '') + '</textarea>' +
+      '<textarea id="prompt-' + agent.agent_id + '" placeholder="System prompt">' + (agent.system_prompt || '') + '</textarea>' +
 
-     '<div class="agent-actions">' +
-  '<button class="btn-primary" onclick="updateAgent(\'' + agent.agent_id + '\')">Save</button>' +
-  '<button class="btn-danger" onclick="deleteAgent(\'' + agent.agent_id + '\')">Delete</button>' +
-  '<button class="btn-copy" onclick="copyEmbed(\'' + agent.agent_id + '\')">Copy Embed</button>' +
-  '<button class="btn-primary" onclick="crawlSite(\'' + agent.agent_id + '\', \'' + (agent.site_domain || '') + '\')">Crawl</button>' +
-'</div>';
+      '<div class="agent-actions">' +
+        '<button class="btn-primary" onclick="updateAgent(\'' + agent.agent_id + '\')">Save</button>' +
+        '<button class="btn-danger" onclick="deleteAgent(\'' + agent.agent_id + '\')">Delete</button>' +
+        '<button class="btn-copy" onclick="copyEmbed(\'' + agent.agent_id + '\')">Copy Embed</button>' +
+        '<button class="btn-primary" onclick="crawlSite(\'' + agent.agent_id + '\', \'' + (agent.site_domain || '') + '\')">Crawl</button>' +
+      '</div>';
 
     container.appendChild(div);
   });
@@ -120,10 +121,10 @@ async function createAgent() {
 }
 
 async function updateAgent(id) {
-  const name = document.getElementById("name-"+id).value;
-  const welcome = document.getElementById("welcome-"+id).value;
-  const color = document.getElementById("color-"+id).value;
-  const prompt = document.getElementById("prompt-"+id).value;
+  const name = document.getElementById("name-" + id).value;
+  const welcome = document.getElementById("welcome-" + id).value;
+  const color = document.getElementById("color-" + id).value;
+  const prompt = document.getElementById("prompt-" + id).value;
 
   await fetch(API + "/update-agent", {
     method: "POST",
@@ -153,14 +154,13 @@ async function deleteAgent(id) {
 }
 
 function copyEmbed(id) {
- const code = '&lt;script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="' + id + '"&gt;&lt;/script&gt;';
+  const code = '<' + 'script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="' + id + '"></' + 'script>';
   navigator.clipboard.writeText(code);
   alert("Copied!");
-  loadAgents();
 }
+
 async function crawlSite(agentId, defaultUrl) {
   const url = prompt("Enter URL to crawl:", defaultUrl || "");
-
   if (!url) return;
 
   try {
@@ -186,6 +186,8 @@ async function crawlSite(agentId, defaultUrl) {
   }
 }
 
+loadAgents();
 </script>
+
 </body>
 </html>
