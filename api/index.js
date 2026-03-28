@@ -253,7 +253,17 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && query.ping === '1') {
       return res.status(200).json({ ok: true, message: 'index alive' });
     }
-
+if (req.method === 'GET' && query.ping === '1') {
+  return res.status(200).json({ ok: true, message: 'index alive' });
+}
+    if (req.method === 'GET' && query.testCreate === '1') {
+  return await handleCreateAgent(req, res, {
+    agentName: 'Test Agent',
+    welcomeMessage: 'Hello from SiteMind',
+    themeColor: '#2563eb',
+    siteDomain: 'https://example.com'
+  });
+}
     // ========================================
     // ACTION ROUTING - START
     // ========================================
