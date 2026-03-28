@@ -4,17 +4,7 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 );
-// ========================================
-// ACTION ROUTING - START
-// ========================================
 
-if (action === 'create-agent') {
-  return await handleCreateAgent(req, res, body);
-}
-
-// ========================================
-// ACTION ROUTING - END
-// ========================================
 // ========================================
 // CREATE AGENT - START
 // ========================================
@@ -36,13 +26,6 @@ async function handleCreateAgent(req, res, body) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
   }
-
-  const { createClient } = await import('@supabase/supabase-js');
-
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
-  );
 
   const agentId = 'agent_' + Math.random().toString(36).slice(2, 10);
 
@@ -75,6 +58,8 @@ async function handleCreateAgent(req, res, body) {
 // ========================================
 // CREATE AGENT - END
 // ========================================
+
+
 // ========================================
 // AGENT CONFIG - START
 // ========================================
@@ -272,6 +257,10 @@ export default async function handler(req, res) {
     // ========================================
     // ACTION ROUTING - START
     // ========================================
+
+    if (action === 'create-agent') {
+      return await handleCreateAgent(req, res, body);
+    }
 
     if (action === 'agent-config') {
       return await handleAgentConfig(req, res, body);
