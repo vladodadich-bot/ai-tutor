@@ -1,3 +1,7 @@
+// ========================================
+// AGENT CONFIG - START
+// ========================================
+
 async function handleAgentConfig(req, res, body) {
   const query = req.query || {};
   const agentId = String(body.agentId || body.agent_id || query.agentId || '').trim();
@@ -14,6 +18,44 @@ async function handleAgentConfig(req, res, body) {
     siteDomain: 'https://example.com'
   });
 }
+
+// ========================================
+// AGENT CONFIG - END
+// ========================================
+
+
+// ========================================
+// CHAT HELPERS - START
+// ========================================
+
+function extractResponseText(data) {
+  if (data && typeof data.output_text === 'string' && data.output_text.trim()) {
+    return data.output_text.trim();
+  }
+
+  const parts = [];
+  const output = Array.isArray(data && data.output) ? data.output : [];
+
+  for (const item of output) {
+    const content = Array.isArray(item && item.content) ? item.content : [];
+    for (const block of content) {
+      if (block && block.type === 'output_text' && typeof block.text === 'string') {
+        parts.push(block.text);
+      }
+    }
+  }
+
+  return parts.join('\n').trim();
+}
+
+// ========================================
+// CHAT HELPERS - END
+// ========================================
+
+
+// ========================================
+// CHAT - START
+// ========================================
 
 async function handleChat(req, res, body) {
   const agentId = String(body.agentId || body.agent_id || '').trim();
@@ -104,33 +146,15 @@ async function handleChat(req, res, body) {
       });
     }
 
-    function extractResponseText(data) {
-  if (data && typeof data.output_text === 'string' && data.output_text.trim()) {
-    return data.output_text.trim();
-  }
-
-  const parts = [];
-  const output = Array.isArray(data && data.output) ? data.output : [];
-
-  for (const item of output) {
-    const content = Array.isArray(item && item.content) ? item.content : [];
-    for (const block of content) {
-      if (block && block.type === 'output_text' && typeof block.text === 'string') {
-        parts.push(block.text);
-      }
-    }
-  }
-
-  return parts.join('\n').trim();
-}
     const reply = extractResponseText(data);
 
-if (!reply) {
-  return res.status(500).json({
-    error: 'No reply generated',
-    details: JSON.stringify(data).slice(0, 1200)
-  });
-}
+    if (!reply) {
+      return res.status(500).json({
+        error: 'No reply generated',
+        details: JSON.stringify(data).slice(0, 1200)
+      });
+    }
+
     return res.status(200).json({
       reply: reply
     });
@@ -140,6 +164,15 @@ if (!reply) {
     });
   }
 }
+
+// ========================================
+// CHAT - END
+// ========================================
+
+
+// ========================================
+// MAIN HANDLER - START
+// ========================================
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -159,6 +192,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, message: 'index alive' });
     }
 
+    // ========================================
+    // ACTION ROUTING - START
+    // ========================================
+
     if (action === 'agent-config') {
       return await handleAgentConfig(req, res, body);
     }
@@ -166,6 +203,10 @@ export default async function handler(req, res) {
     if (action === 'chat') {
       return await handleChat(req, res, body);
     }
+
+    // ========================================
+    // ACTION ROUTING - END
+    // ========================================
 
     return res.status(400).json({ error: 'Unknown or missing action' });
   } catch (err) {
@@ -176,3 +217,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
+// ========================================
+// MAIN HANDLER - END
+// ========================================
