@@ -446,11 +446,53 @@ async function handleChat(req, res, body) {
     'If the answer is not clearly available from the page data, say that honestly. ' +
     'Reply in the same language as the user.';
 
+  let crawlContext = '';
+
+try {
+  const { data: crawledRows, error: crawlError } = await supabase
+    .from('site_content')
+    .select('url, page_title, meta_description, h1, headings, internal_links')
+    .eq('agent_id', agentId)
+    .limit(5);
+
+  if (!crawlError && Array.isArray(crawledRows) && crawledRows.length > 0) {
+    const shortRows = crawledRows.map(function (row) {
+      let headings = [];
+      let links = [];
+
+      try {
+        headings = Array.isArray(row.headings) ? row.headings : JSON.parse(row.headings || '[]');
+      } catch (e) {
+        headings = [];
+      }
+
+      try {
+        links = Array.isArray(row.internal_links) ? row.internal_links : JSON.parse(row.internal_links || '[]');
+      } catch (e) {
+        links = [];
+      }
+
+      return {
+        url: row.url || '',
+        page_title: row.page_title || '',
+        meta_description: row.meta_description || '',
+        h1: row.h1 || '',
+        headings: headings.slice(0, 8),
+        internal_links: links.slice(0, 12)
+      };
+    });
+
+    crawlContext = JSON.stringify(shortRows, null, 2);
+  }
+} catch (e) {
+  crawlContext = '';
+}
   const pageInfo =
-    'Page title: ' + (pageTitle || 'N/A') + '\n' +
-    'Page description: ' + (pageDescription || 'N/A') + '\n' +
-    'Page URL: ' + (pageUrl || 'N/A') + '\n' +
-    'Page context:\n' + (pageContext || 'N/A');
+  'Page title: ' + (pageTitle || 'N/A') + '\n' +
+  'Page description: ' + (pageDescription || 'N/A') + '\n' +
+  'Page URL: ' + (pageUrl || 'N/A') + '\n' +
+  'Page context:\n' + (pageContext || 'N/A') + '\n\n' +
+  'Crawled site data:\n' + (crawlContext || 'N/A');
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
