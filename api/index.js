@@ -46,3 +46,37 @@ export default async function handler(req, res) {
     });
   }
 }
+async function handleAgentConfig(req, res, body) {
+  const query = req.query || {};
+  const agentId = String(body.agentId || body.agent_id || query.agentId || '').trim();
+
+  if (!agentId) {
+    return res.status(400).json({ error: 'Missing agentId' });
+  }
+
+  return res.status(200).json({
+    agentId: agentId,
+    agentName: 'Test Agent',
+    welcomeMessage: 'Hello from config',
+    themeColor: '#2563eb',
+    siteDomain: 'https://example.com'
+  });
+}
+if (action === 'agent-config') {
+  return await handleAgentConfig(req, res, body);
+}
+async function handleChat(req, res, body) {
+  const agentId = String(body.agentId || body.agent_id || '').trim();
+  const message = String(body.message || '').trim();
+
+  if (!agentId || !message) {
+    return res.status(400).json({ error: 'Missing agentId or message' });
+  }
+
+  return res.status(200).json({
+    reply: 'Chat handler radi: ' + message
+  });
+}
+if (action === 'chat') {
+  return await handleChat(req, res, body);
+}
