@@ -1,4 +1,83 @@
 // ========================================
+// ACTION ROUTING - START
+// ========================================
+
+if (action === 'create-agent') {
+  return await handleCreateAgent(req, res, body);
+}
+
+if (action === 'agent-config') {
+  return await handleAgentConfig(req, res, body);
+}
+
+if (action === 'chat') {
+  return await handleChat(req, res, body);
+}
+
+// ========================================
+// ACTION ROUTING - END
+// ========================================
+// ========================================
+// CREATE AGENT - START
+// ========================================
+
+async function handleCreateAgent(req, res, body) {
+  const agentName = String(body.agentName || body.agent_name || 'My Agent').trim();
+  const welcomeMessage = String(body.welcomeMessage || body.welcome_message || 'Hi! How can I help?').trim();
+  const themeColor = String(body.themeColor || body.theme_color || '#2563eb').trim();
+  const siteDomain = String(body.siteDomain || body.site_domain || '').trim();
+
+  if (!siteDomain) {
+    return res.status(400).json({ error: 'Missing siteDomain' });
+  }
+
+  if (!process.env.SUPABASE_URL) {
+    return res.status(500).json({ error: 'Missing SUPABASE_URL' });
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
+    return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
+  }
+
+  const { createClient } = await import('@supabase/supabase-js');
+
+  const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
+  );
+
+  const agentId = 'agent_' + Math.random().toString(36).slice(2, 10);
+
+  const { data, error } = await supabase
+    .from('agents')
+    .insert({
+      agent_id: agentId,
+      agent_name: agentName,
+      welcome_message: welcomeMessage,
+      theme_color: themeColor,
+      site_domain: siteDomain
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  return res.status(200).json({
+    success: true,
+    agentId: data.agent_id,
+    agentName: data.agent_name,
+    welcomeMessage: data.welcome_message,
+    themeColor: data.theme_color,
+    siteDomain: data.site_domain
+  });
+}
+
+// ========================================
+// CREATE AGENT - END
+// ========================================
+// ========================================
 // AGENT CONFIG - START
 // ========================================
 
