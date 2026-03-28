@@ -339,12 +339,38 @@ function buildChatMessages(systemPrompt, history, userMessage, siteContext) {
     content: [
       {
         type: 'input_text',
-        text:
-          'Website context:\n' +
-          JSON.stringify(siteContext, null, 2)
+        text: 'Website context:\n' + JSON.stringify(siteContext, null, 2)
       }
     ]
   });
+
+  const safeHistory = Array.isArray(history) ? history.slice(-8) : [];
+
+  for (const item of safeHistory) {
+    const isAssistant = item && item.role === 'assistant';
+    const role = isAssistant ? 'assistant' : 'user';
+    const text = String(item && item.content ? item.content : '').trim();
+
+    if (!text) continue;
+
+    input.push({
+      role,
+      content: [
+        {
+          type: isAssistant ? 'output_text' : 'input_text',
+          text
+        }
+      ]
+    });
+  }
+
+  input.push({
+    role: 'user',
+    content: [{ type: 'input_text', text: String(userMessage || '') }]
+  });
+
+  return input;
+}
 
   const safeHistory = Array.isArray(history) ? history.slice(-8) : [];
 
