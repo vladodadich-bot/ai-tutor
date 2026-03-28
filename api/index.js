@@ -302,6 +302,9 @@ if (req.method === 'GET' && query.ping === '1') {
     siteDomain: 'https://example.com'
   });
 }
+    if (req.method === 'GET' && query.testGetAgents === '1') {
+  return await handleGetAgents(req, res, {});
+}
     // ========================================
     // ACTION ROUTING - START
     // ========================================
