@@ -187,7 +187,7 @@
     (function () {
       "use strict";
 
-      var API_URL = "/api/chat";
+      var API_BASE = "https://ai-tutor-rouge-theta.vercel.app/api/index";
       var REQUEST_TIMEOUT = 30000;
       var MAX_HISTORY_ITEMS = 12;
 
@@ -339,8 +339,12 @@
 
       async function fetchAgentConfig() {
         try {
-          var res = await fetch("/api/agent-config?agentId=" + encodeURIComponent(agentId));
+          var res = await fetch(
+            API_BASE + "?action=agent-config&agentId=" + encodeURIComponent(agentId)
+          );
+
           if (!res.ok) return;
+
           var data = await res.json();
           if (!data) return;
 
@@ -371,13 +375,14 @@
         }, REQUEST_TIMEOUT);
 
         try {
-          var response = await fetch(API_URL, {
+          var response = await fetch(API_BASE, {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
             },
             signal: activeController.signal,
             body: JSON.stringify({
+              action: "chat",
               agentId: agentId,
               message: userMessage,
               history: history,
@@ -397,19 +402,19 @@
             data = { error: "Neispravan odgovor servera." };
           }
 
-         if (!response.ok) {
-  throw new Error(
-    data.details
-      ? (typeof data.details === "string" ? data.details : JSON.stringify(data.details))
-      : (data.error || "Greška servera.")
-  );
-}
+          if (!response.ok) {
+            throw new Error(
+              data.details
+                ? (typeof data.details === "string" ? data.details : JSON.stringify(data.details))
+                : (data.error || "Greška servera.")
+            );
+          }
 
-          if (!data.answer) {
+          if (!data.reply) {
             throw new Error("Nema odgovora.");
           }
 
-          return String(data.answer).trim();
+          return String(data.reply).trim();
         } finally {
           clearTimeout(timeoutId);
           activeController = null;
