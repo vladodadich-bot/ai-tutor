@@ -616,7 +616,106 @@ async function handleChat(req, res, body) {
     reply: answer
   });
 }
+async function handleGetAgents(req, res, body) {
+  const siteDomain = String(body.siteDomain || body.site_domain || '').trim();
 
+  let query = supabase
+    .from('agents')
+    .select('agent_id, agent_name, welcome_message, theme_color, site_domain, created_at')
+    .order('created_at', { ascending: false });
+
+  if (siteDomain) {
+    query = query.eq('site_domain', siteDomain);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    return json(res, 500, { error: error.message });
+  }
+
+  return json(res, 200, {
+    success: true,
+    agents: data || []
+  });
+}
+
+async function handleUpdateAgent(req, res, body) {
+  const agentId = String(body.agentId || body.agent_id || '').trim();
+
+  if (!agentId) {
+    return json(res, 400, { error: 'Missing agentId' });
+  }
+
+  const updates = {};
+
+  if (body.agentName !== undefined || body.agent_name !== undefined) {
+    updates.agent_name = String(body.agentName || body.agent_name || '').trim();
+  }
+
+  if (body.welcomeMessage !== undefined || body.welcome_message !== undefined) {
+    updates.welcome_message = String(body.welcomeMessage || body.welcome_message || '').trim();
+  }
+
+  if (body.themeColor !== undefined || body.theme_color !== undefined) {
+    updates.theme_color = String(body.themeColor || body.theme_color || '').trim();
+  }
+
+  if (body.siteDomain !== undefined || body.site_domain !== undefined) {
+    updates.site_domain = String(body.siteDomain || body.site_domain || '').trim();
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return json(res, 400, { error: 'No fields to update' });
+  }
+
+  const { data, error } = await supabase
+    .from('agents')
+    .update(updates)
+    .eq('agent_id', agentId)
+    .select('agent_id, agent_name, welcome_message, theme_color, site_domain')
+    .single();
+
+  if (error) {
+    return json(res, 500, { error: error.message });
+  }
+
+  return json(res, 200, {
+    success: true,
+    agent: data
+  });
+}
+
+async function handleDeleteAgent(req, res, body) {
+  const agentId = String(body.agentId || body.agent_id || '').trim();
+
+  if (!agentId) {
+    return json(res, 400, { error: 'Missing agentId' });
+  }
+
+  const deleteSiteContent = await supabase
+    .from('site_content')
+    .delete()
+    .eq('agent_id', agentId);
+
+  if (deleteSiteContent.error) {
+    return json(res, 500, { error: deleteSiteContent.error.message });
+  }
+
+  const deleteAgent = await supabase
+    .from('agents')
+    .delete()
+    .eq('agent_id', agentId);
+
+  if (deleteAgent.error) {
+    return json(res, 500, { error: deleteAgent.error.message });
+  }
+
+  return json(res, 200, {
+    success: true,
+    deletedAgentId: agentId
+  });
+}
 export default async function handler(req, res) {
   setCors(res);
 
@@ -647,7 +746,17 @@ export default async function handler(req, res) {
     if (action === 'chat') {
       return await handleChat(req, res, body);
     }
+if (action === 'get-agents') {
+  return await handleGetAgents(req, res, body);
+}
 
+if (action === 'update-agent') {
+  return await handleUpdateAgent(req, res, body);
+}
+
+if (action === 'delete-agent') {
+  return await handleDeleteAgent(req, res, body);
+}
     return json(res, 404, { error: 'Unknown action' });
   } catch (err) {
     return json(res, 500, {
