@@ -1,9 +1,23 @@
 (function () {
   "use strict";
 
-  var CURRENT_SCRIPT = document.currentScript;
+  if (window.__sitemindWidgetLoaded) return;
+  window.__sitemindWidgetLoaded = true;
+
+  var CURRENT_SCRIPT = document.currentScript || (function () {
+    var scripts = document.getElementsByTagName("script");
+    return scripts[scripts.length - 1] || null;
+  })();
+
   var SCRIPT_SRC = CURRENT_SCRIPT ? CURRENT_SCRIPT.src : "";
-  var SCRIPT_URL = new URL(SCRIPT_SRC, window.location.href);
+  var SCRIPT_URL;
+
+  try {
+    SCRIPT_URL = new URL(SCRIPT_SRC, window.location.href);
+  } catch (e) {
+    return;
+  }
+
   var BASE_URL = SCRIPT_URL.origin;
 
   var agentId =
@@ -122,8 +136,8 @@
 
     var text = cleanText(clone.innerText || clone.textContent || "");
 
-    if (text.length > 5000) {
-      text = text.slice(0, 5000);
+    if (text.length > 3000) {
+      text = text.slice(0, 3000);
     }
 
     return text;
@@ -142,16 +156,20 @@
   function sendPageContext() {
     if (!iframe || !iframe.contentWindow) return;
 
+    var payload = getPageContextPayload();
+
     try {
-      iframe.contentWindow.postMessage(getPageContextPayload(), BASE_URL);
+      iframe.contentWindow.postMessage(payload, BASE_URL);
     } catch (e) {
       try {
-        iframe.contentWindow.postMessage(getPageContextPayload(), "*");
+        iframe.contentWindow.postMessage(payload, "*");
       } catch (err) {}
     }
   }
 
   function createWidget() {
+    if (document.getElementById("sitemind-widget-root")) return;
+
     var root = document.createElement("div");
     root.id = "sitemind-widget-root";
     document.body.appendChild(root);
@@ -185,6 +203,11 @@
     panel.style.overflow = "hidden";
     panel.style.boxShadow = "0 18px 50px rgba(0,0,0,0.22)";
     panel.style.display = "none";
+
+    if (window.innerWidth < 520) {
+      panel.style.width = "calc(100vw - 16px)";
+      panel.style.height = "min(78vh, 620px)";
+    }
 
     iframe = document.createElement("iframe");
     iframe.src = BASE_URL + "/widget-frame.html?agentId=" + encodeURIComponent(agentId);
