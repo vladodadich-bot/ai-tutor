@@ -260,16 +260,6 @@ closeBtn.addEventListener("click", function () {
   panel.style.display = "none";
 });
 
-iframe = document.createElement("iframe");
-iframe.src = BASE_URL + "/widget-frame.html?agentId=" + encodeURIComponent(agentId);
-iframe.style.width = "100%";
-iframe.style.height = "calc(100% - 42px)";
-iframe.style.border = "0";
-iframe.setAttribute("title", "SiteMind AI Chat");
-
-panelHeader.appendChild(closeBtn);
-panel.appendChild(panelHeader);
-panel.appendChild(iframe);
     bubble.addEventListener("click", function () {
       isOpen = !isOpen;
       panel.style.display = isOpen ? "block" : "none";
