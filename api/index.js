@@ -18,13 +18,25 @@ async function handleAgentConfig(req, res, body) {
 async function handleChat(req, res, body) {
   const agentId = String(body.agentId || body.agent_id || '').trim();
   const message = String(body.message || '').trim();
+  const pageTitle = String(body.pageTitle || '').trim();
+  const pageDescription = String(body.pageDescription || '').trim();
+  const pageUrl = String(body.pageUrl || '').trim();
 
   if (!agentId || !message) {
     return res.status(400).json({ error: 'Missing agentId or message' });
   }
 
+  let reply = 'Primio sam tvoje pitanje: ' + message;
+
+  if (/sta radi ova stranica|što radi ova stranica|what does this page do/i.test(message)) {
+    reply =
+      'Naslov stranice je: ' + (pageTitle || 'nije dostupan') + '. ' +
+      'Opis stranice: ' + (pageDescription || 'nije dostupan') + '. ' +
+      'URL: ' + (pageUrl || 'nije dostupan');
+  }
+
   return res.status(200).json({
-    reply: 'Chat handler radi: ' + message
+    reply: reply
   });
 }
 
