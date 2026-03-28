@@ -97,7 +97,67 @@ async function handleGetAgents(req, res, body) {
 // ========================================
 // GET AGENTS - END
 // ========================================
+// ========================================
+// UPDATE AGENT - START
+// ========================================
 
+async function handleUpdateAgent(req, res, body) {
+  const agentId = String(body.agentId || body.agent_id || '').trim();
+
+  if (!agentId) {
+    return res.status(400).json({ error: 'Missing agentId' });
+  }
+
+  if (!process.env.SUPABASE_URL) {
+    return res.status(500).json({ error: 'Missing SUPABASE_URL' });
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
+    return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
+  }
+
+  const updates = {};
+
+  if (body.agentName !== undefined || body.agent_name !== undefined) {
+    updates.agent_name = String(body.agentName || body.agent_name || '').trim();
+  }
+
+  if (body.welcomeMessage !== undefined || body.welcome_message !== undefined) {
+    updates.welcome_message = String(body.welcomeMessage || body.welcome_message || '').trim();
+  }
+
+  if (body.themeColor !== undefined || body.theme_color !== undefined) {
+    updates.theme_color = String(body.themeColor || body.theme_color || '').trim();
+  }
+
+  if (body.siteDomain !== undefined || body.site_domain !== undefined) {
+    updates.site_domain = String(body.siteDomain || body.site_domain || '').trim();
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  const { data, error } = await supabase
+    .from('agents')
+    .update(updates)
+    .eq('agent_id', agentId)
+    .select()
+    .single();
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  return res.status(200).json({
+    success: true,
+    agent: data
+  });
+}
+
+// ========================================
+// UPDATE AGENT - END
+// ========================================
 // ========================================
 // AGENT CONFIG - START
 // ========================================
@@ -294,27 +354,29 @@ export default async function handler(req, res) {
 if (req.method === 'GET' && query.ping === '1') {
   return res.status(200).json({ ok: true, message: 'index alive' });
 }
-    if (req.method === 'GET' && query.testCreate === '1') {
-  return await handleCreateAgent(req, res, {
-    agentName: 'Test Agent',
-    welcomeMessage: 'Hello from SiteMind',
-    themeColor: '#2563eb',
+   if (req.method === 'GET' && query.testUpdate === '1') {
+  return await handleUpdateAgent(req, res, {
+    agentId: 'agent_m4n560rc',
+    agentName: 'Updated Test Agent',
+    welcomeMessage: 'Updated welcome',
+    themeColor: '#10b981',
     siteDomain: 'https://example.com'
   });
-}
-    if (req.method === 'GET' && query.testGetAgents === '1') {
-  return await handleGetAgents(req, res, {});
 }
     // ========================================
     // ACTION ROUTING - START
     // ========================================
 
-  if (action === 'create-agent') {
+ if (action === 'create-agent') {
   return await handleCreateAgent(req, res, body);
 }
 
 if (action === 'get-agents') {
   return await handleGetAgents(req, res, body);
+}
+
+if (action === 'update-agent') {
+  return await handleUpdateAgent(req, res, body);
 }
 
 if (action === 'agent-config') {
@@ -324,6 +386,7 @@ if (action === 'agent-config') {
 if (action === 'chat') {
   return await handleChat(req, res, body);
 }
+
 
     // ========================================
     // ACTION ROUTING - END
