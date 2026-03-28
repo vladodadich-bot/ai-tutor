@@ -159,6 +159,53 @@ async function handleUpdateAgent(req, res, body) {
 // UPDATE AGENT - END
 // ========================================
 // ========================================
+// DELETE AGENT - START
+// ========================================
+
+async function handleDeleteAgent(req, res, body) {
+  const agentId = String(body.agentId || body.agent_id || '').trim();
+
+  if (!agentId) {
+    return res.status(400).json({ error: 'Missing agentId' });
+  }
+
+  if (!process.env.SUPABASE_URL) {
+    return res.status(500).json({ error: 'Missing SUPABASE_URL' });
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
+    return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
+  }
+
+  const deleteSiteContent = await supabase
+    .from('site_content')
+    .delete()
+    .eq('agent_id', agentId);
+
+  if (deleteSiteContent.error) {
+    return res.status(500).json({ error: deleteSiteContent.error.message });
+  }
+
+  const deleteAgent = await supabase
+    .from('agents')
+    .delete()
+    .eq('agent_id', agentId);
+
+  if (deleteAgent.error) {
+    return res.status(500).json({ error: deleteAgent.error.message });
+  }
+
+  return res.status(200).json({
+    success: true,
+    deletedAgentId: agentId
+  });
+}
+
+// ========================================
+// DELETE AGENT - END
+// ========================================
+
+// ========================================
 // AGENT CONFIG - START
 // ========================================
 
@@ -354,20 +401,16 @@ export default async function handler(req, res) {
 if (req.method === 'GET' && query.ping === '1') {
   return res.status(200).json({ ok: true, message: 'index alive' });
 }
-   if (req.method === 'GET' && query.testUpdate === '1') {
-  return await handleUpdateAgent(req, res, {
-    agentId: 'agent_m4n560rc',
-    agentName: 'Updated Test Agent',
-    welcomeMessage: 'Updated welcome',
-    themeColor: '#10b981',
-    siteDomain: 'https://example.com'
+ if (req.method === 'GET' && query.testDelete === '1') {
+  return await handleDeleteAgent(req, res, {
+    agentId: 'agent_86th83ws'
   });
 }
     // ========================================
     // ACTION ROUTING - START
     // ========================================
 
- if (action === 'create-agent') {
+if (action === 'create-agent') {
   return await handleCreateAgent(req, res, body);
 }
 
@@ -379,6 +422,10 @@ if (action === 'update-agent') {
   return await handleUpdateAgent(req, res, body);
 }
 
+if (action === 'delete-agent') {
+  return await handleDeleteAgent(req, res, body);
+}
+
 if (action === 'agent-config') {
   return await handleAgentConfig(req, res, body);
 }
@@ -386,7 +433,6 @@ if (action === 'agent-config') {
 if (action === 'chat') {
   return await handleChat(req, res, body);
 }
-
 
     // ========================================
     // ACTION ROUTING - END
