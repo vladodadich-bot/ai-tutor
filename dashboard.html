@@ -176,7 +176,7 @@
         try {
           data = JSON.parse(text);
         } catch (e) {
-          showStatus("get-agents nije vratio JSON. Provjeri /api/get-agents", "error");
+          showStatus("get-agents nije vratio JSON. Provjeri /api/index", "error");
           console.error("Invalid JSON from get-agents:", text);
           return;
         }
@@ -306,7 +306,7 @@
           return;
         }
 
-        const res = await fetch(API + "/create-agent", {
+        const res = await fetch(API + "/index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -323,7 +323,7 @@
         try {
           data = JSON.parse(text);
         } catch (e) {
-          showStatus("create-agent nije vratio JSON. Provjeri /api/create-agent", "error");
+          showStatus("create-agent nije vratio JSON. Provjeri /api/index", "error");
           console.error("Invalid JSON from create-agent:", text);
           btn.disabled = false;
           btn.textContent = "Create";
@@ -365,7 +365,7 @@
         const color = document.getElementById("color-" + id).value.trim();
         const prompt = document.getElementById("prompt-" + id).value.trim();
 
-        const res = await fetch(API + "/update-agent", {
+        const res = await fetch(API + "/lib/update-agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -397,7 +397,7 @@
 
         if (!confirm("Delete agent?")) return;
 
-        const res = await fetch(API + "/delete-agent", {
+        const res = await fetch(API + "/lib/delete-agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ agent_id: id })
@@ -436,7 +436,7 @@
         const url = prompt("Enter URL to crawl:", defaultUrl || "");
         if (!url) return;
 
-        const res = await fetch(API + "/crawl", {
+        const res = await fetch(API + "/index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
