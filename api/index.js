@@ -58,7 +58,45 @@ async function handleCreateAgent(req, res, body) {
 // ========================================
 // CREATE AGENT - END
 // ========================================
+// ========================================
+// GET AGENTS - START
+// ========================================
 
+async function handleGetAgents(req, res, body) {
+  if (!process.env.SUPABASE_URL) {
+    return res.status(500).json({ error: 'Missing SUPABASE_URL' });
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
+    return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
+  }
+
+  const siteDomain = String(body.siteDomain || body.site_domain || '').trim();
+
+  let query = supabase
+    .from('agents')
+    .select('agent_id, agent_name, welcome_message, theme_color, site_domain, created_at')
+    .order('created_at', { ascending: false });
+
+  if (siteDomain) {
+    query = query.eq('site_domain', siteDomain);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  return res.status(200).json({
+    success: true,
+    agents: data || []
+  });
+}
+
+// ========================================
+// GET AGENTS - END
+// ========================================
 
 // ========================================
 // AGENT CONFIG - START
@@ -268,17 +306,21 @@ if (req.method === 'GET' && query.ping === '1') {
     // ACTION ROUTING - START
     // ========================================
 
-    if (action === 'create-agent') {
-      return await handleCreateAgent(req, res, body);
-    }
+  if (action === 'create-agent') {
+  return await handleCreateAgent(req, res, body);
+}
 
-    if (action === 'agent-config') {
-      return await handleAgentConfig(req, res, body);
-    }
+if (action === 'get-agents') {
+  return await handleGetAgents(req, res, body);
+}
 
-    if (action === 'chat') {
-      return await handleChat(req, res, body);
-    }
+if (action === 'agent-config') {
+  return await handleAgentConfig(req, res, body);
+}
+
+if (action === 'chat') {
+  return await handleChat(req, res, body);
+}
 
     // ========================================
     // ACTION ROUTING - END
