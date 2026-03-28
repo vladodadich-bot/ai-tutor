@@ -92,6 +92,7 @@
       border-radius: 10px;
       background: #1d4ed8;
       display: none;
+      white-space: pre-wrap;
     }
 
     .status.error {
@@ -100,6 +101,10 @@
 
     .status.success {
       background: #065f46;
+    }
+
+    .status.info {
+      background: #1d4ed8;
     }
 
     .muted {
@@ -116,11 +121,38 @@
       word-break: break-all;
       opacity: 0.9;
     }
+
+    .backend-note {
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #172554;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 700px) {
+      .row-2 {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🚀 SiteMind Dashboard</h1>
+
+    <div class="backend-note">
+      Trenutno ovaj dashboard koristi samo jedan backend endpoint:
+      <strong>/api/index</strong> na Vercelu.
+      Ako neka akcija još nije implementirana u <strong>index.js</strong>, dashboard će to prikazati kao poruku, a ne pucati.
+    </div>
 
     <div id="status" class="status"></div>
 
@@ -128,24 +160,32 @@
       <h3>Create Agent</h3>
       <div class="muted">Create a new AI agent</div>
 
-      <input id="name" placeholder="Agent name" />
-      <input id="domain" placeholder="https://example.com" />
-      <input id="color" placeholder="#2563eb" />
+      <div class="row-2">
+        <input id="name" placeholder="Agent name" />
+        <input id="domain" placeholder="https://example.com" />
+      </div>
+
+      <div class="row-2">
+        <input id="color" placeholder="#2563eb" />
+        <input id="agentIdManual" placeholder="Optional existing agent ID for testing" />
+      </div>
+
       <textarea id="welcome" placeholder="Welcome message"></textarea>
 
       <button class="btn-primary" id="createBtn">Create</button>
+      <button class="btn-copy" id="copyManualBtn" type="button">Copy Embed from Manual Agent ID</button>
     </div>
 
     <div id="agents"></div>
   </div>
 
   <script>
-    const API = "/api";
+    const API_BASE = "https://ai-tutor-rouge-theta.vercel.app/api/index";
 
     function showStatus(message, type) {
       const box = document.getElementById("status");
       box.textContent = message;
-      box.className = "status " + (type || "");
+      box.className = "status " + (type || "info");
       box.style.display = "block";
     }
 
@@ -165,124 +205,206 @@
         .replace(/'/g, "&#039;");
     }
 
+    async function apiGet(action, extraQuery) {
+      const url = new URL(API_BASE);
+      url.searchParams.set("action", action);
+
+      if (extraQuery && typeof extraQuery === "object") {
+        Object.keys(extraQuery).forEach(function(key) {
+          if (extraQuery[key] !== undefined && extraQuery[key] !== null && extraQuery[key] !== "") {
+            url.searchParams.set(key, extraQuery[key]);
+          }
+        });
+      }
+
+      const res = await fetch(url.toString(), {
+        method: "GET"
+      });
+
+      const text = await res.text();
+      let data = {};
+
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        throw new Error("Server nije vratio JSON: " + String(text || "").slice(0, 300));
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "GET request failed");
+      }
+
+      return data;
+    }
+
+    async function apiPost(action, payload) {
+      const res = await fetch(API_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          Object.assign(
+            {
+              action: action
+            },
+            payload || {}
+          )
+        )
+      });
+
+      const text = await res.text();
+      let data = {};
+
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        throw new Error("Server nije vratio JSON: " + String(text || "").slice(0, 300));
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "POST request failed");
+      }
+
+      return data;
+    }
+
+    function buildEmbedCode(agentId, themeColor) {
+      const safeColor = themeColor || "#2563eb";
+
+      return '<script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="' +
+        agentId +
+        '" data-bubble-text="Chat" data-position="bottom-right" data-color="' +
+        safeColor +
+        '"><\/script>';
+    }
+
+    function renderAgents(agents) {
+      const container = document.getElementById("agents");
+      container.innerHTML = "";
+
+      if (!Array.isArray(agents) || agents.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "card";
+        empty.innerHTML = "<h3>No agents yet</h3><div class='muted'>Create your first agent above.</div>";
+        container.appendChild(empty);
+        return;
+      }
+
+      agents.forEach(function(agent) {
+        const div = document.createElement("div");
+        div.className = "card";
+
+        const title = document.createElement("h3");
+        title.textContent = agent.agent_name || agent.agentName || "Untitled agent";
+
+        const small = document.createElement("div");
+        small.className = "small";
+        small.textContent =
+          (agent.site_domain || agent.siteDomain || "") +
+          ((agent.created_at || agent.createdAt) ? " • " + (agent.created_at || agent.createdAt) : "");
+
+        const nameInput = document.createElement("input");
+        nameInput.id = "name-" + agent.agent_id;
+        nameInput.value = agent.agent_name || agent.agentName || "";
+
+        const welcomeTextarea = document.createElement("textarea");
+        welcomeTextarea.id = "welcome-" + agent.agent_id;
+        welcomeTextarea.value = agent.welcome_message || agent.welcomeMessage || "";
+
+        const colorInput = document.createElement("input");
+        colorInput.id = "color-" + agent.agent_id;
+        colorInput.value = agent.theme_color || agent.themeColor || "#2563eb";
+
+        const actions = document.createElement("div");
+        actions.className = "agent-actions";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "btn-primary";
+        saveBtn.textContent = "Save";
+        saveBtn.onclick = function() {
+          updateAgent(agent.agent_id);
+        };
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "btn-danger";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = function() {
+          deleteAgent(agent.agent_id);
+        };
+
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "btn-copy";
+        copyBtn.textContent = "Copy Embed";
+        copyBtn.onclick = function() {
+          copyEmbed(agent.agent_id, colorInput.value.trim());
+        };
+
+        const crawlBtn = document.createElement("button");
+        crawlBtn.className = "btn-primary";
+        crawlBtn.textContent = "Crawl";
+        crawlBtn.onclick = function() {
+          crawlSite(agent.agent_id, agent.site_domain || agent.siteDomain || "");
+        };
+
+        const testConfigBtn = document.createElement("button");
+        testConfigBtn.className = "btn-primary";
+        testConfigBtn.textContent = "Test Config";
+        testConfigBtn.onclick = async function() {
+          try {
+            clearStatus();
+            const cfg = await apiGet("agent-config", { agentId: agent.agent_id });
+            showStatus("agent-config radi za: " + (cfg.agentName || cfg.agentId), "success");
+          } catch (err) {
+            showStatus("Config test failed: " + err.message, "error");
+          }
+        };
+
+        const embedBox = document.createElement("div");
+        embedBox.className = "embed-box";
+        embedBox.innerHTML = escapeHtml(buildEmbedCode(agent.agent_id, colorInput.value.trim()));
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(deleteBtn);
+        actions.appendChild(copyBtn);
+        actions.appendChild(crawlBtn);
+        actions.appendChild(testConfigBtn);
+
+        div.appendChild(title);
+        div.appendChild(small);
+        div.appendChild(nameInput);
+        div.appendChild(welcomeTextarea);
+        div.appendChild(colorInput);
+        div.appendChild(actions);
+        div.appendChild(embedBox);
+
+        container.appendChild(div);
+      });
+    }
+
     async function loadAgents() {
       try {
         clearStatus();
 
-        const res = await fetch(API + "/get-agents");
-        const text = await res.text();
+        const data = await apiPost("get-agents", {});
 
-        let data = [];
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          showStatus("get-agents nije vratio JSON. Provjeri /api/index", "error");
-          console.error("Invalid JSON from get-agents:", text);
+        if (Array.isArray(data)) {
+          renderAgents(data);
           return;
         }
 
-        if (!res.ok) {
-          showStatus("Greška kod učitavanja agenata", "error");
-          console.error(data);
+        if (Array.isArray(data.agents)) {
+          renderAgents(data.agents);
           return;
         }
 
-        const container = document.getElementById("agents");
-        container.innerHTML = "";
-
-        if (!Array.isArray(data) || data.length === 0) {
-          const empty = document.createElement("div");
-          empty.className = "card";
-          empty.innerHTML = "<h3>No agents yet</h3><div class='muted'>Create your first agent above.</div>";
-          container.appendChild(empty);
-          return;
-        }
-
-        data.forEach(function(agent) {
-          const div = document.createElement("div");
-          div.className = "card";
-
-          const title = document.createElement("h3");
-          title.textContent = agent.agent_name || "Untitled agent";
-
-          const small = document.createElement("div");
-          small.className = "small";
-          small.textContent = (agent.site_domain || "") + (agent.created_at ? " • " + agent.created_at : "");
-
-          const nameInput = document.createElement("input");
-          nameInput.id = "name-" + agent.agent_id;
-          nameInput.value = agent.agent_name || "";
-
-          const welcomeTextarea = document.createElement("textarea");
-          welcomeTextarea.id = "welcome-" + agent.agent_id;
-          welcomeTextarea.value = agent.welcome_message || "";
-
-          const colorInput = document.createElement("input");
-          colorInput.id = "color-" + agent.agent_id;
-          colorInput.value = agent.theme_color || "";
-
-          const promptTextarea = document.createElement("textarea");
-          promptTextarea.id = "prompt-" + agent.agent_id;
-          promptTextarea.placeholder = "System prompt";
-          promptTextarea.value = agent.system_prompt || "";
-
-          const actions = document.createElement("div");
-          actions.className = "agent-actions";
-
-          const saveBtn = document.createElement("button");
-          saveBtn.className = "btn-primary";
-          saveBtn.textContent = "Save";
-          saveBtn.onclick = function() {
-            updateAgent(agent.agent_id);
-          };
-
-          const deleteBtn = document.createElement("button");
-          deleteBtn.className = "btn-danger";
-          deleteBtn.textContent = "Delete";
-          deleteBtn.onclick = function() {
-            deleteAgent(agent.agent_id);
-          };
-
-          const copyBtn = document.createElement("button");
-          copyBtn.className = "btn-copy";
-          copyBtn.textContent = "Copy Embed";
-          copyBtn.onclick = function() {
-            copyEmbed(agent.agent_id);
-          };
-
-          const crawlBtn = document.createElement("button");
-          crawlBtn.className = "btn-primary";
-          crawlBtn.textContent = "Crawl";
-          crawlBtn.onclick = function() {
-            crawlSite(agent.agent_id, agent.site_domain || "");
-          };
-
-          const embedBox = document.createElement("div");
-          embedBox.className = "embed-box";
-          embedBox.innerHTML =
-            "&lt;script src=&quot;https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js&quot; data-agent-id=&quot;" +
-            escapeHtml(agent.agent_id) +
-            "&quot;&gt;&lt;/script&gt;";
-
-          actions.appendChild(saveBtn);
-          actions.appendChild(deleteBtn);
-          actions.appendChild(copyBtn);
-          actions.appendChild(crawlBtn);
-
-          div.appendChild(title);
-          div.appendChild(small);
-          div.appendChild(nameInput);
-          div.appendChild(welcomeTextarea);
-          div.appendChild(colorInput);
-          div.appendChild(promptTextarea);
-          div.appendChild(actions);
-          div.appendChild(embedBox);
-
-          container.appendChild(div);
-        });
+        renderAgents([]);
       } catch (err) {
-        showStatus("Greška u loadAgents(): " + err.message, "error");
-        console.error(err);
+        renderAgents([]);
+        showStatus(
+          "get-agents trenutno nije spreman u index.js ili vraća grešku.\n" +
+          "Frontend je ispravno prebačen na /api/index.\n\n" +
+          "Detalj: " + err.message,
+          "error"
+        );
       }
     }
 
@@ -296,7 +418,7 @@
 
         const name = document.getElementById("name").value.trim();
         const domain = document.getElementById("domain").value.trim();
-        const color = document.getElementById("color").value.trim();
+        const color = document.getElementById("color").value.trim() || "#2563eb";
         const welcome = document.getElementById("welcome").value.trim();
 
         if (!name || !domain) {
@@ -306,51 +428,38 @@
           return;
         }
 
-        const res = await fetch(API + "/index", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            agent_name: name,
-            site_domain: domain,
-            theme_color: color,
-            welcome_message: welcome
-          })
+        const data = await apiPost("create-agent", {
+          agentName: name,
+          siteDomain: domain,
+          themeColor: color,
+          welcomeMessage: welcome,
+
+          agent_name: name,
+          site_domain: domain,
+          theme_color: color,
+          welcome_message: welcome
         });
-
-        const text = await res.text();
-
-        let data = {};
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          showStatus("create-agent nije vratio JSON. Provjeri /api/index", "error");
-          console.error("Invalid JSON from create-agent:", text);
-          btn.disabled = false;
-          btn.textContent = "Create";
-          return;
-        }
-
-        if (!res.ok) {
-          showStatus("Create error: " + (data.error || "Unknown error"), "error");
-          console.error(data);
-          btn.disabled = false;
-          btn.textContent = "Create";
-          return;
-        }
 
         document.getElementById("name").value = "";
         document.getElementById("domain").value = "";
         document.getElementById("color").value = "";
         document.getElementById("welcome").value = "";
 
-        showStatus("Agent created successfully", "success");
+        showStatus(
+          "Agent created successfully.\nAgent ID: " + (data.agentId || data.agent_id || "nije vraćen"),
+          "success"
+        );
+
         await loadAgents();
 
         btn.disabled = false;
         btn.textContent = "Create";
       } catch (err) {
-        showStatus("Create failed: " + err.message, "error");
-        console.error(err);
+        showStatus(
+          "create-agent trenutno nije spreman u index.js ili vraća grešku.\n" +
+          "Detalj: " + err.message,
+          "error"
+        );
         document.getElementById("createBtn").disabled = false;
         document.getElementById("createBtn").textContent = "Create";
       }
@@ -363,31 +472,26 @@
         const name = document.getElementById("name-" + id).value.trim();
         const welcome = document.getElementById("welcome-" + id).value.trim();
         const color = document.getElementById("color-" + id).value.trim();
-        const prompt = document.getElementById("prompt-" + id).value.trim();
 
-        const res = await fetch(API + "/lib/update-agent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            agent_id: id,
-            agent_name: name,
-            welcome_message: welcome,
-            theme_color: color,
-            system_prompt: prompt
-          })
+        await apiPost("update-agent", {
+          agentId: id,
+          agentName: name,
+          welcomeMessage: welcome,
+          themeColor: color,
+
+          agent_id: id,
+          agent_name: name,
+          welcome_message: welcome,
+          theme_color: color
         });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          showStatus("Update error: " + (data.error || "Unknown error"), "error");
-          return;
-        }
 
         showStatus("Saved", "success");
       } catch (err) {
-        showStatus("Update failed: " + err.message, "error");
-        console.error(err);
+        showStatus(
+          "update-agent trenutno nije spreman u index.js ili vraća grešku.\n" +
+          "Detalj: " + err.message,
+          "error"
+        );
       }
     }
 
@@ -397,35 +501,29 @@
 
         if (!confirm("Delete agent?")) return;
 
-        const res = await fetch(API + "/lib/delete-agent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ agent_id: id })
+        await apiPost("delete-agent", {
+          agentId: id,
+          agent_id: id
         });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          showStatus("Delete error: " + (data.error || "Unknown error"), "error");
-          return;
-        }
 
         showStatus("Agent deleted", "success");
         await loadAgents();
       } catch (err) {
-        showStatus("Delete failed: " + err.message, "error");
-        console.error(err);
+        showStatus(
+          "delete-agent trenutno nije spreman u index.js ili vraća grešku.\n" +
+          "Detalj: " + err.message,
+          "error"
+        );
       }
     }
 
-    async function copyEmbed(id) {
+    async function copyEmbed(id, color) {
       try {
-        const code = '<' + 'script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="' + id + '"></' + 'script>';
+        const code = buildEmbedCode(id, color);
         await navigator.clipboard.writeText(code);
         showStatus("Embed code copied", "success");
       } catch (err) {
         showStatus("Copy failed: " + err.message, "error");
-        console.error(err);
       }
     }
 
@@ -436,30 +534,47 @@
         const url = prompt("Enter URL to crawl:", defaultUrl || "");
         if (!url) return;
 
-        const res = await fetch(API + "/index", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            url: url,
-            agent_id: agentId
-          })
+        const data = await apiPost("crawl-site", {
+          url: url,
+          agentId: agentId,
+          agent_id: agentId
         });
 
-        const data = await res.json();
+        showStatus(
+          "Crawl success.\nPages crawled: " + (data.pagesCrawled || data.pages_crawled || "n/a"),
+          "success"
+        );
+      } catch (err) {
+        showStatus(
+          "crawl-site trenutno nije spreman u index.js ili vraća grešku.\n" +
+          "Detalj: " + err.message,
+          "error"
+        );
+      }
+    }
 
-        if (!res.ok) {
-          showStatus("Crawl error: " + (data.error || "Unknown error"), "error");
+    async function copyManualEmbed() {
+      try {
+        clearStatus();
+
+        const manualId = document.getElementById("agentIdManual").value.trim();
+        const color = document.getElementById("color").value.trim() || "#2563eb";
+
+        if (!manualId) {
+          showStatus("Unesi postojeći agent ID za ručni embed.", "error");
           return;
         }
 
-        showStatus("Crawl success. Saved content length: " + data.content_length, "success");
+        const code = buildEmbedCode(manualId, color);
+        await navigator.clipboard.writeText(code);
+        showStatus("Manual embed code copied", "success");
       } catch (err) {
-        showStatus("Crawl failed: " + err.message, "error");
-        console.error(err);
+        showStatus("Copy failed: " + err.message, "error");
       }
     }
 
     document.getElementById("createBtn").addEventListener("click", createAgent);
+    document.getElementById("copyManualBtn").addEventListener("click", copyManualEmbed);
 
     loadAgents();
   </script>
