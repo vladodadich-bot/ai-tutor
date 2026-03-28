@@ -281,12 +281,30 @@ async function handleAgentConfig(req, res, body) {
     return res.status(400).json({ error: 'Missing agentId' });
   }
 
+  if (!process.env.SUPABASE_URL) {
+    return res.status(500).json({ error: 'Missing SUPABASE_URL' });
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
+    return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
+  }
+
+  const { data, error } = await supabase
+    .from('agents')
+    .select('agent_id, agent_name, welcome_message, theme_color, site_domain')
+    .eq('agent_id', agentId)
+    .single();
+
+  if (error || !data) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
   return res.status(200).json({
-    agentId: agentId,
-    agentName: 'Test Agent',
-    welcomeMessage: 'Hello from config',
-    themeColor: '#2563eb',
-    siteDomain: 'https://example.com'
+    agentId: data.agent_id,
+    agentName: data.agent_name,
+    welcomeMessage: data.welcome_message,
+    themeColor: data.theme_color,
+    siteDomain: data.site_domain
   });
 }
 
