@@ -238,27 +238,6 @@ bubble.style.whiteSpace = "normal";
       panel.style.right = "16px";
       panel.style.bottom = "92px";
     }
-var closeBtn = document.createElement("button");
-closeBtn.type = "button";
-closeBtn.setAttribute("aria-label", "Close chat");
-closeBtn.innerHTML = "&times;";
-closeBtn.style.border = "0";
-closeBtn.style.background = "transparent";
-closeBtn.style.color = "#334155";
-closeBtn.style.fontSize = "24px";
-closeBtn.style.lineHeight = "1";
-closeBtn.style.width = "34px";
-closeBtn.style.height = "34px";
-closeBtn.style.borderRadius = "999px";
-closeBtn.style.cursor = "pointer";
-closeBtn.style.display = "flex";
-closeBtn.style.alignItems = "center";
-closeBtn.style.justifyContent = "center";
-
-closeBtn.addEventListener("click", function () {
-  isOpen = false;
-  panel.style.display = "none";
-});
 
     bubble.addEventListener("click", function () {
       isOpen = !isOpen;
