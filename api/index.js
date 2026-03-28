@@ -21,23 +21,105 @@ async function handleChat(req, res, body) {
   const pageTitle = String(body.pageTitle || '').trim();
   const pageDescription = String(body.pageDescription || '').trim();
   const pageUrl = String(body.pageUrl || '').trim();
+  const pageContext = String(body.pageContext || '').trim().slice(0, 3000);
 
   if (!agentId || !message) {
     return res.status(400).json({ error: 'Missing agentId or message' });
   }
 
-  let reply = 'Primio sam tvoje pitanje: ' + message;
-
-  if (/sta radi ova stranica|što radi ova stranica|what does this page do/i.test(message)) {
-    reply =
-      'Naslov stranice je: ' + (pageTitle || 'nije dostupan') + '. ' +
-      'Opis stranice: ' + (pageDescription || 'nije dostupan') + '. ' +
-      'URL: ' + (pageUrl || 'nije dostupan');
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
   }
 
-  return res.status(200).json({
-    reply: reply
-  });
+  const systemPrompt =
+    'You are SiteMind AI, a helpful website assistant. ' +
+    'Answer based only on the provided page information. ' +
+    'Be clear, short, and useful. ' +
+    'If the answer is not clearly available from the page data, say that honestly. ' +
+    'Reply in the same language as the user.';
+
+  const pageInfo =
+    'Page title: ' + (pageTitle || 'N/A') + '\n' +
+    'Page description: ' + (pageDescription || 'N/A') + '\n' +
+    'Page URL: ' + (pageUrl || 'N/A') + '\n' +
+    'Page context:\n' + (pageContext || 'N/A');
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-mini',
+        input: [
+          {
+            role: 'system',
+            content: [
+              {
+                type: 'input_text',
+                text: systemPrompt
+              }
+            ]
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: pageInfo
+              }
+            ]
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: message
+              }
+            ]
+          }
+        ]
+      })
+    });
+
+    const rawText = await response.text();
+
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch (e) {
+      return res.status(500).json({
+        error: 'OpenAI did not return JSON',
+        details: rawText.slice(0, 500)
+      });
+    }
+
+    if (!response.ok) {
+      return res.status(500).json({
+        error: data.error && data.error.message ? data.error.message : 'OpenAI request failed',
+        details: data
+      });
+    }
+
+    const reply = String(data.output_text || '').trim();
+
+    if (!reply) {
+      return res.status(500).json({
+        error: 'No reply generated'
+      });
+    }
+
+    return res.status(200).json({
+      reply: reply
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err && err.message ? err.message : 'Chat request failed'
+    });
+  }
 }
 
 export default async function handler(req, res) {
