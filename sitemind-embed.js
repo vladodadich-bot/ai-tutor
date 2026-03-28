@@ -231,12 +231,12 @@ bubble.style.whiteSpace = "normal";
       bubble.style.left = "16px";
       bubble.style.bottom = "16px";
       panel.style.left = "16px";
-      panel.style.bottom = "72px";
+      panel.style.bottom = "92px";
     } else {
       bubble.style.right = "16px";
       bubble.style.bottom = "16px";
       panel.style.right = "16px";
-      panel.style.bottom = "72px";
+      panel.style.bottom = "92px";
     }
 
     bubble.addEventListener("click", function () {
