@@ -12,14 +12,6 @@ if (action === 'create-agent') {
   return await handleCreateAgent(req, res, body);
 }
 
-if (action === 'agent-config') {
-  return await handleAgentConfig(req, res, body);
-}
-
-if (action === 'chat') {
-  return await handleChat(req, res, body);
-}
-
 // ========================================
 // ACTION ROUTING - END
 // ========================================
