@@ -104,14 +104,33 @@ async function handleChat(req, res, body) {
       });
     }
 
-    const reply = String(data.output_text || '').trim();
+    function extractResponseText(data) {
+  if (data && typeof data.output_text === 'string' && data.output_text.trim()) {
+    return data.output_text.trim();
+  }
 
-    if (!reply) {
-      return res.status(500).json({
-        error: 'No reply generated'
-      });
+  const parts = [];
+  const output = Array.isArray(data && data.output) ? data.output : [];
+
+  for (const item of output) {
+    const content = Array.isArray(item && item.content) ? item.content : [];
+    for (const block of content) {
+      if (block && block.type === 'output_text' && typeof block.text === 'string') {
+        parts.push(block.text);
+      }
     }
+  }
 
+  return parts.join('\n').trim();
+}
+    const reply = extractResponseText(data);
+
+if (!reply) {
+  return res.status(500).json({
+    error: 'No reply generated',
+    details: JSON.stringify(data).slice(0, 1200)
+  });
+}
     return res.status(200).json({
       reply: reply
     });
