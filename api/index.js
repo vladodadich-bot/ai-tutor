@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
+import { crawlSinglePage } from '../lib/crawl.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 );
-
 // ========================================
 // CREATE AGENT - START
 // ========================================
@@ -204,7 +204,71 @@ async function handleDeleteAgent(req, res, body) {
 // ========================================
 // DELETE AGENT - END
 // ========================================
+// ========================================
+// CRAWL SITE - START
+// ========================================
 
+async function handleCrawlSite(req, res, body) {
+  const url = String(body.url || '').trim();
+  const agentId = String(body.agentId || body.agent_id || '').trim();
+
+  if (!url || !agentId) {
+    return res.status(400).json({ error: 'Missing url or agentId' });
+  }
+
+  if (!process.env.SUPABASE_URL) {
+    return res.status(500).json({ error: 'Missing SUPABASE_URL' });
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
+    return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
+  }
+
+  try {
+    const page = await crawlSinglePage(url);
+
+    const deleteResult = await supabase
+      .from('site_content')
+      .delete()
+      .eq('agent_id', agentId);
+
+    if (deleteResult.error) {
+      return res.status(500).json({ error: deleteResult.error.message });
+    }
+
+    const insertResult = await supabase
+      .from('site_content')
+      .insert({
+        agent_id: agentId,
+        url: page.url,
+        content: '',
+        page_title: page.page_title || '',
+        meta_description: page.meta_description || '',
+        h1: page.h1 || '',
+        headings: JSON.stringify(page.headings || []),
+        internal_links: JSON.stringify(page.internal_links || []),
+        text_preview: page.text_preview || ''
+      });
+
+    if (insertResult.error) {
+      return res.status(500).json({ error: insertResult.error.message });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Crawl saved',
+      pagesCrawled: 1
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err && err.message ? err.message : 'Crawl failed'
+    });
+  }
+}
+
+// ========================================
+// CRAWL SITE - END
+// ========================================
 // ========================================
 // AGENT CONFIG - START
 // ========================================
@@ -401,9 +465,10 @@ export default async function handler(req, res) {
 if (req.method === 'GET' && query.ping === '1') {
   return res.status(200).json({ ok: true, message: 'index alive' });
 }
- if (req.method === 'GET' && query.testDelete === '1') {
-  return await handleDeleteAgent(req, res, {
-    agentId: 'agent_86th83ws'
+if (req.method === 'GET' && query.testCrawl === '1') {
+  return await handleCrawlSite(req, res, {
+    url: 'https://njemacki2.blogspot.com/',
+    agentId: 'agent_ji9hsuvk'
   });
 }
     // ========================================
@@ -426,6 +491,10 @@ if (action === 'delete-agent') {
   return await handleDeleteAgent(req, res, body);
 }
 
+if (action === 'crawl-site') {
+  return await handleCrawlSite(req, res, body);
+}
+
 if (action === 'agent-config') {
   return await handleAgentConfig(req, res, body);
 }
@@ -433,7 +502,6 @@ if (action === 'agent-config') {
 if (action === 'chat') {
   return await handleChat(req, res, body);
 }
-
     // ========================================
     // ACTION ROUTING - END
     // ========================================
