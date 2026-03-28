@@ -26,7 +26,7 @@
 
   var bubbleText =
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-bubble-text")) ||
-    "Chat";
+    "💬 Trebaš pomoć?<br>Pitaj AI web asistenta";
 
   var position =
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-position")) ||
@@ -177,19 +177,28 @@
     bubble = document.createElement("button");
     bubble.type = "button";
     bubble.setAttribute("aria-label", "Open chat");
-    bubble.textContent = bubbleText;
+    bubble.innerHTML = bubbleText;
 
-    bubble.style.position = "fixed";
-    bubble.style.zIndex = "999999";
-    bubble.style.border = "0";
-    bubble.style.borderRadius = "999px";
-    bubble.style.padding = "12px 18px";
-    bubble.style.background = themeColor;
-    bubble.style.color = "#fff";
-    bubble.style.fontSize = "14px";
-    bubble.style.fontWeight = "700";
-    bubble.style.boxShadow = "0 8px 24px rgba(0,0,0,0.18)";
-    bubble.style.cursor = "pointer";
+   bubble.style.position = "fixed";
+bubble.style.zIndex = "999999";
+bubble.style.border = "1px solid rgba(255,255,255,0.18)";
+bubble.style.borderRadius = "999px";
+bubble.style.padding = "14px 22px";
+bubble.style.background = "linear-gradient(135deg, " + themeColor + ", #60a5fa)";
+bubble.style.color = "#fff";
+bubble.style.fontSize = "14px";
+bubble.style.fontWeight = "700";
+bubble.style.lineHeight = "1.35";
+bubble.style.textAlign = "center";
+bubble.style.maxWidth = "255px";
+bubble.style.boxShadow = "0 16px 34px rgba(37, 99, 235, 0.28)";
+bubble.style.cursor = "pointer";
+bubble.style.whiteSpace = "normal";
+    if (window.innerWidth < 520) {
+  bubble.style.maxWidth = "220px";
+  bubble.style.fontSize = "13px";
+  bubble.style.padding = "12px 18px";
+}
 
     panel = document.createElement("div");
     panel.style.position = "fixed";
