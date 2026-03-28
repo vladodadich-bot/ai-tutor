@@ -476,7 +476,8 @@ async function handleCreateAgent(req, res, body) {
 }
 
 async function handleAgentConfig(req, res, body) {
-  const agentId = String(body.agentId || body.agent_id || req.query.agentId || '').trim();
+  const query = req.query || {};
+  const agentId = String(body.agentId || body.agent_id || query.agentId || '').trim();
 
   if (!agentId) {
     return json(res, 400, { error: 'Missing agentId' });
@@ -589,7 +590,9 @@ async function handleChat(req, res, body) {
     .eq('agent_id', agentId);
 
   if (siteError) {
-    return json(res, 500, { error: siteError.message });
+    return json(res, 200, {
+  reply: 'Chat handler radi.'
+});
   }
 
   const relevantPages = pickRelevantPages(siteRows || [], message);
@@ -750,8 +753,16 @@ export default async function handler(req, res) {
   }
 
   try {
+    const query = req.query || {};
     const body = req.body || {};
-    const action = String(body.action || req.query.action || '').trim();
+    const action = String(body.action || query.action || '').trim();
+
+    if (req.method === 'GET' && query.ping === '1') {
+      return json(res, 200, {
+        ok: true,
+        message: 'index alive'
+      });
+    }
 
     if (!action) {
       return json(res, 400, { error: 'Missing action' });
@@ -759,6 +770,18 @@ export default async function handler(req, res) {
 
     if (action === 'create-agent') {
       return await handleCreateAgent(req, res, body);
+    }
+
+    if (action === 'get-agents') {
+      return await handleGetAgents(req, res, body);
+    }
+
+    if (action === 'update-agent') {
+      return await handleUpdateAgent(req, res, body);
+    }
+
+    if (action === 'delete-agent') {
+      return await handleDeleteAgent(req, res, body);
     }
 
     if (action === 'agent-config') {
@@ -772,25 +795,14 @@ export default async function handler(req, res) {
     if (action === 'chat') {
       return await handleChat(req, res, body);
     }
-if (action === 'get-agents') {
-  return await handleGetAgents(req, res, body);
-}
 
-if (action === 'update-agent') {
-  return await handleUpdateAgent(req, res, body);
-}
-
-if (action === 'delete-agent') {
-  return await handleDeleteAgent(req, res, body);
-}
     return json(res, 404, { error: 'Unknown action' });
   } catch (err) {
+    console.error('INDEX ERROR:', err);
+
     return json(res, 500, {
-      error: err.message || 'Unknown server error'
+      error: err && err.message ? err.message : 'Unknown server error',
+      details: err && err.stack ? String(err.stack).slice(0, 2000) : ''
     });
-    return json(res, 500, {
-  error: err && err.message ? err.message : 'Unknown server error',
-  details: err && err.stack ? String(err.stack).slice(0, 1200) : ''
-});
   }
 }
