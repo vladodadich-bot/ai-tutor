@@ -788,5 +788,9 @@ if (action === 'delete-agent') {
     return json(res, 500, {
       error: err.message || 'Unknown server error'
     });
+    return json(res, 500, {
+  error: err && err.message ? err.message : 'Unknown server error',
+  details: err && err.stack ? String(err.stack).slice(0, 1200) : ''
+});
   }
 }
