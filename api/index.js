@@ -1,3 +1,20 @@
+async function handleAgentConfig(req, res, body) {
+  const query = req.query || {};
+  const agentId = String(body.agentId || body.agent_id || query.agentId || '').trim();
+
+  if (!agentId) {
+    return res.status(400).json({ error: 'Missing agentId' });
+  }
+
+  return res.status(200).json({
+    agentId: agentId,
+    agentName: 'Test Agent',
+    welcomeMessage: 'Hello from config',
+    themeColor: '#2563eb',
+    siteDomain: 'https://example.com'
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
@@ -7,10 +24,25 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  return res.status(200).json({
-    ok: true,
-    method: req.method,
-    query: req.query || null,
-    body: req.body || null
-  });
+  try {
+    const query = req.query || {};
+    const body = req.body || {};
+    const action = String(body.action || query.action || '').trim();
+
+    if (req.method === 'GET' && query.ping === '1') {
+      return res.status(200).json({ ok: true, message: 'index alive' });
+    }
+
+    if (action === 'agent-config') {
+      return await handleAgentConfig(req, res, body);
+    }
+
+    return res.status(400).json({ error: 'Unknown or missing action' });
+  } catch (err) {
+    console.error('INDEX ERROR:', err);
+    return res.status(500).json({
+      error: err && err.message ? err.message : 'Unknown server error',
+      details: err && err.stack ? String(err.stack).slice(0, 2000) : ''
+    });
+  }
 }
