@@ -340,7 +340,69 @@ function extractResponseText(data) {
 // ========================================
 // CHAT HELPERS - END
 // ========================================
+// ========================================
+// CRAWL CHAT HELPERS - START
+// ========================================
 
+function safeJsonArray(value) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function scorePageForMessage(page, message) {
+  const text = String(message || '').toLowerCase();
+  if (!text) return 0;
+
+  const title = String(page.page_title || '').toLowerCase();
+  const meta = String(page.meta_description || '').toLowerCase();
+  const h1 = String(page.h1 || '').toLowerCase();
+  const headings = safeJsonArray(page.headings).join(' ').toLowerCase();
+  const links = safeJsonArray(page.internal_links)
+    .map(link => ((link && link.text) || '') + ' ' + ((link && link.href) || ''))
+    .join(' ')
+    .toLowerCase();
+
+  let score = 0;
+  const words = text.split(/\s+/).filter(Boolean);
+
+  for (const word of words) {
+    if (word.length < 2) continue;
+    if (title.includes(word)) score += 5;
+    if (h1.includes(word)) score += 4;
+    if (headings.includes(word)) score += 3;
+    if (meta.includes(word)) score += 2;
+    if (links.includes(word)) score += 1;
+  }
+
+  return score;
+}
+
+function pickRelevantCrawledPages(rows, message, limit = 3) {
+  const scored = (rows || [])
+    .map(row => ({
+      ...row,
+      _score: scorePageForMessage(row, message)
+    }))
+    .sort((a, b) => b._score - a._score);
+
+  const useful = scored.filter(row => row._score > 0).slice(0, limit);
+  if (useful.length) return useful;
+
+  return scored.slice(0, limit);
+}
+
+// ========================================
+// CRAWL CHAT HELPERS - END
+// ========================================
 
 // ========================================
 // CHAT - START
@@ -361,7 +423,22 @@ async function handleChat(req, res, body) {
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
   }
+  let crawledRows = [];
 
+  try {
+    const { data, error } = await supabase
+      .from('site_content')
+      .select('url, page_title, meta_description, h1, headings, internal_links')
+      .eq('agent_id', agentId);
+
+    if (!error && Array.isArray(data)) {
+      crawledRows = data;
+    }
+  } catch (e) {
+    crawledRows = [];
+  }
+
+  const relevantPages = pickRelevantCrawledPages(crawledRows, message, 3);
   const systemPrompt =
     'You are SiteMind AI, a helpful website assistant. ' +
     'Answer based only on the provided page information. ' +
