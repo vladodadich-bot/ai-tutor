@@ -14,9 +14,14 @@ async function handleCreateAgent(req, res, body) {
   const welcomeMessage = String(body.welcomeMessage || body.welcome_message || 'Hi! How can I help?').trim();
   const themeColor = String(body.themeColor || body.theme_color || '#2563eb').trim();
   const siteDomain = String(body.siteDomain || body.site_domain || '').trim();
+  const userId = String(body.user_id || body.userId || '').trim();
 
   if (!siteDomain) {
     return res.status(400).json({ error: 'Missing siteDomain' });
+  }
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Missing user_id' });
   }
 
   if (!process.env.SUPABASE_URL) {
@@ -32,6 +37,7 @@ async function handleCreateAgent(req, res, body) {
   const { data, error } = await supabase
     .from('agents')
     .insert({
+      user_id: userId,
       agent_id: agentId,
       agent_name: agentName,
       welcome_message: welcomeMessage,
@@ -47,6 +53,7 @@ async function handleCreateAgent(req, res, body) {
 
   return res.status(200).json({
     success: true,
+    userId: data.user_id,
     agentId: data.agent_id,
     agentName: data.agent_name,
     welcomeMessage: data.welcome_message,
