@@ -5,23 +5,92 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 );
+
+// ========================================
+// AUTH HELPERS - START
+// ========================================
+
+function getBearerToken(req) {
+  const authHeader =
+    req.headers?.authorization ||
+    req.headers?.Authorization ||
+    '';
+
+  if (!authHeader || typeof authHeader !== 'string') {
+    return '';
+  }
+
+  if (!authHeader.startsWith('Bearer ')) {
+    return '';
+  }
+
+  return authHeader.slice(7).trim();
+}
+
+async function getAuthenticatedUser(req) {
+  const token = getBearerToken(req);
+
+  if (!token) {
+    return {
+      user: null,
+      error: 'Missing Authorization bearer token'
+    };
+  }
+
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+
+    if (error || !data?.user) {
+      return {
+        user: null,
+        error: error?.message || 'Invalid or expired session'
+      };
+    }
+
+    return {
+      user: data.user,
+      error: null
+    };
+  } catch (err) {
+    return {
+      user: null,
+      error: err && err.message ? err.message : 'Authentication failed'
+    };
+  }
+}
+
+async function requireAuthenticatedUser(req, res) {
+  const { user, error } = await getAuthenticatedUser(req);
+
+  if (error || !user) {
+    res.status(401).json({
+      error: error || 'Unauthorized'
+    });
+    return null;
+  }
+
+  return user;
+}
+
+// ========================================
+// AUTH HELPERS - END
+// ========================================
+
 // ========================================
 // CREATE AGENT - START
 // ========================================
 
 async function handleCreateAgent(req, res, body) {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
   const agentName = String(body.agentName || body.agent_name || 'My Agent').trim();
   const welcomeMessage = String(body.welcomeMessage || body.welcome_message || 'Hi! How can I help?').trim();
   const themeColor = String(body.themeColor || body.theme_color || '#2563eb').trim();
   const siteDomain = String(body.siteDomain || body.site_domain || '').trim();
-  const userId = String(body.user_id || body.userId || '').trim();
 
   if (!siteDomain) {
     return res.status(400).json({ error: 'Missing siteDomain' });
-  }
-
-  if (!userId) {
-    return res.status(400).json({ error: 'Missing user_id' });
   }
 
   if (!process.env.SUPABASE_URL) {
@@ -37,7 +106,7 @@ async function handleCreateAgent(req, res, body) {
   const { data, error } = await supabase
     .from('agents')
     .insert({
-      user_id: userId,
+      user_id: user.id,
       agent_id: agentId,
       agent_name: agentName,
       welcome_message: welcomeMessage,
@@ -65,11 +134,15 @@ async function handleCreateAgent(req, res, body) {
 // ========================================
 // CREATE AGENT - END
 // ========================================
+
 // ========================================
 // GET AGENTS - START
 // ========================================
 
 async function handleGetAgents(req, res, body) {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
   if (!process.env.SUPABASE_URL) {
     return res.status(500).json({ error: 'Missing SUPABASE_URL' });
   }
@@ -83,6 +156,7 @@ async function handleGetAgents(req, res, body) {
   let query = supabase
     .from('agents')
     .select('agent_id, agent_name, welcome_message, theme_color, site_domain, created_at')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
   if (siteDomain) {
@@ -104,11 +178,15 @@ async function handleGetAgents(req, res, body) {
 // ========================================
 // GET AGENTS - END
 // ========================================
+
 // ========================================
 // UPDATE AGENT - START
 // ========================================
 
 async function handleUpdateAgent(req, res, body) {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
   const agentId = String(body.agentId || body.agent_id || '').trim();
 
   if (!agentId) {
@@ -121,6 +199,17 @@ async function handleUpdateAgent(req, res, body) {
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
+  }
+
+  const { data: existingAgent, error: existingError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id')
+    .eq('agent_id', agentId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (existingError || !existingAgent) {
+    return res.status(404).json({ error: 'Agent not found' });
   }
 
   const updates = {};
@@ -149,6 +238,7 @@ async function handleUpdateAgent(req, res, body) {
     .from('agents')
     .update(updates)
     .eq('agent_id', agentId)
+    .eq('user_id', user.id)
     .select()
     .single();
 
@@ -165,11 +255,15 @@ async function handleUpdateAgent(req, res, body) {
 // ========================================
 // UPDATE AGENT - END
 // ========================================
+
 // ========================================
 // DELETE AGENT - START
 // ========================================
 
 async function handleDeleteAgent(req, res, body) {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
   const agentId = String(body.agentId || body.agent_id || '').trim();
 
   if (!agentId) {
@@ -184,6 +278,17 @@ async function handleDeleteAgent(req, res, body) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
   }
 
+  const { data: existingAgent, error: existingError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id')
+    .eq('agent_id', agentId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (existingError || !existingAgent) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
   const deleteSiteContent = await supabase
     .from('site_content')
     .delete()
@@ -196,7 +301,8 @@ async function handleDeleteAgent(req, res, body) {
   const deleteAgent = await supabase
     .from('agents')
     .delete()
-    .eq('agent_id', agentId);
+    .eq('agent_id', agentId)
+    .eq('user_id', user.id);
 
   if (deleteAgent.error) {
     return res.status(500).json({ error: deleteAgent.error.message });
@@ -211,11 +317,15 @@ async function handleDeleteAgent(req, res, body) {
 // ========================================
 // DELETE AGENT - END
 // ========================================
+
 // ========================================
 // CRAWL SITE - START
 // ========================================
 
 async function handleCrawlSite(req, res, body) {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
   const url = String(body.url || '').trim();
   const agentId = String(body.agentId || body.agent_id || '').trim();
 
@@ -229,6 +339,17 @@ async function handleCrawlSite(req, res, body) {
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
+  }
+
+  const { data: existingAgent, error: existingError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id')
+    .eq('agent_id', agentId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (existingError || !existingAgent) {
+    return res.status(404).json({ error: 'Agent not found' });
   }
 
   try {
@@ -276,6 +397,7 @@ async function handleCrawlSite(req, res, body) {
 // ========================================
 // CRAWL SITE - END
 // ========================================
+
 // ========================================
 // AGENT CONFIG - START
 // ========================================
@@ -319,7 +441,6 @@ async function handleAgentConfig(req, res, body) {
 // AGENT CONFIG - END
 // ========================================
 
-
 // ========================================
 // CHAT HELPERS - START
 // ========================================
@@ -347,6 +468,7 @@ function extractResponseText(data) {
 // ========================================
 // CHAT HELPERS - END
 // ========================================
+
 // ========================================
 // CRAWL CHAT HELPERS - START
 // ========================================
@@ -430,6 +552,7 @@ async function handleChat(req, res, body) {
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
   }
+
   let crawledRows = [];
 
   try {
@@ -446,6 +569,7 @@ async function handleChat(req, res, body) {
   }
 
   const relevantPages = pickRelevantCrawledPages(crawledRows, message, 3);
+
   const systemPrompt =
     'You are SiteMind AI, a helpful website assistant. ' +
     'Answer based only on the provided page information. ' +
@@ -455,51 +579,50 @@ async function handleChat(req, res, body) {
 
   let crawlContext = '';
 
-try {
-  const { data: crawledRows, error: crawlError } = await supabase
-    .from('site_content')
-    .select('url, page_title, meta_description, h1, headings, internal_links')
-    .eq('agent_id', agentId)
-    .limit(5);
+  try {
+    const rowsToUse = Array.isArray(relevantPages) && relevantPages.length
+      ? relevantPages
+      : crawledRows.slice(0, 3);
 
-  if (!crawlError && Array.isArray(crawledRows) && crawledRows.length > 0) {
-    const shortRows = crawledRows.map(function (row) {
-      let headings = [];
-      let links = [];
+    if (rowsToUse.length > 0) {
+      const shortRows = rowsToUse.map(function (row) {
+        let headings = [];
+        let links = [];
 
-      try {
-        headings = Array.isArray(row.headings) ? row.headings : JSON.parse(row.headings || '[]');
-      } catch (e) {
-        headings = [];
-      }
+        try {
+          headings = Array.isArray(row.headings) ? row.headings : JSON.parse(row.headings || '[]');
+        } catch (e) {
+          headings = [];
+        }
 
-      try {
-        links = Array.isArray(row.internal_links) ? row.internal_links : JSON.parse(row.internal_links || '[]');
-      } catch (e) {
-        links = [];
-      }
+        try {
+          links = Array.isArray(row.internal_links) ? row.internal_links : JSON.parse(row.internal_links || '[]');
+        } catch (e) {
+          links = [];
+        }
 
-      return {
-        url: row.url || '',
-        page_title: row.page_title || '',
-        meta_description: row.meta_description || '',
-        h1: row.h1 || '',
-        headings: headings.slice(0, 8),
-        internal_links: links.slice(0, 12)
-      };
-    });
+        return {
+          url: row.url || '',
+          page_title: row.page_title || '',
+          meta_description: row.meta_description || '',
+          h1: row.h1 || '',
+          headings: headings.slice(0, 8),
+          internal_links: links.slice(0, 12)
+        };
+      });
 
-    crawlContext = JSON.stringify(shortRows, null, 2);
+      crawlContext = JSON.stringify(shortRows, null, 2);
+    }
+  } catch (e) {
+    crawlContext = '';
   }
-} catch (e) {
-  crawlContext = '';
-}
+
   const pageInfo =
-  'Page title: ' + (pageTitle || 'N/A') + '\n' +
-  'Page description: ' + (pageDescription || 'N/A') + '\n' +
-  'Page URL: ' + (pageUrl || 'N/A') + '\n' +
-  'Page context:\n' + (pageContext || 'N/A') + '\n\n' +
-  'Crawled site data:\n' + (crawlContext || 'N/A');
+    'Page title: ' + (pageTitle || 'N/A') + '\n' +
+    'Page description: ' + (pageDescription || 'N/A') + '\n' +
+    'Page URL: ' + (pageUrl || 'N/A') + '\n' +
+    'Page context:\n' + (pageContext || 'N/A') + '\n\n' +
+    'Crawled site data:\n' + (crawlContext || 'N/A');
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -584,14 +707,13 @@ try {
 // CHAT - END
 // ========================================
 
-
 // ========================================
 // MAIN HANDLER - START
 // ========================================
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
@@ -606,46 +728,46 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && query.ping === '1') {
       return res.status(200).json({ ok: true, message: 'index alive' });
     }
-if (req.method === 'GET' && query.ping === '1') {
-  return res.status(200).json({ ok: true, message: 'index alive' });
-}
-if (req.method === 'GET' && query.testCrawl === '1') {
-  return await handleCrawlSite(req, res, {
-    url: 'https://njemacki2.blogspot.com/',
-    agentId: 'agent_ji9hsuvk'
-  });
-}
+
+    if (req.method === 'GET' && query.testCrawl === '1') {
+      return await handleCrawlSite(req, res, {
+        url: 'https://njemacki2.blogspot.com/',
+        agentId: 'agent_ji9hsuvk'
+      });
+    }
+
     // ========================================
     // ACTION ROUTING - START
     // ========================================
 
-if (action === 'create-agent') {
-  return await handleCreateAgent(req, res, body);
-}
+    if (action === 'create-agent') {
+      return await handleCreateAgent(req, res, body);
+    }
 
-if (action === 'get-agents') {
-  return await handleGetAgents(req, res, body);
-}
+    if (action === 'get-agents') {
+      return await handleGetAgents(req, res, body);
+    }
 
-if (action === 'update-agent') {
-  return await handleUpdateAgent(req, res, body);
-}
+    if (action === 'update-agent') {
+      return await handleUpdateAgent(req, res, body);
+    }
 
-if (action === 'delete-agent') {
-  return await handleDeleteAgent(req, res, body);
-}
+    if (action === 'delete-agent') {
+      return await handleDeleteAgent(req, res, body);
+    }
 
-if (action === 'crawl-site') {
-  return await handleCrawlSite(req, res, body);
-}
+    if (action === 'crawl-site') {
+      return await handleCrawlSite(req, res, body);
+    }
 
-if (action === 'agent-config') {
-  return await handleAgentConfig(req, res, body);
-}
+    if (action === 'agent-config') {
+      return await handleAgentConfig(req, res, body);
+    }
 
-if (action === 'chat') {
-  return await handleChat(req, res, body);
-}
+    if (action === 'chat') {
+      return await handleChat(req, res, body);
+    }
+
     // ========================================
     // ACTION ROUTING - END
     // ========================================
