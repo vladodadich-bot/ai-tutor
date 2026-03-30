@@ -2,19 +2,24 @@
 <html lang="en">
 <head>
   <script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
   const supabase = createClient(
     'https://YOUR-PROJECT.supabase.co',
     'YOUR_ANON_KEY'
-  )
+  );
 
-  const { data, error } = await supabase.auth.getSession()
+  const { data, error } = await supabase.auth.getSession();
 
   if (error || !data?.session) {
-    window.location.href = '/login.html'
+    window.location.href = '/login.html';
+  } else {
+    document.body.style.display = 'block';
   }
 </script>
+  <style>
+  body { display: none; }
+</style>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SiteMind Dashboard</title>
