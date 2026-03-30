@@ -1,104 +1,288 @@
 <!DOCTYPE html>
-
-<head>
 <html lang="en">
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SiteMind AI Builder</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SiteMind AI Builder</title>
 
-<style>
-body {
-  font-family: Arial;
-  background: #0f172a;
-  color: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-}
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: white;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
 
-.box {
-  background: #1e293b;
-  padding: 30px;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 400px;
-}
+    .box {
+      background: #1e293b;
+      padding: 30px;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 460px;
+      box-sizing: border-box;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
+    }
 
-input {
-  width: 100%;
-  padding: 10px;
-  margin-top: 10px;
-  border-radius: 6px;
-  border: none;
-  background: #334155;
-  color: white;
-}
+    h2 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
 
-button {
-  width: 100%;
-  padding: 12px;
-  margin-top: 15px;
-  background: #2563eb;
-  border: none;
-  border-radius: 6px;
-  color: white;
-  cursor: pointer;
-}
+    .subtext {
+      color: #cbd5e1;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
 
-.code {
-  margin-top: 15px;
-  background: black;
-  padding: 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  word-break: break-all;
-}
-</style>
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #334155;
+      color: white;
+      box-sizing: border-box;
+      outline: none;
+    }
+
+    input::placeholder {
+      color: #94a3b8;
+    }
+
+    input:focus {
+      border-color: #60a5fa;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 15px;
+      background: #2563eb;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s ease;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .message {
+      margin-top: 15px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .success {
+      color: #86efac;
+    }
+
+    .error {
+      color: #fca5a5;
+    }
+
+    .code-wrap {
+      margin-top: 15px;
+    }
+
+    .code-label {
+      font-size: 13px;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+    }
+
+    .code {
+      background: #020617;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      word-break: break-all;
+      color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.08);
+      line-height: 1.6;
+    }
+
+    .copy-btn {
+      margin-top: 10px;
+      background: #0f766e;
+    }
+
+    .copy-btn:hover {
+      background: #0d9488;
+    }
+  </style>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    try {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error || !data?.session) {
+        window.location.href = '/login.html';
+      } else {
+        window.addEventListener('DOMContentLoaded', () => {
+          document.body.style.display = 'flex';
+        });
+      }
+    } catch (err) {
+      window.location.href = '/login.html';
+    }
+  </script>
 </head>
 
 <body>
+  <div class="box">
+    <h2>🚀 Create your AI Chat</h2>
+    <div class="subtext">
+      Enter your company name and website URL to generate your SiteMind AI widget code.
+    </div>
 
-<div class="box">
-  <h2>🚀 Create your AI Chat</h2>
+    <input id="name" placeholder="Your company name" />
+    <input id="url" placeholder="https://yourwebsite.com" />
 
-  <input id="name" placeholder="Your company name">
-  <input id="url" placeholder="https://yourwebsite.com">
+    <button id="generateBtn" onclick="createAgent()">Generate</button>
 
-  <button onclick="create()">Generate</button>
+    <div id="result"></div>
+  </div>
 
-  <div id="result"></div>
-</div>
+  <script>
+    const API = "https://ai-tutor-rouge-theta.vercel.app/api/index";
 
-<script>
-const API = "https://ai-tutor-rouge-theta.vercel.app/api";
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
 
-async function create() {
-  const name = document.getElementById("name").value;
-  const url = document.getElementById("url").value;
+    function isValidUrl(value) {
+      try {
+        const url = new URL(value);
+        return url.protocol === "http:" || url.protocol === "https:";
+      } catch {
+        return false;
+      }
+    }
 
-  const res = await fetch(API + "/create-agent", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      agent_name: name,
-      site_domain: url,
-      welcome_message: "Hi! How can I help you?",
-      theme_color: "#2563eb"
-    })
-  });
+    async function copyCode() {
+      const codeEl = document.getElementById("embedCodeRaw");
+      if (!codeEl) return;
 
-  const data = await res.json();
+      const code = codeEl.textContent;
 
-  const code = `<script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="${data.agent_id}"></script>`;
+      try {
+        await navigator.clipboard.writeText(code);
+        const copyBtn = document.getElementById("copyBtn");
+        if (copyBtn) {
+          const oldText = copyBtn.textContent;
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => {
+            copyBtn.textContent = oldText;
+          }, 1500);
+        }
+      } catch (err) {
+        alert("Copy failed. Please copy manually.");
+      }
+    }
 
-  document.getElementById("result").innerHTML = `
-    <p>✅ Your AI is ready</p>
-    <div class="code">${code}</div>
-  `;
-}
+    async function createAgent() {
+      const nameInput = document.getElementById("name");
+      const urlInput = document.getElementById("url");
+      const result = document.getElementById("result");
+      const button = document.getElementById("generateBtn");
 
-</script>
+      const name = nameInput.value.trim();
+      const url = urlInput.value.trim();
 
+      result.innerHTML = "";
+
+      if (!name) {
+        result.innerHTML = `<div class="message error">Please enter your company name.</div>`;
+        return;
+      }
+
+      if (!url) {
+        result.innerHTML = `<div class="message error">Please enter your website URL.</div>`;
+        return;
+      }
+
+      if (!isValidUrl(url)) {
+        result.innerHTML = `<div class="message error">Please enter a valid URL starting with http:// or https://</div>`;
+        return;
+      }
+
+      button.disabled = true;
+      button.textContent = "Generating...";
+
+      try {
+        const res = await fetch(API, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            action: "create-agent",
+            agent_name: name,
+            site_domain: url,
+            welcome_message: "Hi! How can I help you?",
+            theme_color: "#2563eb"
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || "Something went wrong while creating the agent.");
+        }
+
+        if (!data.agent_id) {
+          throw new Error("Agent ID was not returned from the API.");
+        }
+
+        const code = `<script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="${data.agent_id}"><\/script>`;
+
+        result.innerHTML = `
+          <div class="message success">✅ Your AI is ready</div>
+
+          <div class="code-wrap">
+            <div class="code-label">Embed this code on your website:</div>
+            <div class="code" id="embedCodeRaw">${escapeHtml(code)}</div>
+            <button class="copy-btn" id="copyBtn" onclick="copyCode()">Copy code</button>
+          </div>
+        `;
+      } catch (error) {
+        result.innerHTML = `
+          <div class="message error">❌ ${escapeHtml(error.message || "Unexpected error.")}</div>
+        `;
+      } finally {
+        button.disabled = false;
+        button.textContent = "Generate";
+      }
+    }
+  </script>
 </body>
 </html>
