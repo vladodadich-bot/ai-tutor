@@ -237,7 +237,7 @@
       <textarea
         id="chatInput"
         class="chat-input"
-        placeholder="Napiši pitanje..."
+        placeholder="Tipe a question..."
         rows="1"
       ></textarea>
       <button type="submit" id="chatSend" class="chat-send">Send</button>
@@ -531,7 +531,7 @@
           pageData.pageContext = String(event.data.pageContext || "").slice(0, 5000);
 
           if (pageData.pageTitle) {
-            chatSubtitle.textContent = "Pitaj nešto o: " + pageData.pageTitle;
+            chatSubtitle.textContent = "Ask Ai : " + pageData.pageTitle;
           }
         }
 
