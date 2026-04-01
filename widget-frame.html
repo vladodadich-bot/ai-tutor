@@ -227,7 +227,7 @@
   <div class="chat-shell">
     <div class="chat-header" id="chatHeader">
       <div class="chat-title" id="chatTitle">SiteMind AI</div>
-      <div class="chat-subtitle" id="chatSubtitle">Postavi pitanje o ovoj stranici.</div>
+      <div class="chat-subtitle" id="chatSubtitle">Ask Ai Agent</div>
     </div>
 
     <div class="chat-messages" id="chatMessages"></div>
@@ -240,7 +240,7 @@
         placeholder="Napiši pitanje..."
         rows="1"
       ></textarea>
-      <button type="submit" id="chatSend" class="chat-send">Pošalji</button>
+      <button type="submit" id="chatSend" class="chat-send">Send</button>
     </form>
   </div>
 
@@ -311,7 +311,7 @@
         isSending = !!loading;
         chatSend.disabled = loading;
         chatInput.disabled = loading;
-        chatSend.textContent = loading ? "..." : "Pošalji";
+        chatSend.textContent = loading ? "..." : "Send";
         setStatus(loading ? "AI razmišlja..." : "");
       }
 
