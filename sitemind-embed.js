@@ -26,7 +26,7 @@
 
   var bubbleText =
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-bubble-text")) ||
-    "💬 Trebaš pomoć?<br>Pitaj AI web asistenta";
+    "💬 You need help?<br>Ask AI web Agent";
 
   var position =
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-position")) ||
