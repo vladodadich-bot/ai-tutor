@@ -42,6 +42,11 @@
   var footerLink = null;
   var isOpen = false;
 
+  var originalBodyPaddingRight = "";
+  var originalBodyPaddingLeft = "";
+  var originalHtmlOverflowX = "";
+  var originalBodyOverflowX = "";
+
   function isDesktop() {
     return window.innerWidth >= 992;
   }
@@ -200,7 +205,6 @@
     panel.style.borderRadius = "";
     panel.style.borderLeft = "";
     panel.style.borderRight = "";
-    panel.style.borderTop = "";
     panel.style.background = "#fff";
     panel.style.overflow = "hidden";
     panel.style.boxShadow = "0 18px 50px rgba(0,0,0,0.22)";
@@ -217,16 +221,15 @@
       panel.style.top = "0";
       panel.style.bottom = "0";
       panel.style.borderRadius = "0";
-      panel.style.borderLeft = "1px solid rgba(15,23,42,0.08)";
-      panel.style.boxShadow = "-12px 0 40px rgba(15,23,42,0.16)";
 
       if (position === "bottom-left") {
         panel.style.left = "0";
-        panel.style.borderLeft = "0";
         panel.style.borderRight = "1px solid rgba(15,23,42,0.08)";
         panel.style.boxShadow = "12px 0 40px rgba(15,23,42,0.16)";
       } else {
         panel.style.right = "0";
+        panel.style.borderLeft = "1px solid rgba(15,23,42,0.08)";
+        panel.style.boxShadow = "-12px 0 40px rgba(15,23,42,0.16)";
       }
 
       bubble.style.display = isOpen ? "none" : "block";
@@ -254,11 +257,48 @@
     footerLink.style.display = isOpen ? "block" : "none";
   }
 
+  function applyPageShrink() {
+    if (!isDesktop()) return;
+
+    if (originalBodyPaddingRight === "") {
+      originalBodyPaddingRight = document.body.style.paddingRight || "";
+    }
+    if (originalBodyPaddingLeft === "") {
+      originalBodyPaddingLeft = document.body.style.paddingLeft || "";
+    }
+    if (originalHtmlOverflowX === "") {
+      originalHtmlOverflowX = document.documentElement.style.overflowX || "";
+    }
+    if (originalBodyOverflowX === "") {
+      originalBodyOverflowX = document.body.style.overflowX || "";
+    }
+
+    document.documentElement.style.overflowX = "hidden";
+    document.body.style.overflowX = "hidden";
+    document.body.style.transition = "padding-right 0.28s ease, padding-left 0.28s ease";
+
+    if (position === "bottom-left") {
+      document.body.style.paddingLeft = "400px";
+      document.body.style.paddingRight = originalBodyPaddingRight;
+    } else {
+      document.body.style.paddingRight = "400px";
+      document.body.style.paddingLeft = originalBodyPaddingLeft;
+    }
+  }
+
+  function resetPageShrink() {
+    document.body.style.paddingRight = originalBodyPaddingRight;
+    document.body.style.paddingLeft = originalBodyPaddingLeft;
+    document.documentElement.style.overflowX = originalHtmlOverflowX;
+    document.body.style.overflowX = originalBodyOverflowX;
+  }
+
   function openPanel() {
     if (!panel) return;
     isOpen = true;
     panel.style.display = "block";
     applyPanelLayout();
+    applyPageShrink();
     updateBrandLinkVisibility();
     sendPageContext();
   }
@@ -268,6 +308,7 @@
     isOpen = false;
     panel.style.display = "none";
     applyPanelLayout();
+    resetPageShrink();
     updateBrandLinkVisibility();
   }
 
@@ -308,11 +349,7 @@
       footerLink.style.right = "16px";
     }
 
-    if (isDesktop()) {
-      footerLink.style.bottom = "14px";
-    } else {
-      footerLink.style.bottom = "20px";
-    }
+    footerLink.style.bottom = isDesktop() ? "14px" : "20px";
 
     footerLink.addEventListener("mouseenter", function () {
       footerLink.style.color = "rgba(15,23,42,0.82)";
@@ -421,6 +458,16 @@
   window.addEventListener("resize", function () {
     applyBubblePosition();
     applyPanelLayout();
+
+    if (isOpen) {
+      if (isDesktop()) {
+        applyPageShrink();
+      } else {
+        resetPageShrink();
+      }
+    } else {
+      resetPageShrink();
+    }
 
     if (footerLink) {
       if (position === "bottom-left") {
