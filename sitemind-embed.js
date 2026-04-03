@@ -1,490 +1,755 @@
-(function () {
-  "use strict";
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SiteMind AI</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
-  if (window.__sitemindWidgetLoaded) return;
-  window.__sitemindWidgetLoaded = true;
+    :root {
+      --bg-1: #eef4fb;
+      --bg-2: #f8fbff;
+      --panel: rgba(255,255,255,0.94);
+      --panel-strong: rgba(255,255,255,0.98);
+      --line: rgba(15, 23, 42, 0.08);
+      --line-strong: rgba(15, 23, 42, 0.12);
+      --text: #0f172a;
+      --muted: #64748b;
+      --muted-2: #94a3b8;
+      --user-grad-1: #2563eb;
+      --user-grad-2: #3b82f6;
+      --assistant-bg: #ffffff;
+      --header-grad-1: #1d4ed8;
+      --header-grad-2: #2563eb;
+      --header-grad-3: #60a5fa;
+      --shadow-lg: 0 18px 45px rgba(15, 23, 42, 0.16);
+      --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
+      --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.07);
+      --radius-xl: 22px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+      --radius-sm: 10px;
+    }
 
-  var CURRENT_SCRIPT = document.currentScript || (function () {
-    var scripts = document.getElementsByTagName("script");
-    return scripts[scripts.length - 1] || null;
-  })();
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.10), transparent 28%),
+        linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+    }
 
-  var SCRIPT_SRC = CURRENT_SCRIPT ? CURRENT_SCRIPT.src : "";
-  var SCRIPT_URL;
+    body {
+      display: flex;
+      flex-direction: column;
+    }
 
-  try {
-    SCRIPT_URL = new URL(SCRIPT_SRC, window.location.href);
-  } catch (e) {
-    return;
-  }
+    .chat-shell {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100vh;
+      min-height: 100vh;
+      overflow: hidden;
+      background: transparent;
+      position: relative;
+    }
 
-  var BASE_URL = SCRIPT_URL.origin;
+    .chat-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at top right, rgba(96, 165, 250, 0.10), transparent 24%),
+        radial-gradient(circle at bottom left, rgba(37, 99, 235, 0.06), transparent 28%);
+      z-index: 0;
+    }
 
-  var agentId =
-    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-agent-id")) ||
-    "demo-agent";
+    .chat-header {
+      position: relative;
+      z-index: 1;
+      padding: 14px 18px 16px;
+      color: #ffffff;
+      background:
+        radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 28%),
+        linear-gradient(135deg, var(--header-grad-1) 0%, var(--header-grad-2) 55%, var(--header-grad-3) 100%);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+      border-bottom-left-radius: 22px;
+      border-bottom-right-radius: 22px;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+    }
 
-  var bubbleText =
-    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-bubble-text")) ||
-    "💬 You need help?<br>Ask AI web Agent";
+    .chat-header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
 
-  var position =
-    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-position")) ||
-    "bottom-right";
+    .chat-header-left {
+      min-width: 0;
+      flex: 1;
+    }
 
-  var themeColor =
-    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-color")) ||
-    "#2563eb";
+    .brand-link {
+      display: inline-block;
+      margin: 0 0 6px;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      color: rgba(255,255,255,0.82);
+      text-decoration: none;
+      opacity: 0.95;
+    }
 
-  var iframe = null;
-  var bubble = null;
-  var panel = null;
-  var footerLink = null;
-  var isOpen = false;
+    .brand-link:hover {
+      color: #ffffff;
+      text-decoration: underline;
+    }
 
-  var originalBodyPaddingRight = "";
-  var originalBodyPaddingLeft = "";
-  var originalHtmlOverflowX = "";
-  var originalBodyOverflowX = "";
+    .chat-title {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.2px;
+      padding-right: 6px;
+      word-break: break-word;
+    }
 
-  function isDesktop() {
-    return window.innerWidth >= 992;
-  }
+    .chat-close {
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.12);
+      color: #ffffff;
+      width: 34px;
+      height: 34px;
+      min-width: 34px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+    }
 
-  function getPageTitle() {
-    var ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle && ogTitle.content) return ogTitle.content.trim();
+    .chat-close:hover {
+      background: rgba(255,255,255,0.18);
+      transform: translateY(-1px);
+    }
 
-    var h1 = document.querySelector("h1");
-    if (h1 && h1.textContent) return h1.textContent.trim();
+    .chat-subtitle {
+      font-size: 12px;
+      opacity: 0.92;
+      line-height: 1.45;
+      max-width: 96%;
+    }
 
-    return document.title || "";
-  }
+    .chat-messages {
+      position: relative;
+      z-index: 1;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 18px 14px 12px;
+      background: transparent;
+      scroll-behavior: smooth;
+    }
 
-  function getPageDescription() {
-    var meta =
-      document.querySelector('meta[name="description"]') ||
-      document.querySelector('meta[property="og:description"]');
+    .chat-messages::-webkit-scrollbar {
+      width: 8px;
+    }
 
-    return meta && meta.content ? meta.content.trim() : "";
-  }
+    .chat-messages::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.35);
+      border-radius: 999px;
+    }
 
-  function cleanText(text) {
-    return String(text || "")
-      .replace(/\s+/g, " ")
-      .replace(/\u00A0/g, " ")
-      .trim();
-  }
+    .chat-messages::-webkit-scrollbar-track {
+      background: transparent;
+    }
 
-  function getMainContentText() {
-    var selectors = [
-      "article",
-      "main",
-      ".post-body",
-      ".entry-content",
-      ".post",
-      ".content",
-      "#content",
-      ".article-content"
-    ];
+    .message-row {
+      display: flex;
+      margin-bottom: 14px;
+    }
 
-    var root = null;
+    .message-row.user {
+      justify-content: flex-end;
+    }
 
-    for (var i = 0; i < selectors.length; i++) {
-      var el = document.querySelector(selectors[i]);
-      if (el) {
-        root = el;
-        break;
+    .message-row.assistant {
+      justify-content: flex-start;
+    }
+
+    .bubble {
+      max-width: 88%;
+      padding: 12px 14px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.6;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+      box-shadow: var(--shadow-md);
+      backdrop-filter: blur(10px);
+    }
+
+    .message-row.user .bubble {
+      background: linear-gradient(135deg, var(--user-grad-1), var(--user-grad-2));
+      color: #ffffff;
+      border-bottom-right-radius: 6px;
+    }
+
+    .message-row.assistant .bubble {
+      background: var(--assistant-bg);
+      color: var(--text);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-bottom-left-radius: 6px;
+    }
+
+    .chat-status {
+      position: relative;
+      z-index: 1;
+      min-height: 24px;
+      padding: 0 16px 10px;
+      font-size: 12px;
+      color: var(--muted);
+      background: transparent;
+      flex-shrink: 0;
+    }
+
+    .chat-form {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      padding: 12px;
+      background: rgba(255,255,255,0.76);
+      backdrop-filter: blur(14px);
+      border-top: 1px solid rgba(148, 163, 184, 0.12);
+      flex-shrink: 0;
+      box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.04);
+    }
+
+    .chat-input {
+      flex: 1;
+      resize: none;
+      min-height: 48px;
+      max-height: 120px;
+      padding: 12px 14px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+      outline: none;
+      background: rgba(255,255,255,0.95);
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+
+    .chat-input::placeholder {
+      color: var(--muted-2);
+    }
+
+    .chat-input:focus {
+      border-color: rgba(37, 99, 235, 0.42);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.10);
+      background: #ffffff;
+    }
+
+    .chat-send {
+      border: 0;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      color: #ffffff;
+      padding: 0 18px;
+      font-size: 14px;
+      font-weight: 700;
+      min-width: 96px;
+      height: 48px;
+      cursor: pointer;
+      box-shadow: 0 12px 24px rgba(37, 99, 235, 0.20);
+      transition: transform 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease;
+      white-space: nowrap;
+    }
+
+    .chat-send:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
+    }
+
+    .chat-send:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    @media (min-width: 480px) {
+      .chat-shell {
+        border-left: 1px solid rgba(15, 23, 42, 0.08);
+        background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04));
+      }
+
+      .chat-header {
+        padding: 16px 20px 18px;
+        border-bottom-left-radius: 24px;
+        border-bottom-right-radius: 24px;
+      }
+
+      .chat-title {
+        font-size: 17px;
+      }
+
+      .chat-subtitle {
+        font-size: 12px;
+      }
+
+      .chat-messages {
+        padding: 20px 16px 12px;
+      }
+
+      .bubble {
+        max-width: 84%;
+      }
+
+      .chat-form {
+        padding: 14px;
       }
     }
 
-    if (!root) root = document.body;
-
-    var clone = root.cloneNode(true);
-
-    var removeSelectors = [
-      "script",
-      "style",
-      "noscript",
-      "iframe",
-      "svg",
-      "canvas",
-      "img",
-      "video",
-      "audio",
-      "form",
-      "button",
-      "input",
-      "textarea",
-      "select",
-      "nav",
-      "footer",
-      "header",
-      ".sidebar",
-      ".menu",
-      ".nav",
-      ".comments",
-      "#comments",
-      ".related-posts",
-      ".share-buttons",
-      ".social-share",
-      ".advertisement",
-      ".adsbygoogle",
-      ".cookie-banner",
-      ".newsletter",
-      ".popup",
-      ".chat-widget",
-      "#sitemind-widget-root"
-    ];
-
-    for (var j = 0; j < removeSelectors.length; j++) {
-      var nodes = clone.querySelectorAll(removeSelectors[j]);
-      for (var k = 0; k < nodes.length; k++) {
-        nodes[k].remove();
-      }
-    }
-
-    var text = cleanText(clone.innerText || clone.textContent || "");
-
-    if (text.length > 3000) {
-      text = text.slice(0, 3000);
-    }
-
-    return text;
-  }
-
-  function getPageContextPayload() {
-    return {
-      type: "sitemind-page-context",
-      pageTitle: getPageTitle(),
-      pageDescription: getPageDescription(),
-      pageUrl: window.location.href,
-      pageContext: getMainContentText()
-    };
-  }
-
-  function sendPageContext() {
-    if (!iframe || !iframe.contentWindow) return;
-
-    var payload = getPageContextPayload();
-
-    try {
-      iframe.contentWindow.postMessage(payload, BASE_URL);
-    } catch (e) {
-      try {
-        iframe.contentWindow.postMessage(payload, "*");
-      } catch (err) {}
-    }
-  }
-
-  function applyBubblePosition() {
-    if (!bubble) return;
-
-    bubble.style.left = "";
-    bubble.style.right = "";
-    bubble.style.bottom = "16px";
-
-    if (position === "bottom-left") {
-      bubble.style.left = "16px";
-    } else {
-      bubble.style.right = "16px";
-    }
-  }
-
-  function applyPanelLayout() {
-    if (!panel || !bubble || !iframe) return;
-
-    panel.style.left = "";
-    panel.style.right = "";
-    panel.style.top = "";
-    panel.style.bottom = "";
-    panel.style.width = "";
-    panel.style.height = "";
-    panel.style.maxWidth = "";
-    panel.style.maxHeight = "";
-    panel.style.borderRadius = "";
-    panel.style.borderLeft = "";
-    panel.style.borderRight = "";
-    panel.style.background = "#fff";
-    panel.style.overflow = "hidden";
-    panel.style.boxShadow = "0 18px 50px rgba(0,0,0,0.22)";
-
-    iframe.style.width = "100%";
-    iframe.style.height = "100%";
-    iframe.style.border = "0";
-
-    if (isDesktop()) {
-      panel.style.width = "400px";
-      panel.style.height = "100vh";
-      panel.style.maxWidth = "400px";
-      panel.style.maxHeight = "100vh";
-      panel.style.top = "0";
-      panel.style.bottom = "0";
-      panel.style.borderRadius = "0";
-
-      if (position === "bottom-left") {
-        panel.style.left = "0";
-        panel.style.borderRight = "1px solid rgba(15,23,42,0.08)";
-        panel.style.boxShadow = "12px 0 40px rgba(15,23,42,0.16)";
-      } else {
-        panel.style.right = "0";
-        panel.style.borderLeft = "1px solid rgba(15,23,42,0.08)";
-        panel.style.boxShadow = "-12px 0 40px rgba(15,23,42,0.16)";
+    @media (max-width: 460px) {
+      .chat-header {
+        padding: 14px 14px 14px;
       }
 
-      bubble.style.display = isOpen ? "none" : "block";
-    } else {
-      panel.style.width = window.innerWidth < 520 ? "calc(100vw - 16px)" : "380px";
-      panel.style.maxWidth = "calc(100vw - 24px)";
-      panel.style.height = window.innerWidth < 520 ? "min(78vh, 620px)" : "620px";
-      panel.style.maxHeight = "calc(100vh - 90px)";
-      panel.style.borderRadius = "16px";
-
-      if (position === "bottom-left") {
-        panel.style.left = "16px";
-        panel.style.bottom = "92px";
-      } else {
-        panel.style.right = "16px";
-        panel.style.bottom = "92px";
+      .chat-messages {
+        padding: 14px 12px 10px;
       }
 
-      bubble.style.display = "block";
-    }
-  }
-
-  function updateBrandLinkVisibility() {
-    if (!footerLink) return;
-    footerLink.style.display = isOpen ? "block" : "none";
-  }
-
-  function applyPageShrink() {
-    if (!isDesktop()) return;
-
-    if (originalBodyPaddingRight === "") {
-      originalBodyPaddingRight = document.body.style.paddingRight || "";
-    }
-    if (originalBodyPaddingLeft === "") {
-      originalBodyPaddingLeft = document.body.style.paddingLeft || "";
-    }
-    if (originalHtmlOverflowX === "") {
-      originalHtmlOverflowX = document.documentElement.style.overflowX || "";
-    }
-    if (originalBodyOverflowX === "") {
-      originalBodyOverflowX = document.body.style.overflowX || "";
-    }
-
-    document.documentElement.style.overflowX = "hidden";
-    document.body.style.overflowX = "hidden";
-    document.body.style.transition = "padding-right 0.28s ease, padding-left 0.28s ease";
-
-    if (position === "bottom-left") {
-      document.body.style.paddingLeft = "400px";
-      document.body.style.paddingRight = originalBodyPaddingRight;
-    } else {
-      document.body.style.paddingRight = "400px";
-      document.body.style.paddingLeft = originalBodyPaddingLeft;
-    }
-  }
-
-  function resetPageShrink() {
-    document.body.style.paddingRight = originalBodyPaddingRight;
-    document.body.style.paddingLeft = originalBodyPaddingLeft;
-    document.documentElement.style.overflowX = originalHtmlOverflowX;
-    document.body.style.overflowX = originalBodyOverflowX;
-  }
-
-  function openPanel() {
-    if (!panel) return;
-    isOpen = true;
-    panel.style.display = "block";
-    applyPanelLayout();
-    applyPageShrink();
-    updateBrandLinkVisibility();
-    sendPageContext();
-  }
-
-  function closePanel() {
-    if (!panel) return;
-    isOpen = false;
-    panel.style.display = "none";
-    applyPanelLayout();
-    resetPageShrink();
-    updateBrandLinkVisibility();
-  }
-
-  function togglePanel() {
-    if (isOpen) {
-      closePanel();
-    } else {
-      openPanel();
-    }
-  }
-
-  function createBrandLink(root) {
-    footerLink = document.createElement("a");
-    footerLink.href = "https://sitemindai.app";
-    footerLink.target = "_blank";
-    footerLink.rel = "noopener noreferrer";
-    footerLink.textContent = "sitemindai.app";
-
-    footerLink.style.position = "fixed";
-    footerLink.style.zIndex = "999999";
-    footerLink.style.textDecoration = "none";
-    footerLink.style.fontSize = "11px";
-    footerLink.style.lineHeight = "1";
-    footerLink.style.fontWeight = "600";
-    footerLink.style.color = "rgba(15,23,42,0.58)";
-    footerLink.style.background = "rgba(255,255,255,0.82)";
-    footerLink.style.backdropFilter = "blur(10px)";
-    footerLink.style.padding = "7px 10px";
-    footerLink.style.borderRadius = "999px";
-    footerLink.style.boxShadow = "0 8px 18px rgba(15,23,42,0.10)";
-    footerLink.style.border = "1px solid rgba(15,23,42,0.08)";
-    footerLink.style.transition = "opacity 0.2s ease";
-    footerLink.style.display = "none";
-
-    if (position === "bottom-left") {
-      footerLink.style.left = "16px";
-    } else {
-      footerLink.style.right = "16px";
-    }
-
-    footerLink.style.bottom = isDesktop() ? "14px" : "20px";
-
-    footerLink.addEventListener("mouseenter", function () {
-      footerLink.style.color = "rgba(15,23,42,0.82)";
-    });
-
-    footerLink.addEventListener("mouseleave", function () {
-      footerLink.style.color = "rgba(15,23,42,0.58)";
-    });
-
-    root.appendChild(footerLink);
-  }
-
-  function createWidget() {
-    if (document.getElementById("sitemind-widget-root")) return;
-
-    var root = document.createElement("div");
-    root.id = "sitemind-widget-root";
-    document.body.appendChild(root);
-
-    bubble = document.createElement("button");
-    bubble.type = "button";
-    bubble.setAttribute("aria-label", "Open chat");
-    bubble.innerHTML = bubbleText;
-
-    bubble.style.position = "fixed";
-    bubble.style.zIndex = "999999";
-    bubble.style.border = "1px solid rgba(255,255,255,0.18)";
-    bubble.style.borderRadius = "999px";
-    bubble.style.padding = "14px 22px";
-    bubble.style.background = "linear-gradient(135deg, " + themeColor + ", #60a5fa)";
-    bubble.style.color = "#fff";
-    bubble.style.fontSize = "14px";
-    bubble.style.fontWeight = "700";
-    bubble.style.lineHeight = "1.35";
-    bubble.style.textAlign = "center";
-    bubble.style.maxWidth = "255px";
-    bubble.style.boxShadow = "0 16px 34px rgba(37, 99, 235, 0.28)";
-    bubble.style.cursor = "pointer";
-    bubble.style.whiteSpace = "normal";
-    bubble.style.transition = "transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease";
-
-    if (window.innerWidth < 520) {
-      bubble.style.maxWidth = "220px";
-      bubble.style.fontSize = "13px";
-      bubble.style.padding = "12px 18px";
-    }
-
-    bubble.addEventListener("mouseenter", function () {
-      bubble.style.transform = "translateY(-1px)";
-      bubble.style.boxShadow = "0 20px 38px rgba(37, 99, 235, 0.34)";
-    });
-
-    bubble.addEventListener("mouseleave", function () {
-      bubble.style.transform = "translateY(0)";
-      bubble.style.boxShadow = "0 16px 34px rgba(37, 99, 235, 0.28)";
-    });
-
-    panel = document.createElement("div");
-    panel.style.position = "fixed";
-    panel.style.zIndex = "999999";
-    panel.style.background = "#fff";
-    panel.style.overflow = "hidden";
-    panel.style.display = "none";
-
-    iframe = document.createElement("iframe");
-    iframe.src = BASE_URL + "/widget-frame.html?agentId=" + encodeURIComponent(agentId);
-    iframe.style.width = "100%";
-    iframe.style.height = "100%";
-    iframe.style.border = "0";
-    iframe.setAttribute("title", "SiteMind AI Chat");
-
-    panel.appendChild(iframe);
-
-    applyBubblePosition();
-    applyPanelLayout();
-
-    bubble.addEventListener("click", function () {
-      togglePanel();
-    });
-
-    iframe.addEventListener("load", function () {
-      setTimeout(sendPageContext, 300);
-      setTimeout(sendPageContext, 1200);
-    });
-
-    createBrandLink(root);
-
-    root.appendChild(panel);
-    root.appendChild(bubble);
-
-    updateBrandLinkVisibility();
-  }
-
-  window.addEventListener("message", function (event) {
-    if (!event.data || typeof event.data !== "object") return;
-
-    if (event.data.type === "sitemind-widget-ready") {
-      sendPageContext();
-    }
-
-    if (event.data.type === "sitemind-close-widget") {
-      closePanel();
-    }
-  });
-
-  window.addEventListener("resize", function () {
-    applyBubblePosition();
-    applyPanelLayout();
-
-    if (isOpen) {
-      if (isDesktop()) {
-        applyPageShrink();
-      } else {
-        resetPageShrink();
-      }
-    } else {
-      resetPageShrink();
-    }
-
-    if (footerLink) {
-      if (position === "bottom-left") {
-        footerLink.style.left = "16px";
-        footerLink.style.right = "";
-      } else {
-        footerLink.style.right = "16px";
-        footerLink.style.left = "";
+      .bubble {
+        max-width: 90%;
+        font-size: 13.5px;
       }
 
-      footerLink.style.bottom = isDesktop() ? "14px" : "20px";
-    }
-  });
+      .chat-form {
+        padding: 10px;
+        gap: 8px;
+      }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", createWidget);
-  } else {
-    createWidget();
-  }
-})();
+      .chat-send {
+        min-width: 82px;
+        padding: 0 14px;
+      }
+
+      .chat-close {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-shell">
+    <div class="chat-header" id="chatHeader">
+      <div class="chat-header-top">
+        <div class="chat-header-left">
+          <a class="brand-link" href="https://sitemindai.app" target="_blank" rel="noopener noreferrer">sitemindai.app</a>
+          <div class="chat-title" id="chatTitle">SiteMind AI</div>
+        </div>
+        <button type="button" class="chat-close" id="chatClose" aria-label="Close chat">×</button>
+      </div>
+      <div class="chat-subtitle" id="chatSubtitle">Ask AI Agent</div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-status" id="chatStatus"></div>
+
+    <form class="chat-form" id="chatForm">
+      <textarea
+        id="chatInput"
+        class="chat-input"
+        placeholder="Type a question..."
+        rows="1"
+      ></textarea>
+      <button type="submit" id="chatSend" class="chat-send">Send</button>
+    </form>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var API_BASE = "https://ai-tutor-rouge-theta.vercel.app/api/index";
+      var REQUEST_TIMEOUT = 30000;
+      var MAX_HISTORY_ITEMS = 12;
+
+      var chatForm = document.getElementById("chatForm");
+      var chatInput = document.getElementById("chatInput");
+      var chatSend = document.getElementById("chatSend");
+      var chatMessages = document.getElementById("chatMessages");
+      var chatStatus = document.getElementById("chatStatus");
+      var chatTitle = document.getElementById("chatTitle");
+      var chatSubtitle = document.getElementById("chatSubtitle");
+      var chatHeader = document.getElementById("chatHeader");
+      var chatClose = document.getElementById("chatClose");
+
+      var params = new URLSearchParams(window.location.search);
+      var agentId = params.get("agentId") || "demo-agent";
+
+      var pageData = {
+        pageTitle: "",
+        pageDescription: "",
+        pageUrl: "",
+        pageContext: ""
+      };
+
+      var agentData = {
+        agentId: agentId,
+        agentName: "SiteMind AI",
+        welcomeMessage: "",
+        themeColor: "#2563eb"
+      };
+
+      var isSending = false;
+      var activeController = null;
+
+      function getHistoryKey() {
+        return "sitemind_history_" + agentId;
+      }
+
+      function escapeHtml(str) {
+        return String(str || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function notifyParentClose() {
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.postMessage(
+              {
+                type: "sitemind-close-widget",
+                agentId: agentId
+              },
+              "*"
+            );
+          } catch (e) {}
+        }
+      }
+
+      function setStatus(text) {
+        chatStatus.textContent = text || "";
+      }
+
+      function autoResizeTextarea() {
+        chatInput.style.height = "auto";
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + "px";
+      }
+
+      function scrollToBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      function setLoading(loading) {
+        isSending = !!loading;
+        chatSend.disabled = loading;
+        chatInput.disabled = loading;
+        chatSend.textContent = loading ? "..." : "Send";
+        setStatus(loading ? "One moment..." : "");
+      }
+
+      function getStoredHistory() {
+        try {
+          var raw = localStorage.getItem(getHistoryKey());
+          var parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function saveStoredHistory(history) {
+        try {
+          localStorage.setItem(
+            getHistoryKey(),
+            JSON.stringify(history.slice(-MAX_HISTORY_ITEMS))
+          );
+        } catch (e) {}
+      }
+
+      function normalizeHistory(history) {
+        if (!Array.isArray(history)) return [];
+        return history
+          .map(function (item) {
+            return {
+              role: item && item.role === "assistant" ? "assistant" : "user",
+              content: String(item && item.content ? item.content : "").trim().slice(0, 1500)
+            };
+          })
+          .filter(function (item) {
+            return item.content;
+          })
+          .slice(-MAX_HISTORY_ITEMS);
+      }
+
+      function addMessage(role, text) {
+        var row = document.createElement("div");
+        row.className = "message-row " + role;
+
+        var bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+
+        row.appendChild(bubble);
+        chatMessages.appendChild(row);
+        scrollToBottom();
+
+        return row;
+      }
+
+      function updateMessage(row, text) {
+        if (!row) return;
+        var bubble = row.querySelector(".bubble");
+        if (!bubble) return;
+        bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+        scrollToBottom();
+      }
+
+      function renderStoredHistory() {
+        var history = getStoredHistory();
+        if (!history.length) return;
+
+        history.forEach(function (item) {
+          addMessage(item.role, item.content);
+        });
+      }
+
+      function renderWelcomeIfNeeded() {
+        var history = getStoredHistory();
+        if (history.length) return;
+
+        var welcome =
+          agentData.welcomeMessage ||
+          "Hello! I can help with this page, services, products, or general questions.";
+
+        addMessage("assistant", welcome);
+      }
+
+      function applyAgentData() {
+        var color = agentData.themeColor || "#2563eb";
+
+        chatTitle.textContent = agentData.agentName || "SiteMind AI";
+        chatHeader.style.background =
+          "radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 28%), linear-gradient(135deg, " +
+          color +
+          " 0%, " +
+          color +
+          " 55%, #60a5fa 100%)";
+        chatSend.style.background = "linear-gradient(135deg, " + color + ", #3b82f6)";
+      }
+
+      async function fetchAgentConfig() {
+        try {
+          var res = await fetch(
+            API_BASE + "?action=agent-config&agentId=" + encodeURIComponent(agentId)
+          );
+
+          if (!res.ok) return;
+
+          var data = await res.json();
+          if (!data) return;
+
+          agentData.agentId = data.agentId || agentId;
+          agentData.agentName = data.agentName || "SiteMind AI";
+          agentData.welcomeMessage = data.welcomeMessage || "";
+          agentData.themeColor = data.themeColor || "#2563eb";
+
+          applyAgentData();
+        } catch (e) {}
+      }
+
+      async function sendMessageToApi(userMessage) {
+        var history = normalizeHistory(getStoredHistory());
+
+        if (activeController) {
+          try {
+            activeController.abort();
+          } catch (e) {}
+        }
+
+        activeController = new AbortController();
+
+        var timeoutId = setTimeout(function () {
+          try {
+            activeController.abort();
+          } catch (e) {}
+        }, REQUEST_TIMEOUT);
+
+        try {
+          var response = await fetch(API_BASE, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            signal: activeController.signal,
+            body: JSON.stringify({
+              action: "chat",
+              agentId: agentId,
+              message: userMessage,
+              history: history,
+              pageTitle: pageData.pageTitle,
+              pageDescription: pageData.pageDescription,
+              pageUrl: pageData.pageUrl,
+              pageContext: pageData.pageContext
+            })
+          });
+
+          var text = await response.text();
+          var data = {};
+
+          try {
+            data = text ? JSON.parse(text) : {};
+          } catch (e) {
+            throw new Error("Server did not return JSON: " + String(text || "").slice(0, 500));
+          }
+
+          if (!response.ok) {
+            throw new Error(
+              data.details
+                ? (typeof data.details === "string" ? data.details : JSON.stringify(data.details))
+                : (data.error || "Server error.")
+            );
+          }
+
+          if (!data.reply) {
+            throw new Error("No reply received.");
+          }
+
+          return String(data.reply).trim();
+        } finally {
+          clearTimeout(timeoutId);
+          activeController = null;
+        }
+      }
+
+      async function handleSubmit(event) {
+        event.preventDefault();
+        if (isSending) return;
+
+        var userMessage = String(chatInput.value || "").trim();
+        if (!userMessage) return;
+
+        addMessage("user", userMessage);
+        chatInput.value = "";
+        autoResizeTextarea();
+        setLoading(true);
+
+        var placeholder = addMessage("assistant", "One moment...");
+
+        try {
+          var answer = await sendMessageToApi(userMessage);
+
+          updateMessage(placeholder, answer);
+
+          var history = normalizeHistory(getStoredHistory());
+          history.push({ role: "user", content: userMessage });
+          history.push({ role: "assistant", content: answer });
+          saveStoredHistory(history);
+        } catch (error) {
+          var msg = "Something went wrong. Please try again.";
+
+          if (error && error.name === "AbortError") {
+            msg = "The request took too long. Try a shorter question.";
+          } else if (error && error.message) {
+            msg = error.message;
+          }
+
+          updateMessage(placeholder, msg);
+        } finally {
+          setLoading(false);
+          chatInput.focus();
+        }
+      }
+
+      window.addEventListener("message", function (event) {
+        if (!event.data || typeof event.data !== "object") return;
+
+        if (event.data.type === "sitemind-page-context") {
+          pageData.pageTitle = String(event.data.pageTitle || "").slice(0, 300);
+          pageData.pageDescription = String(event.data.pageDescription || "").slice(0, 500);
+          pageData.pageUrl = String(event.data.pageUrl || "").slice(0, 500);
+          pageData.pageContext = String(event.data.pageContext || "").slice(0, 5000);
+
+          if (pageData.pageTitle) {
+            chatSubtitle.textContent = "Ask AI: " + pageData.pageTitle;
+          }
+        }
+
+        if (event.data.type === "sitemind-agent-config") {
+          agentData.agentId = event.data.agentId || agentId;
+          agentData.agentName = event.data.agentName || "SiteMind AI";
+          agentData.welcomeMessage = event.data.welcomeMessage || "";
+          agentData.themeColor = event.data.themeColor || "#2563eb";
+          applyAgentData();
+        }
+      });
+
+      chatForm.addEventListener("submit", handleSubmit);
+
+      chatInput.addEventListener("input", autoResizeTextarea);
+
+      chatInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          handleSubmit(event);
+        }
+      });
+
+      chatClose.addEventListener("click", function () {
+        notifyParentClose();
+      });
+
+      renderStoredHistory();
+      applyAgentData();
+      autoResizeTextarea();
+
+      fetchAgentConfig().finally(function () {
+        renderWelcomeIfNeeded();
+      });
+
+      if (window.parent && window.parent !== window) {
+        try {
+          window.parent.postMessage(
+            {
+              type: "sitemind-widget-ready",
+              agentId: agentId
+            },
+            "*"
+          );
+        } catch (e) {}
+      }
+    })();
+  </script>
+</body>
+</html>
