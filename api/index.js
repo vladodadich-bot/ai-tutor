@@ -529,6 +529,68 @@ function pickRelevantCrawledPages(rows, message, limit = 3) {
   return scored.slice(0, limit);
 }
 
+function normalizeHostname(value) {
+  try {
+    const url = value.startsWith('http://') || value.startsWith('https://')
+      ? new URL(value)
+      : new URL('https://' + value);
+
+    return String(url.hostname || '')
+      .toLowerCase()
+      .replace(/^www\./, '')
+      .trim();
+  } catch {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .split('/')[0]
+      .trim();
+  }
+}
+
+function getRequestHostname(req, pageUrl) {
+  const origin = String(
+    req.headers?.origin ||
+    req.headers?.Origin ||
+    ''
+  ).trim();
+
+  const referer = String(
+    req.headers?.referer ||
+    req.headers?.Referer ||
+    ''
+  ).trim();
+
+  const candidates = [pageUrl, origin, referer];
+
+  for (const value of candidates) {
+    const host = normalizeHostname(value);
+    if (host) return host;
+  }
+
+  return '';
+}
+
+function isAllowedWidgetHost(requestHost, siteDomain) {
+  const normalizedRequestHost = normalizeHostname(requestHost);
+  const normalizedSiteDomain = normalizeHostname(siteDomain);
+
+  if (!normalizedRequestHost || !normalizedSiteDomain) {
+    return false;
+  }
+
+  if (normalizedRequestHost === normalizedSiteDomain) {
+    return true;
+  }
+
+  if (normalizedRequestHost === 'sitemindai.app') {
+    return true;
+  }
+
+  return false;
+}
+
 async function getAgentWithAccess(agentId) {
   const { data: agent, error: agentError } = await supabase
     .from('agents')
@@ -635,6 +697,16 @@ async function handleChat(req, res, body) {
   if (!accessCheck.agent) {
     return res.status(404).json({
       error: 'Agent not found'
+    });
+  }
+
+  const requestHost = getRequestHostname(req, pageUrl);
+  const allowedSiteDomain = accessCheck.agent.site_domain || '';
+
+  if (!isAllowedWidgetHost(requestHost, allowedSiteDomain)) {
+    return res.status(403).json({
+      error: 'DOMAIN_NOT_ALLOWED',
+      message: 'Widget nije dozvoljen na ovom domenu.'
     });
   }
 
