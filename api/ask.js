@@ -95,6 +95,9 @@ Budi strpljiv, prirodan i koristan učitelj.
 Naslov posta:
 ${postTitle ? postTitle : "Nepoznato djelo"}
 
+Tekst posta:
+${postText ? postText : "Tekst posta nije dostupan."}
+
 Prethodni razgovor:
 ${historyText}
 
