@@ -312,7 +312,7 @@
         chatSend.disabled = loading;
         chatInput.disabled = loading;
         chatSend.textContent = loading ? "..." : "Send";
-        setStatus(loading ? "AI razmišlja..." : "");
+        setStatus(loading ? "Thinking..." : "");
       }
 
       function getStoredHistory() {
@@ -494,7 +494,7 @@
         autoResizeTextarea();
         setLoading(true);
 
-        var placeholder = addMessage("assistant", "Razmišljam...");
+        var placeholder = addMessage("assistant", "Thinking...");
 
         try {
           var answer = await sendMessageToApi(userMessage);
