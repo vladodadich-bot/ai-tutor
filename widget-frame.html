@@ -12,10 +12,6 @@
     :root {
       --bg-1: #eef4fb;
       --bg-2: #f8fbff;
-      --panel: rgba(255,255,255,0.94);
-      --panel-strong: rgba(255,255,255,0.98);
-      --line: rgba(15, 23, 42, 0.08);
-      --line-strong: rgba(15, 23, 42, 0.12);
       --text: #0f172a;
       --muted: #64748b;
       --muted-2: #94a3b8;
@@ -25,13 +21,7 @@
       --header-grad-1: #1d4ed8;
       --header-grad-2: #2563eb;
       --header-grad-3: #60a5fa;
-      --shadow-lg: 0 18px 45px rgba(15, 23, 42, 0.16);
       --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
-      --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.07);
-      --radius-xl: 22px;
-      --radius-lg: 18px;
-      --radius-md: 14px;
-      --radius-sm: 10px;
     }
 
     html, body {
@@ -77,18 +67,47 @@
     .chat-header {
       position: relative;
       z-index: 1;
-      padding: 18px 18px 16px;
+      padding: 14px 18px 16px;
       color: #ffffff;
       background:
         radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 28%),
         linear-gradient(135deg, var(--header-grad-1) 0%, var(--header-grad-2) 55%, var(--header-grad-3) 100%);
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
       flex-shrink: 0;
       border-bottom-left-radius: 22px;
       border-bottom-right-radius: 22px;
       box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+    }
+
+    .chat-header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .chat-header-left {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .brand-link {
+      display: inline-block;
+      margin: 0 0 6px;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      color: rgba(255,255,255,0.84);
+      text-decoration: none;
+      opacity: 0.95;
+    }
+
+    .brand-link:hover {
+      color: #ffffff;
+      text-decoration: underline;
     }
 
     .chat-title {
@@ -97,6 +116,30 @@
       line-height: 1.2;
       letter-spacing: -0.2px;
       padding-right: 6px;
+      word-break: break-word;
+    }
+
+    .chat-close {
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.12);
+      color: #ffffff;
+      width: 34px;
+      height: 34px;
+      min-width: 34px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.18s ease, transform 0.18s ease;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+    }
+
+    .chat-close:hover {
+      background: rgba(255,255,255,0.18);
+      transform: translateY(-1px);
     }
 
     .chat-subtitle {
@@ -124,10 +167,6 @@
     .chat-messages::-webkit-scrollbar-thumb {
       background: rgba(148, 163, 184, 0.35);
       border-radius: 999px;
-    }
-
-    .chat-messages::-webkit-scrollbar-track {
-      background: transparent;
     }
 
     .message-row {
@@ -248,18 +287,6 @@
       box-shadow: none;
     }
 
-    .typing-dots {
-      display: inline-block;
-      letter-spacing: 2px;
-      animation: blink 1s infinite;
-    }
-
-    @keyframes blink {
-      0% { opacity: 0.2; }
-      50% { opacity: 1; }
-      100% { opacity: 0.2; }
-    }
-
     @media (min-width: 480px) {
       .chat-shell {
         border-left: 1px solid rgba(15, 23, 42, 0.08);
@@ -267,17 +294,13 @@
       }
 
       .chat-header {
-        padding: 20px 20px 18px;
+        padding: 16px 20px 18px;
         border-bottom-left-radius: 24px;
         border-bottom-right-radius: 24px;
       }
 
       .chat-title {
         font-size: 17px;
-      }
-
-      .chat-subtitle {
-        font-size: 12px;
       }
 
       .chat-messages {
@@ -295,7 +318,7 @@
 
     @media (max-width: 460px) {
       .chat-header {
-        padding: 16px 14px 14px;
+        padding: 14px 14px 14px;
       }
 
       .chat-messages {
@@ -316,13 +339,25 @@
         min-width: 82px;
         padding: 0 14px;
       }
+
+      .chat-close {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="chat-shell">
     <div class="chat-header" id="chatHeader">
-      <div class="chat-title" id="chatTitle">SiteMind AI</div>
+      <div class="chat-header-top">
+        <div class="chat-header-left">
+          <a class="brand-link" href="https://sitemindai.app" target="_blank" rel="noopener noreferrer">sitemindai.app</a>
+          <div class="chat-title" id="chatTitle">SiteMind AI</div>
+        </div>
+        <button type="button" class="chat-close" id="chatClose" aria-label="Close chat">×</button>
+      </div>
       <div class="chat-subtitle" id="chatSubtitle">Ask AI Agent</div>
     </div>
 
@@ -356,6 +391,7 @@
       var chatTitle = document.getElementById("chatTitle");
       var chatSubtitle = document.getElementById("chatSubtitle");
       var chatHeader = document.getElementById("chatHeader");
+      var chatClose = document.getElementById("chatClose");
 
       var params = new URLSearchParams(window.location.search);
       var agentId = params.get("agentId") || "demo-agent";
@@ -388,6 +424,20 @@
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#039;");
+      }
+
+      function notifyParentClose() {
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.postMessage(
+              {
+                type: "sitemind-close-widget",
+                agentId: agentId
+              },
+              "*"
+            );
+          } catch (e) {}
+        }
       }
 
       function setStatus(text) {
@@ -648,7 +698,6 @@
       });
 
       chatForm.addEventListener("submit", handleSubmit);
-
       chatInput.addEventListener("input", autoResizeTextarea);
 
       chatInput.addEventListener("keydown", function (event) {
@@ -656,6 +705,10 @@
           event.preventDefault();
           handleSubmit(event);
         }
+      });
+
+      chatClose.addEventListener("click", function () {
+        notifyParentClose();
       });
 
       renderStoredHistory();
