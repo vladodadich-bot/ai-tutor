@@ -580,6 +580,7 @@ Use information in this order:
 STRICT RULES
 - Never invent specific facts about the website, company, product, service, pricing, policy, features, author, or page content.
 - If a website-specific fact is not present in the provided context, say so honestly.
+- If the exact content is not available but a relevant internal page or link is clearly available, point the user to that page instead of acting like the topic does not exist.
 - Use general knowledge only to explain concepts, give safe background, or help when the site context is incomplete.
 - Never present general knowledge as if it were a confirmed site-specific fact.
 - Prefer the currently open page over crawled site pages when answering.
@@ -648,6 +649,39 @@ ${historyText}
 `.trim();
 }
 
+function buildLinkSuggestionReply(language, candidates) {
+  const lang = String(language || 'en').toLowerCase();
+  const items = (candidates || []).slice(0, 2);
+
+  if (!items.length) return '';
+
+  if (lang.startsWith('de')) {
+    if (items.length === 1) {
+      return `Ich habe hier keinen vollständigen Inhalt zu diesem Thema, aber es gibt auf der Website offenbar eine passende Seite: ${items[0].title} – ${items[0].url}`;
+    }
+    return `Ich habe hier keinen vollständigen Inhalt zu diesem Thema, aber auf der Website gibt es passende Seiten:\n- ${items[0].title} – ${items[0].url}\n- ${items[1].title} – ${items[1].url}`;
+  }
+
+  if (lang.startsWith('hr')) {
+    if (items.length === 1) {
+      return `Nemam ovdje puni sadržaj o toj temi, ali na stranici očito postoji relevantan članak: ${items[0].title} – ${items[0].url}`;
+    }
+    return `Nemam ovdje puni sadržaj o toj temi, ali na stranici postoje relevantne poveznice:\n- ${items[0].title} – ${items[0].url}\n- ${items[1].title} – ${items[1].url}`;
+  }
+
+  if (lang.startsWith('it')) {
+    if (items.length === 1) {
+      return `Qui non ho il contenuto completo su questo argomento, ma sul sito esiste una pagina pertinente: ${items[0].title} – ${items[0].url}`;
+    }
+    return `Qui non ho il contenuto completo su questo argomento, ma sul sito ci sono pagine pertinenti:\n- ${items[0].title} – ${items[0].url}\n- ${items[1].title} – ${items[1].url}`;
+  }
+
+  if (items.length === 1) {
+    return `I do not have the full content for that topic here, but there is a relevant page on the website: ${items[0].title} – ${items[0].url}`;
+  }
+  return `I do not have the full content for that topic here, but there are relevant pages on the website:\n- ${items[0].title} – ${items[0].url}\n- ${items[1].title} – ${items[1].url}`;
+}
+
 // ========================================
 // CHAT HELPERS - END
 // ========================================
@@ -700,6 +734,25 @@ function scorePageForMessage(page, message) {
   return score;
 }
 
+function scoreLinkMatch(link, message) {
+  const text = String(message || '').toLowerCase();
+  if (!text) return 0;
+
+  const linkText = String(link && link.text ? link.text : '').toLowerCase();
+  const linkHref = String(link && link.href ? link.href : '').toLowerCase();
+
+  let score = 0;
+  const words = text.split(/\s+/).filter(Boolean);
+
+  for (const word of words) {
+    if (word.length < 2) continue;
+    if (linkText.includes(word)) score += 5;
+    if (linkHref.includes(word)) score += 3;
+  }
+
+  return score;
+}
+
 function pickRelevantCrawledPages(rows, message, limit = 3) {
   const scored = (rows || [])
     .map(row => ({
@@ -712,6 +765,54 @@ function pickRelevantCrawledPages(rows, message, limit = 3) {
   if (useful.length) return useful;
 
   return scored.slice(0, limit);
+}
+
+function findRelevantLinkCandidates(rows, message, limit = 3) {
+  const matches = [];
+
+  for (const row of rows || []) {
+    const pageTitle = String(row.page_title || '').trim();
+    const pageUrl = String(row.url || '').trim();
+    const pageH1 = String(row.h1 || '').trim();
+    const links = safeJsonArray(row.internal_links);
+
+    const pageScore = scorePageForMessage(row, message);
+    if (pageScore > 0 && pageUrl) {
+      matches.push({
+        title: pageTitle || pageH1 || pageUrl,
+        url: pageUrl,
+        score: pageScore + 4
+      });
+    }
+
+    for (const link of links) {
+      const score = scoreLinkMatch(link, message);
+      const href = String(link && link.href ? link.href : '').trim();
+      const title = String(link && link.text ? link.text : '').trim() || href;
+
+      if (score > 0 && href) {
+        matches.push({
+          title,
+          url: href,
+          score
+        });
+      }
+    }
+  }
+
+  const deduped = [];
+  const seen = new Set();
+
+  matches
+    .sort((a, b) => b.score - a.score)
+    .forEach((item) => {
+      const key = String(item.url || '').trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      deduped.push(item);
+    });
+
+  return deduped.slice(0, limit);
 }
 
 async function getAgentWithAccess(agentId) {
@@ -860,6 +961,19 @@ async function handleChat(req, res, body) {
   }
 
   const relevantPages = pickRelevantCrawledPages(crawledRows, message, 3);
+  const linkCandidates = findRelevantLinkCandidates(crawledRows, message, 3);
+
+  const hasStrongCurrentPageContent = pageText.length > 180 || pageContext.length > 180;
+  const hasStrongRelevantContent = Array.isArray(relevantPages) && relevantPages.some((row) => {
+    const content = String(row.content || row.text_preview || '');
+    return content.trim().length > 180 && scorePageForMessage(row, message) >= 4;
+  });
+
+  if (!hasStrongCurrentPageContent && !hasStrongRelevantContent && linkCandidates.length > 0) {
+    return res.status(200).json({
+      reply: buildLinkSuggestionReply(language, linkCandidates)
+    });
+  }
 
   let crawlContext = '';
 
