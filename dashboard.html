@@ -2,24 +2,32 @@
 <html lang="en">
 <head>
   <script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-  const supabase = createClient(
-    'https://YOUR-PROJECT.supabase.co',
-    'YOUR_ANON_KEY'
-  );
+    const supabase = createClient(
+      'https://ynmimpncrhfiqtwtgewi.supabase.co',
+      'sb_publishable_pTBqRGuGnYDeqLeIWMC8pA_Vp01sKKd'
+    );
 
-  const { data, error } = await supabase.auth.getSession();
+    window.supabase = supabase;
 
-  if (error || !data?.session) {
-    window.location.href = '/login.html';
-  } else {
-    document.body.style.display = 'block';
-  }
-</script>
+    try {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error || !data?.session) {
+        window.location.href = '/login.html';
+      } else {
+        document.body.style.display = 'block';
+      }
+    } catch (err) {
+      window.location.href = '/login.html';
+    }
+  </script>
+
   <style>
-  body { display: none; }
-</style>
+    body { display: none; }
+  </style>
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SiteMind Dashboard</title>
@@ -224,7 +232,23 @@
         .replace(/'/g, "&#039;");
     }
 
+    async function getAccessToken() {
+      if (!window.supabase) {
+        throw new Error("Supabase nije dostupan.");
+      }
+
+      const { data, error } = await window.supabase.auth.getSession();
+
+      if (error || !data?.session?.access_token) {
+        throw new Error("Nema aktivne prijave. Prijavi se ponovo.");
+      }
+
+      return data.session.access_token;
+    }
+
     async function apiGet(action, extraQuery) {
+      const token = await getAccessToken();
+
       const url = new URL(API_BASE);
       url.searchParams.set("action", action);
 
@@ -237,7 +261,10 @@
       }
 
       const res = await fetch(url.toString(), {
-        method: "GET"
+        method: "GET",
+        headers: {
+          "Authorization": "Bearer " + token
+        }
       });
 
       const text = await res.text();
@@ -257,9 +284,14 @@
     }
 
     async function apiPost(action, payload) {
+      const token = await getAccessToken();
+
       const res = await fetch(API_BASE, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
         body: JSON.stringify(
           Object.assign(
             {
@@ -555,12 +587,16 @@
 
         const data = await apiPost("crawl-site", {
           url: url,
+          siteUrl: url,
+          siteDomain: url,
+          site_domain: url,
           agentId: agentId,
           agent_id: agentId
         });
 
         showStatus(
-          "Crawl success.\nPages crawled: " + (data.pagesCrawled || data.pages_crawled || "n/a"),
+          "Crawl success.\nPages crawled: " +
+          (data.pagesCrawled || data.pages_crawled || data.count || "n/a"),
           "success"
         );
       } catch (err) {
