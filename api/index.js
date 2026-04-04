@@ -77,85 +77,6 @@ async function requireAuthenticatedUser(req, res) {
 // ========================================
 
 // ========================================
-// GENERAL HELPERS - START
-// ========================================
-
-function normalizeUrl(rawValue) {
-  const value = String(rawValue || '').trim();
-  if (!value) return '';
-
-  try {
-    const url = new URL(value);
-    return url.toString().replace(/\/$/, '');
-  } catch (e) {
-    return value;
-  }
-}
-
-function toArray(value) {
-  if (Array.isArray(value)) return value;
-  if (!value) return [];
-
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  return [];
-}
-
-function normalizeCrawlResultToRows(crawlResult, agentId) {
-  const pages = Array.isArray(crawlResult) ? crawlResult : [crawlResult];
-
-  return pages
-    .filter(Boolean)
-    .map(function (page) {
-      const headings = toArray(page.headings);
-      const internalLinks = toArray(page.internal_links);
-      const textPreview = String(page.text_preview || '').trim();
-      const content = String(page.content || textPreview || '').trim();
-
-      return {
-        agent_id: agentId,
-        url: normalizeUrl(page.url || ''),
-        content: content,
-        page_title: String(page.page_title || '').trim(),
-        meta_description: String(page.meta_description || '').trim(),
-        h1: String(page.h1 || '').trim(),
-        headings: headings,
-        internal_links: internalLinks,
-        text_preview: textPreview
-      };
-    })
-    .filter(function (row) {
-      return !!row.url;
-    });
-}
-
-async function getOwnedAgent(agentId, userId) {
-  const { data, error } = await supabase
-    .from('agents')
-    .select('agent_id, user_id, site_domain, agent_name, welcome_message, theme_color')
-    .eq('agent_id', agentId)
-    .eq('user_id', userId)
-    .single();
-
-  if (error || !data) {
-    return null;
-  }
-
-  return data;
-}
-
-// ========================================
-// GENERAL HELPERS - END
-// ========================================
-
-// ========================================
 // CREATE AGENT - START
 // ========================================
 
@@ -166,7 +87,7 @@ async function handleCreateAgent(req, res, body) {
   const agentName = String(body.agentName || body.agent_name || 'My Agent').trim();
   const welcomeMessage = String(body.welcomeMessage || body.welcome_message || 'Hi! How can I help?').trim();
   const themeColor = String(body.themeColor || body.theme_color || '#2563eb').trim();
-  const siteDomain = normalizeUrl(body.siteDomain || body.site_domain || body.siteUrl || body.url || '');
+  const siteDomain = String(body.siteDomain || body.site_domain || '').trim();
 
   if (!siteDomain) {
     return res.status(400).json({ error: 'Missing siteDomain' });
@@ -230,7 +151,7 @@ async function handleGetAgents(req, res, body) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
   }
 
-  const siteDomain = normalizeUrl(body.siteDomain || body.site_domain || body.siteUrl || body.url || '');
+  const siteDomain = String(body.siteDomain || body.site_domain || '').trim();
 
   let query = supabase
     .from('agents')
@@ -280,9 +201,14 @@ async function handleUpdateAgent(req, res, body) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
   }
 
-  const existingAgent = await getOwnedAgent(agentId, user.id);
+  const { data: existingAgent, error: existingError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id')
+    .eq('agent_id', agentId)
+    .eq('user_id', user.id)
+    .single();
 
-  if (!existingAgent) {
+  if (existingError || !existingAgent) {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
@@ -300,13 +226,8 @@ async function handleUpdateAgent(req, res, body) {
     updates.theme_color = String(body.themeColor || body.theme_color || '').trim();
   }
 
-  if (
-    body.siteDomain !== undefined ||
-    body.site_domain !== undefined ||
-    body.siteUrl !== undefined ||
-    body.url !== undefined
-  ) {
-    updates.site_domain = normalizeUrl(body.siteDomain || body.site_domain || body.siteUrl || body.url || '');
+  if (body.siteDomain !== undefined || body.site_domain !== undefined) {
+    updates.site_domain = String(body.siteDomain || body.site_domain || '').trim();
   }
 
   if (Object.keys(updates).length === 0) {
@@ -357,9 +278,14 @@ async function handleDeleteAgent(req, res, body) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
   }
 
-  const existingAgent = await getOwnedAgent(agentId, user.id);
+  const { data: existingAgent, error: existingError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id')
+    .eq('agent_id', agentId)
+    .eq('user_id', user.id)
+    .single();
 
-  if (!existingAgent) {
+  if (existingError || !existingAgent) {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
@@ -393,6 +319,77 @@ async function handleDeleteAgent(req, res, body) {
 // ========================================
 
 // ========================================
+// CRAWL HELPERS - START
+// ========================================
+
+function normalizeUrlValue(value) {
+  return String(value || '').trim();
+}
+
+function safeStringifyArray(value) {
+  if (Array.isArray(value)) {
+    return JSON.stringify(value);
+  }
+
+  if (!value) {
+    return JSON.stringify([]);
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return JSON.stringify(Array.isArray(parsed) ? parsed : []);
+    } catch (err) {
+      return JSON.stringify([]);
+    }
+  }
+
+  return JSON.stringify([]);
+}
+
+function normalizeCrawlResultToRows(crawlResult, agentId) {
+  let pages = [];
+
+  if (Array.isArray(crawlResult)) {
+    pages = crawlResult;
+  } else if (Array.isArray(crawlResult?.pages)) {
+    pages = crawlResult.pages;
+  } else if (crawlResult && typeof crawlResult === 'object') {
+    pages = [crawlResult];
+  }
+
+  const normalizedRows = pages
+    .filter(Boolean)
+    .map((page) => {
+      const headings = Array.isArray(page?.headings) ? page.headings : [];
+      const internalLinks = Array.isArray(page?.internal_links)
+        ? page.internal_links
+        : Array.isArray(page?.internalLinks)
+          ? page.internalLinks
+          : [];
+
+      return {
+        agent_id: agentId,
+        url: normalizeUrlValue(page?.url),
+        content: String(page?.content || ''),
+        page_title: String(page?.page_title || page?.pageTitle || ''),
+        meta_description: String(page?.meta_description || page?.metaDescription || ''),
+        h1: String(page?.h1 || ''),
+        headings: JSON.stringify(headings),
+        internal_links: JSON.stringify(internalLinks),
+        text_preview: String(page?.text_preview || page?.textPreview || '')
+      };
+    })
+    .filter((row) => row.url);
+
+  return normalizedRows;
+}
+
+// ========================================
+// CRAWL HELPERS - END
+// ========================================
+
+// ========================================
 // CRAWL SITE - START
 // ========================================
 
@@ -401,6 +398,8 @@ async function handleCrawlSite(req, res, body) {
   if (!user) return;
 
   const agentId = String(body.agentId || body.agent_id || '').trim();
+  const requestedUrl = String(body.url || body.siteUrl || body.site_url || '').trim();
+  const requestedSiteDomain = String(body.siteDomain || body.site_domain || '').trim();
 
   if (!agentId) {
     return res.status(400).json({ error: 'Missing agentId' });
@@ -414,40 +413,38 @@ async function handleCrawlSite(req, res, body) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
   }
 
-  const existingAgent = await getOwnedAgent(agentId, user.id);
+  const { data: existingAgent, error: existingError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id, site_domain')
+    .eq('agent_id', agentId)
+    .eq('user_id', user.id)
+    .single();
 
-  if (!existingAgent) {
+  if (existingError || !existingAgent) {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
-  const targetUrl = normalizeUrl(
-    body.url ||
-    body.siteUrl ||
-    body.siteDomain ||
-    body.site_domain ||
-    existingAgent.site_domain ||
-    ''
-  );
+  const crawlUrl =
+    requestedUrl ||
+    requestedSiteDomain ||
+    String(existingAgent.site_domain || '').trim();
 
-  if (!targetUrl) {
-    return res.status(400).json({ error: 'Missing url or siteDomain' });
+  if (!crawlUrl) {
+    return res.status(400).json({ error: 'Missing crawl url/siteDomain and agent has no saved site_domain' });
   }
 
   try {
-    console.log('CRAWL START', {
-      userId: user.id,
-      agentId: agentId,
-      targetUrl: targetUrl
-    });
+    const crawlResult = await crawlSinglePage(crawlUrl);
 
-    const crawlResult = await crawlSinglePage(targetUrl);
     const rowsToInsert = normalizeCrawlResultToRows(crawlResult, agentId);
 
     if (!rowsToInsert.length) {
-      return res.status(500).json({
-        error: 'Crawler returned no valid pages'
-      });
+      console.error('CRAWL NORMALIZE ERROR: No valid rows produced from crawl result');
+      return res.status(500).json({ error: 'Crawler returned no valid rows to insert' });
     }
+
+    console.log('CRAWL ROWS TO INSERT:', rowsToInsert.length);
+    console.log('CRAWL SAMPLE ROW:', rowsToInsert[0]);
 
     const deleteResult = await supabase
       .from('site_content')
@@ -463,23 +460,17 @@ async function handleCrawlSite(req, res, body) {
       .insert(rowsToInsert);
 
     if (insertResult.error) {
+      console.error('SITE_CONTENT INSERT ERROR:', insertResult.error);
       return res.status(500).json({ error: insertResult.error.message });
     }
 
     return res.status(200).json({
       success: true,
       message: 'Crawl saved',
-      agentId: agentId,
-      targetUrl: targetUrl,
-      pagesCrawled: rowsToInsert.length,
-      count: rowsToInsert.length,
-      crawledUrls: rowsToInsert.map(function (row) {
-        return row.url;
-      })
+      pagesCrawled: rowsToInsert.length
     });
   } catch (err) {
-    console.error('CRAWL ERROR', err);
-
+    console.error('CRAWL FAILED:', err);
     return res.status(500).json({
       error: err && err.message ? err.message : 'Crawl failed'
     });
@@ -921,6 +912,10 @@ export default async function handler(req, res) {
       });
     }
 
+    // ========================================
+    // ACTION ROUTING - START
+    // ========================================
+
     if (action === 'create-agent') {
       return await handleCreateAgent(req, res, body);
     }
@@ -948,6 +943,10 @@ export default async function handler(req, res) {
     if (action === 'chat') {
       return await handleChat(req, res, body);
     }
+
+    // ========================================
+    // ACTION ROUTING - END
+    // ========================================
 
     return res.status(400).json({ error: 'Unknown or missing action' });
   } catch (err) {
