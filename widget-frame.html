@@ -404,8 +404,8 @@
 
       var API_BASE = "https://ai-tutor-rouge-theta.vercel.app/api/index";
       var REQUEST_TIMEOUT = 30000;
-      var MAX_HISTORY_ITEMS = 12;
-      var HISTORY_EXPIRY_MS = 45 * 60 * 1000; // 45 minuta
+      var MAX_HISTORY_ITEMS = 10;
+      var HISTORY_EXPIRY_MS = 45 * 60 * 1000;
 
       var chatForm = document.getElementById("chatForm");
       var chatInput = document.getElementById("chatInput");
@@ -419,12 +419,18 @@
 
       var params = new URLSearchParams(window.location.search);
       var agentId = params.get("agentId") || "demo-agent";
+      var initialLang = params.get("lang") || "en";
 
       var pageData = {
         pageTitle: "",
         pageDescription: "",
         pageUrl: "",
-        pageContext: ""
+        pageContext: "",
+        pageText: "",
+        h1: "",
+        headings: [],
+        language: initialLang,
+        pageTypeHint: "general"
       };
 
       var agentData = {
@@ -437,8 +443,72 @@
       var isSending = false;
       var activeController = null;
 
-      function getHistoryKey() {
-        return "sitemind_history_" + agentId;
+      var UI_TEXT = {
+        hr: {
+          subtitleDefault: "Pitaj AI asistenta",
+          inputPlaceholder: "Napiši pitanje...",
+          send: "Pošalji",
+          sending: "...",
+          loading: "Samo trenutak...",
+          errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
+          errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
+          welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
+          askPage: "Pitaj AI o: ",
+          closeAria: "Zatvori chat",
+          openStatus: ""
+        },
+        de: {
+          subtitleDefault: "Frag den KI-Assistenten",
+          inputPlaceholder: "Schreibe eine Frage...",
+          send: "Senden",
+          sending: "...",
+          loading: "Einen Moment...",
+          errorGeneric: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+          errorTimeout: "Die Anfrage hat zu lange gedauert. Versuche eine kürzere Frage.",
+          welcome: "Hallo! Ich kann dir mit dem Inhalt dieser Seite, Services, Produkten oder allgemeinen Fragen helfen.",
+          askPage: "Frage die KI zu: ",
+          closeAria: "Chat schließen",
+          openStatus: ""
+        },
+        it: {
+          subtitleDefault: "Chiedi all'assistente AI",
+          inputPlaceholder: "Scrivi una domanda...",
+          send: "Invia",
+          sending: "...",
+          loading: "Un momento...",
+          errorGeneric: "Si è verificato un errore. Riprova.",
+          errorTimeout: "La richiesta ha richiesto troppo tempo. Prova con una domanda più breve.",
+          welcome: "Ciao! Posso aiutarti con il contenuto di questa pagina, servizi, prodotti o domande generali.",
+          askPage: "Chiedi all'AI di: ",
+          closeAria: "Chiudi chat",
+          openStatus: ""
+        },
+        en: {
+          subtitleDefault: "Ask AI Agent",
+          inputPlaceholder: "Type a question...",
+          send: "Send",
+          sending: "...",
+          loading: "One moment...",
+          errorGeneric: "Something went wrong. Please try again.",
+          errorTimeout: "The request took too long. Try a shorter question.",
+          welcome: "Hello! I can help with this page, services, products, or general questions.",
+          askPage: "Ask AI about: ",
+          closeAria: "Close chat",
+          openStatus: ""
+        }
+      };
+
+      function getLang() {
+        var lang = String(pageData.language || initialLang || "en").toLowerCase();
+        if (lang.indexOf("hr") === 0) return "hr";
+        if (lang.indexOf("de") === 0) return "de";
+        if (lang.indexOf("it") === 0) return "it";
+        return "en";
+      }
+
+      function t(key) {
+        var lang = getLang();
+        return (UI_TEXT[lang] && UI_TEXT[lang][key]) || UI_TEXT.en[key] || "";
       }
 
       function getHistoryPayloadKey() {
@@ -454,12 +524,39 @@
           .replace(/'/g, "&#039;");
       }
 
+      function cleanText(value) {
+        return String(value || "")
+          .replace(/\u00A0/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function truncateText(value, max) {
+        var text = cleanText(value);
+        if (text.length <= max) return text;
+        return text.slice(0, max);
+      }
+
       function notifyParentClose() {
         if (window.parent && window.parent !== window) {
           try {
             window.parent.postMessage(
               {
                 type: "sitemind-close-widget",
+                agentId: agentId
+              },
+              "*"
+            );
+          } catch (e) {}
+        }
+      }
+
+      function requestPageContextRefresh() {
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.postMessage(
+              {
+                type: "sitemind-refresh-page-context",
                 agentId: agentId
               },
               "*"
@@ -481,21 +578,34 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
+      function updateUiLanguage() {
+        chatInput.placeholder = t("inputPlaceholder");
+        chatSend.textContent = isSending ? t("sending") : t("send");
+        chatClose.setAttribute("aria-label", t("closeAria"));
+
+        if (pageData.pageTitle) {
+          chatSubtitle.textContent = t("askPage") + pageData.pageTitle;
+        } else {
+          chatSubtitle.textContent = t("subtitleDefault");
+        }
+      }
+
       function setLoading(loading) {
         isSending = !!loading;
         chatSend.disabled = loading;
         chatInput.disabled = loading;
-        chatSend.textContent = loading ? "..." : "Send";
-        setStatus(loading ? "One moment..." : "");
+        chatSend.textContent = loading ? t("sending") : t("send");
+        setStatus(loading ? t("loading") : "");
       }
 
       function normalizeHistory(history) {
         if (!Array.isArray(history)) return [];
+
         return history
           .map(function (item) {
             return {
               role: item && item.role === "assistant" ? "assistant" : "user",
-              content: String(item && item.content ? item.content : "").trim().slice(0, 1500)
+              content: truncateText(item && item.content ? item.content : "", 1200)
             };
           })
           .filter(function (item) {
@@ -588,10 +698,7 @@
         var history = getStoredHistory();
         if (history.length) return;
 
-        var welcome =
-          agentData.welcomeMessage ||
-          "Hello! I can help with this page, services, products, or general questions.";
-
+        var welcome = agentData.welcomeMessage || t("welcome");
         addMessage("assistant", welcome);
       }
 
@@ -621,7 +728,6 @@
       function applyAgentData() {
         var color = agentData.themeColor || "#22d3ee";
         var glowSoft = rgbaFromHex(color, 0.10);
-        var glowStrong = rgbaFromHex(color, 0.22);
 
         chatTitle.textContent = agentData.agentName || "SiteMind AI";
 
@@ -645,6 +751,8 @@
 
         document.documentElement.style.setProperty("--user-grad-1", color);
         document.documentElement.style.setProperty("--user-grad-2", "#06b6d4");
+
+        updateUiLanguage();
       }
 
       async function fetchAgentConfig() {
@@ -694,12 +802,17 @@
             body: JSON.stringify({
               action: "chat",
               agentId: agentId,
+              language: getLang(),
+              pageTypeHint: pageData.pageTypeHint || "general",
               message: userMessage,
               history: history,
               pageTitle: pageData.pageTitle,
               pageDescription: pageData.pageDescription,
               pageUrl: pageData.pageUrl,
-              pageContext: pageData.pageContext
+              pageContext: pageData.pageContext,
+              pageText: pageData.pageText,
+              h1: pageData.h1,
+              headings: pageData.headings
             })
           });
 
@@ -716,7 +829,7 @@
             throw new Error(
               data.details
                 ? (typeof data.details === "string" ? data.details : JSON.stringify(data.details))
-                : (data.error || "Server error.")
+                : (data.error || t("errorGeneric"))
             );
           }
 
@@ -735,7 +848,7 @@
         event.preventDefault();
         if (isSending) return;
 
-        var userMessage = String(chatInput.value || "").trim();
+        var userMessage = cleanText(chatInput.value || "");
         if (!userMessage) return;
 
         addMessage("user", userMessage);
@@ -743,7 +856,7 @@
         autoResizeTextarea();
         setLoading(true);
 
-        var placeholder = addMessage("assistant", "One moment...");
+        var placeholder = addMessage("assistant", t("loading"));
 
         try {
           var answer = await sendMessageToApi(userMessage);
@@ -755,10 +868,10 @@
           history.push({ role: "assistant", content: answer });
           saveStoredHistory(history);
         } catch (error) {
-          var msg = "Something went wrong. Please try again.";
+          var msg = t("errorGeneric");
 
           if (error && error.name === "AbortError") {
-            msg = "The request took too long. Try a shorter question.";
+            msg = t("errorTimeout");
           } else if (error && error.message) {
             msg = error.message;
           }
@@ -774,14 +887,29 @@
         if (!event.data || typeof event.data !== "object") return;
 
         if (event.data.type === "sitemind-page-context") {
-          pageData.pageTitle = String(event.data.pageTitle || "").slice(0, 300);
-          pageData.pageDescription = String(event.data.pageDescription || "").slice(0, 500);
-          pageData.pageUrl = String(event.data.pageUrl || "").slice(0, 500);
-          pageData.pageContext = String(event.data.pageContext || "").slice(0, 5000);
+          pageData.pageTitle = truncateText(event.data.pageTitle || "", 300);
+          pageData.pageDescription = truncateText(event.data.pageDescription || "", 500);
+          pageData.pageUrl = truncateText(event.data.pageUrl || "", 500);
+          pageData.pageContext = truncateText(event.data.pageContext || "", 5000);
+          pageData.pageText = truncateText(event.data.pageText || event.data.pageContext || "", 7000);
+          pageData.h1 = truncateText(event.data.h1 || "", 300);
+          pageData.language = truncateText(event.data.language || initialLang || "en", 20);
+          pageData.pageTypeHint = truncateText(event.data.pageTypeHint || "general", 50);
 
-          if (pageData.pageTitle) {
-            chatSubtitle.textContent = "Ask AI: " + pageData.pageTitle;
+          if (Array.isArray(event.data.headings)) {
+            pageData.headings = event.data.headings
+              .map(function (item) {
+                return truncateText(item, 200);
+              })
+              .filter(function (item) {
+                return !!item;
+              })
+              .slice(0, 12);
+          } else {
+            pageData.headings = [];
           }
+
+          updateUiLanguage();
         }
 
         if (event.data.type === "sitemind-agent-config") {
@@ -808,12 +936,15 @@
       });
 
       renderStoredHistory();
+      updateUiLanguage();
       applyAgentData();
       autoResizeTextarea();
 
       fetchAgentConfig().finally(function () {
         renderWelcomeIfNeeded();
       });
+
+      requestPageContextRefresh();
 
       if (window.parent && window.parent !== window) {
         try {
