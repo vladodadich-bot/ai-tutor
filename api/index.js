@@ -77,6 +77,85 @@ async function requireAuthenticatedUser(req, res) {
 // ========================================
 
 // ========================================
+// GENERAL HELPERS - START
+// ========================================
+
+function normalizeUrl(rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return '';
+
+  try {
+    const url = new URL(value);
+    return url.toString().replace(/\/$/, '');
+  } catch (e) {
+    return value;
+  }
+}
+
+function toArray(value) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function normalizeCrawlResultToRows(crawlResult, agentId) {
+  const pages = Array.isArray(crawlResult) ? crawlResult : [crawlResult];
+
+  return pages
+    .filter(Boolean)
+    .map(function (page) {
+      const headings = toArray(page.headings);
+      const internalLinks = toArray(page.internal_links);
+      const textPreview = String(page.text_preview || '').trim();
+      const content = String(page.content || textPreview || '').trim();
+
+      return {
+        agent_id: agentId,
+        url: normalizeUrl(page.url || ''),
+        content: content,
+        page_title: String(page.page_title || '').trim(),
+        meta_description: String(page.meta_description || '').trim(),
+        h1: String(page.h1 || '').trim(),
+        headings: headings,
+        internal_links: internalLinks,
+        text_preview: textPreview
+      };
+    })
+    .filter(function (row) {
+      return !!row.url;
+    });
+}
+
+async function getOwnedAgent(agentId, userId) {
+  const { data, error } = await supabase
+    .from('agents')
+    .select('agent_id, user_id, site_domain, agent_name, welcome_message, theme_color')
+    .eq('agent_id', agentId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data;
+}
+
+// ========================================
+// GENERAL HELPERS - END
+// ========================================
+
+// ========================================
 // CREATE AGENT - START
 // ========================================
 
@@ -87,7 +166,7 @@ async function handleCreateAgent(req, res, body) {
   const agentName = String(body.agentName || body.agent_name || 'My Agent').trim();
   const welcomeMessage = String(body.welcomeMessage || body.welcome_message || 'Hi! How can I help?').trim();
   const themeColor = String(body.themeColor || body.theme_color || '#2563eb').trim();
-  const siteDomain = String(body.siteDomain || body.site_domain || '').trim();
+  const siteDomain = normalizeUrl(body.siteDomain || body.site_domain || body.siteUrl || body.url || '');
 
   if (!siteDomain) {
     return res.status(400).json({ error: 'Missing siteDomain' });
@@ -151,7 +230,7 @@ async function handleGetAgents(req, res, body) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
   }
 
-  const siteDomain = String(body.siteDomain || body.site_domain || '').trim();
+  const siteDomain = normalizeUrl(body.siteDomain || body.site_domain || body.siteUrl || body.url || '');
 
   let query = supabase
     .from('agents')
@@ -201,14 +280,9 @@ async function handleUpdateAgent(req, res, body) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
   }
 
-  const { data: existingAgent, error: existingError } = await supabase
-    .from('agents')
-    .select('agent_id, user_id')
-    .eq('agent_id', agentId)
-    .eq('user_id', user.id)
-    .single();
+  const existingAgent = await getOwnedAgent(agentId, user.id);
 
-  if (existingError || !existingAgent) {
+  if (!existingAgent) {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
@@ -226,8 +300,13 @@ async function handleUpdateAgent(req, res, body) {
     updates.theme_color = String(body.themeColor || body.theme_color || '').trim();
   }
 
-  if (body.siteDomain !== undefined || body.site_domain !== undefined) {
-    updates.site_domain = String(body.siteDomain || body.site_domain || '').trim();
+  if (
+    body.siteDomain !== undefined ||
+    body.site_domain !== undefined ||
+    body.siteUrl !== undefined ||
+    body.url !== undefined
+  ) {
+    updates.site_domain = normalizeUrl(body.siteDomain || body.site_domain || body.siteUrl || body.url || '');
   }
 
   if (Object.keys(updates).length === 0) {
@@ -278,14 +357,9 @@ async function handleDeleteAgent(req, res, body) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
   }
 
-  const { data: existingAgent, error: existingError } = await supabase
-    .from('agents')
-    .select('agent_id, user_id')
-    .eq('agent_id', agentId)
-    .eq('user_id', user.id)
-    .single();
+  const existingAgent = await getOwnedAgent(agentId, user.id);
 
-  if (existingError || !existingAgent) {
+  if (!existingAgent) {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
@@ -326,11 +400,10 @@ async function handleCrawlSite(req, res, body) {
   const user = await requireAuthenticatedUser(req, res);
   if (!user) return;
 
-  const url = String(body.url || '').trim();
   const agentId = String(body.agentId || body.agent_id || '').trim();
 
-  if (!url || !agentId) {
-    return res.status(400).json({ error: 'Missing url or agentId' });
+  if (!agentId) {
+    return res.status(400).json({ error: 'Missing agentId' });
   }
 
   if (!process.env.SUPABASE_URL) {
@@ -341,19 +414,40 @@ async function handleCrawlSite(req, res, body) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY' });
   }
 
-  const { data: existingAgent, error: existingError } = await supabase
-    .from('agents')
-    .select('agent_id, user_id')
-    .eq('agent_id', agentId)
-    .eq('user_id', user.id)
-    .single();
+  const existingAgent = await getOwnedAgent(agentId, user.id);
 
-  if (existingError || !existingAgent) {
+  if (!existingAgent) {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
+  const targetUrl = normalizeUrl(
+    body.url ||
+    body.siteUrl ||
+    body.siteDomain ||
+    body.site_domain ||
+    existingAgent.site_domain ||
+    ''
+  );
+
+  if (!targetUrl) {
+    return res.status(400).json({ error: 'Missing url or siteDomain' });
+  }
+
   try {
-    const page = await crawlSinglePage(url);
+    console.log('CRAWL START', {
+      userId: user.id,
+      agentId: agentId,
+      targetUrl: targetUrl
+    });
+
+    const crawlResult = await crawlSinglePage(targetUrl);
+    const rowsToInsert = normalizeCrawlResultToRows(crawlResult, agentId);
+
+    if (!rowsToInsert.length) {
+      return res.status(500).json({
+        error: 'Crawler returned no valid pages'
+      });
+    }
 
     const deleteResult = await supabase
       .from('site_content')
@@ -366,17 +460,7 @@ async function handleCrawlSite(req, res, body) {
 
     const insertResult = await supabase
       .from('site_content')
-      .insert({
-        agent_id: agentId,
-        url: page.url,
-        content: '',
-        page_title: page.page_title || '',
-        meta_description: page.meta_description || '',
-        h1: page.h1 || '',
-        headings: JSON.stringify(page.headings || []),
-        internal_links: JSON.stringify(page.internal_links || []),
-        text_preview: page.text_preview || ''
-      });
+      .insert(rowsToInsert);
 
     if (insertResult.error) {
       return res.status(500).json({ error: insertResult.error.message });
@@ -385,9 +469,17 @@ async function handleCrawlSite(req, res, body) {
     return res.status(200).json({
       success: true,
       message: 'Crawl saved',
-      pagesCrawled: 1
+      agentId: agentId,
+      targetUrl: targetUrl,
+      pagesCrawled: rowsToInsert.length,
+      count: rowsToInsert.length,
+      crawledUrls: rowsToInsert.map(function (row) {
+        return row.url;
+      })
     });
   } catch (err) {
+    console.error('CRAWL ERROR', err);
+
     return res.status(500).json({
       error: err && err.message ? err.message : 'Crawl failed'
     });
@@ -829,10 +921,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // ========================================
-    // ACTION ROUTING - START
-    // ========================================
-
     if (action === 'create-agent') {
       return await handleCreateAgent(req, res, body);
     }
@@ -860,10 +948,6 @@ export default async function handler(req, res) {
     if (action === 'chat') {
       return await handleChat(req, res, body);
     }
-
-    // ========================================
-    // ACTION ROUTING - END
-    // ========================================
 
     return res.status(400).json({ error: 'Unknown or missing action' });
   } catch (err) {
