@@ -24,7 +24,7 @@
       padding: 30px;
       border-radius: 12px;
       width: 100%;
-      max-width: 460px;
+      max-width: 520px;
       box-sizing: border-box;
       box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
     }
@@ -97,6 +97,14 @@
       color: #fca5a5;
     }
 
+    .warn {
+      color: #fde68a;
+    }
+
+    .info {
+      color: #93c5fd;
+    }
+
     .code-wrap {
       margin-top: 15px;
     }
@@ -125,6 +133,20 @@
 
     .copy-btn:hover {
       background: #0d9488;
+    }
+
+    .status-box {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(2, 6, 23, 0.45);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .status-line {
+      margin: 6px 0;
+      font-size: 13px;
+      color: #cbd5e1;
     }
   </style>
 
@@ -156,7 +178,7 @@
   <div class="box">
     <h2>🚀 Create your AI Chat</h2>
     <div class="subtext">
-      Enter your company name and website URL to generate your SiteMind AI widget code.
+      Enter your company name and website URL to generate your SiteMind AI widget code and start the first crawl.
     </div>
 
     <input id="name" placeholder="Your company name" />
@@ -171,7 +193,7 @@
     const API = "https://ai-tutor-rouge-theta.vercel.app/api/index";
 
     function escapeHtml(text) {
-      return text
+      return String(text || "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
@@ -186,6 +208,23 @@
       } catch {
         return false;
       }
+    }
+
+    function normalizeUrl(value) {
+      try {
+        const url = new URL(value.trim());
+        return url.toString().replace(/\/$/, "");
+      } catch {
+        return value.trim();
+      }
+    }
+
+    function renderStatus(lines) {
+      return `
+        <div class="status-box">
+          ${lines.map(line => `<div class="status-line">${line}</div>`).join("")}
+        </div>
+      `;
     }
 
     async function copyCode() {
@@ -209,6 +248,63 @@
       }
     }
 
+    async function createAgentRequest(payload) {
+      const res = await fetch(API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Something went wrong while creating the agent.");
+      }
+
+      return data;
+    }
+
+    async function crawlSiteRequest(agentId, siteUrl) {
+      const payload = {
+        action: "crawl-site",
+        agent_id: agentId,
+        agentId: agentId,
+        site_domain: siteUrl,
+        siteUrl: siteUrl,
+        url: siteUrl
+      };
+
+      const res = await fetch(API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const rawText = await res.text();
+      let data = {};
+
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch (e) {
+        data = { raw: rawText };
+      }
+
+      if (!res.ok || data.error) {
+        throw new Error(
+          data.error ||
+          data.details ||
+          data.message ||
+          "Crawl request failed."
+        );
+      }
+
+      return data;
+    }
+
     async function createAgent() {
       const nameInput = document.getElementById("name");
       const urlInput = document.getElementById("url");
@@ -216,7 +312,7 @@
       const button = document.getElementById("generateBtn");
 
       const name = nameInput.value.trim();
-      const url = urlInput.value.trim();
+      const url = normalizeUrl(urlInput.value.trim());
 
       result.innerHTML = "";
 
@@ -238,42 +334,85 @@
       button.disabled = true;
       button.textContent = "Generating...";
 
+      result.innerHTML = `
+        <div class="message info">Creating agent...</div>
+        ${renderStatus([
+          "⏳ Step 1: Creating your AI agent",
+          "⏳ Step 2: Preparing first crawl",
+          "⏳ Step 3: Generating embed code"
+        ])}
+      `;
+
       try {
-        const res = await fetch(API, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            action: "create-agent",
-            agent_name: name,
-            site_domain: url,
-            welcome_message: "Hi! How can I help you?",
-            theme_color: "#2563eb"
-          })
-        });
+        const createPayload = {
+          action: "create-agent",
+          agent_name: name,
+          site_domain: url,
+          welcome_message: "Hi! How can I help you?",
+          theme_color: "#2563eb"
+        };
 
-        const data = await res.json();
-
-        if (!res.ok || data.error) {
-          throw new Error(data.error || "Something went wrong while creating the agent.");
-        }
+        const data = await createAgentRequest(createPayload);
 
         if (!data.agent_id) {
           throw new Error("Agent ID was not returned from the API.");
         }
 
-        const code = `<script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="${data.agent_id}"><\/script>`;
+        const agentId = data.agent_id;
+        const code = `<script src="https://ai-tutor-rouge-theta.vercel.app/sitemind-embed.js" data-agent-id="${agentId}"><\/script>`;
 
         result.innerHTML = `
-          <div class="message success">✅ Your AI is ready</div>
-
+          <div class="message success">✅ Agent created successfully</div>
+          ${renderStatus([
+            "✅ Step 1: AI agent created",
+            "⏳ Step 2: Starting first crawl",
+            "✅ Step 3: Embed code generated"
+          ])}
           <div class="code-wrap">
             <div class="code-label">Embed this code on your website:</div>
             <div class="code" id="embedCodeRaw">${escapeHtml(code)}</div>
             <button class="copy-btn" id="copyBtn" onclick="copyCode()">Copy code</button>
           </div>
         `;
+
+        try {
+          const crawlData = await crawlSiteRequest(agentId, url);
+
+          const crawledCount =
+            crawlData.count ||
+            crawlData.pages_count ||
+            crawlData.crawled_count ||
+            crawlData.total ||
+            null;
+
+          result.innerHTML = `
+            <div class="message success">✅ Your AI is ready</div>
+            ${renderStatus([
+              "✅ Step 1: AI agent created",
+              "✅ Step 2: Crawl completed" + (crawledCount ? ` (${escapeHtml(String(crawledCount))} pages)` : ""),
+              "✅ Step 3: Embed code generated"
+            ])}
+            <div class="code-wrap">
+              <div class="code-label">Embed this code on your website:</div>
+              <div class="code" id="embedCodeRaw">${escapeHtml(code)}</div>
+              <button class="copy-btn" id="copyBtn" onclick="copyCode()">Copy code</button>
+            </div>
+          `;
+        } catch (crawlError) {
+          result.innerHTML = `
+            <div class="message warn">⚠️ Agent created, but crawl may not have finished.</div>
+            ${renderStatus([
+              "✅ Step 1: AI agent created",
+              `⚠️ Step 2: Crawl issue: ${escapeHtml(crawlError.message || "Unknown crawl error")}`,
+              "✅ Step 3: Embed code generated"
+            ])}
+            <div class="code-wrap">
+              <div class="code-label">Embed this code on your website:</div>
+              <div class="code" id="embedCodeRaw">${escapeHtml(code)}</div>
+              <button class="copy-btn" id="copyBtn" onclick="copyCode()">Copy code</button>
+            </div>
+          `;
+        }
       } catch (error) {
         result.innerHTML = `
           <div class="message error">❌ ${escapeHtml(error.message || "Unexpected error.")}</div>
