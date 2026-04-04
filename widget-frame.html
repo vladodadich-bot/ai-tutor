@@ -405,6 +405,7 @@
       var API_BASE = "https://ai-tutor-rouge-theta.vercel.app/api/index";
       var REQUEST_TIMEOUT = 30000;
       var MAX_HISTORY_ITEMS = 12;
+      var HISTORY_EXPIRY_MS = 45 * 60 * 1000; // 45 minuta
 
       var chatForm = document.getElementById("chatForm");
       var chatInput = document.getElementById("chatInput");
@@ -438,6 +439,10 @@
 
       function getHistoryKey() {
         return "sitemind_history_" + agentId;
+      }
+
+      function getHistoryPayloadKey() {
+        return "sitemind_history_payload_" + agentId;
       }
 
       function escapeHtml(str) {
@@ -484,25 +489,6 @@
         setStatus(loading ? "One moment..." : "");
       }
 
-      function getStoredHistory() {
-        try {
-          var raw = localStorage.getItem(getHistoryKey());
-          var parsed = raw ? JSON.parse(raw) : [];
-          return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-          return [];
-        }
-      }
-
-      function saveStoredHistory(history) {
-        try {
-          localStorage.setItem(
-            getHistoryKey(),
-            JSON.stringify(history.slice(-MAX_HISTORY_ITEMS))
-          );
-        } catch (e) {}
-      }
-
       function normalizeHistory(history) {
         if (!Array.isArray(history)) return [];
         return history
@@ -516,6 +502,52 @@
             return item.content;
           })
           .slice(-MAX_HISTORY_ITEMS);
+      }
+
+      function clearStoredHistory() {
+        try {
+          sessionStorage.removeItem(getHistoryPayloadKey());
+        } catch (e) {}
+      }
+
+      function getStoredHistory() {
+        try {
+          var raw = sessionStorage.getItem(getHistoryPayloadKey());
+          if (!raw) return [];
+
+          var parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== "object") {
+            clearStoredHistory();
+            return [];
+          }
+
+          var savedAt = Number(parsed.savedAt || 0);
+          var history = Array.isArray(parsed.history) ? parsed.history : [];
+
+          if (!savedAt || (Date.now() - savedAt > HISTORY_EXPIRY_MS)) {
+            clearStoredHistory();
+            return [];
+          }
+
+          return normalizeHistory(history);
+        } catch (e) {
+          clearStoredHistory();
+          return [];
+        }
+      }
+
+      function saveStoredHistory(history) {
+        try {
+          var normalized = normalizeHistory(history).slice(-MAX_HISTORY_ITEMS);
+
+          sessionStorage.setItem(
+            getHistoryPayloadKey(),
+            JSON.stringify({
+              savedAt: Date.now(),
+              history: normalized
+            })
+          );
+        } catch (e) {}
       }
 
       function addMessage(role, text) {
@@ -548,6 +580,8 @@
         history.forEach(function (item) {
           addMessage(item.role, item.content);
         });
+
+        saveStoredHistory(history);
       }
 
       function renderWelcomeIfNeeded() {
