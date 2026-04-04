@@ -326,27 +326,6 @@ function normalizeUrlValue(value) {
   return String(value || '').trim();
 }
 
-function safeStringifyArray(value) {
-  if (Array.isArray(value)) {
-    return JSON.stringify(value);
-  }
-
-  if (!value) {
-    return JSON.stringify([]);
-  }
-
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return JSON.stringify(Array.isArray(parsed) ? parsed : []);
-    } catch (err) {
-      return JSON.stringify([]);
-    }
-  }
-
-  return JSON.stringify([]);
-}
-
 function normalizeCrawlResultToRows(crawlResult, agentId) {
   let pages = [];
 
@@ -435,7 +414,6 @@ async function handleCrawlSite(req, res, body) {
 
   try {
     const crawlResult = await crawlSinglePage(crawlUrl);
-
     const rowsToInsert = normalizeCrawlResultToRows(crawlResult, agentId);
 
     if (!rowsToInsert.length) {
@@ -582,6 +560,7 @@ function scorePageForMessage(page, message) {
     .map(link => ((link && link.text) || '') + ' ' + ((link && link.href) || ''))
     .join(' ')
     .toLowerCase();
+  const content = String(page.content || page.text_preview || '').toLowerCase();
 
   let score = 0;
   const words = text.split(/\s+/).filter(Boolean);
@@ -593,6 +572,7 @@ function scorePageForMessage(page, message) {
     if (headings.includes(word)) score += 3;
     if (meta.includes(word)) score += 2;
     if (links.includes(word)) score += 1;
+    if (content.includes(word)) score += 6;
   }
 
   return score;
@@ -734,7 +714,7 @@ async function handleChat(req, res, body) {
   try {
     const { data, error } = await supabase
       .from('site_content')
-      .select('url, page_title, meta_description, h1, headings, internal_links')
+      .select('url, page_title, meta_description, h1, headings, internal_links, text_preview, content')
       .eq('agent_id', agentId);
 
     if (!error && Array.isArray(data)) {
@@ -748,7 +728,8 @@ async function handleChat(req, res, body) {
 
   const systemPrompt =
     'You are SiteMind AI, a helpful website assistant. ' +
-    'Answer based only on the provided page information. ' +
+    'Answer based only on the provided page information and crawled site data. ' +
+    'Use the crawled page content when it is relevant to the user question. ' +
     'Be clear, short, and useful. ' +
     'If the answer is not clearly available from the page data, say that honestly. ' +
     'Reply in the same language as the user.';
@@ -783,7 +764,9 @@ async function handleChat(req, res, body) {
           meta_description: row.meta_description || '',
           h1: row.h1 || '',
           headings: headings.slice(0, 8),
-          internal_links: links.slice(0, 12)
+          internal_links: links.slice(0, 12),
+          text_preview: String(row.text_preview || '').slice(0, 800),
+          content: String(row.content || '').slice(0, 2000)
         };
       });
 
@@ -912,10 +895,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // ========================================
-    // ACTION ROUTING - START
-    // ========================================
-
     if (action === 'create-agent') {
       return await handleCreateAgent(req, res, body);
     }
@@ -943,10 +922,6 @@ export default async function handler(req, res) {
     if (action === 'chat') {
       return await handleChat(req, res, body);
     }
-
-    // ========================================
-    // ACTION ROUTING - END
-    // ========================================
 
     return res.status(400).json({ error: 'Unknown or missing action' });
   } catch (err) {
