@@ -24,6 +24,24 @@
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-agent-id")) ||
     "demo-agent";
 
+  var position =
+    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-position")) ||
+    "bottom-right";
+
+  var themeColor =
+    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-color")) ||
+    "#22d3ee";
+
+  var iframe = null;
+  var bubble = null;
+  var panel = null;
+  var isOpen = false;
+
+  var originalBodyPaddingRight = "";
+  var originalBodyPaddingLeft = "";
+  var originalHtmlOverflowX = "";
+  var originalBodyOverflowX = "";
+
   function detectPageLanguage() {
     var htmlLang = document.documentElement.getAttribute("lang") || "";
     var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
@@ -60,24 +78,6 @@
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-bubble-text")) ||
     getDefaultBubbleText(detectedLang);
 
-  var position =
-    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-position")) ||
-    "bottom-right";
-
-  var themeColor =
-    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-color")) ||
-    "#22d3ee";
-
-  var iframe = null;
-  var bubble = null;
-  var panel = null;
-  var isOpen = false;
-
-  var originalBodyPaddingRight = "";
-  var originalBodyPaddingLeft = "";
-  var originalHtmlOverflowX = "";
-  var originalBodyOverflowX = "";
-
   function isDesktop() {
     return window.innerWidth >= 992;
   }
@@ -109,14 +109,24 @@
     return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
   }
 
+  function cleanText(text) {
+    return String(text || "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   function getPageTitle() {
     var ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle && ogTitle.content) return ogTitle.content.trim();
+    if (ogTitle && ogTitle.content) return cleanText(ogTitle.content);
+
+    var title = document.title || "";
+    if (title) return cleanText(title);
 
     var h1 = document.querySelector("h1");
-    if (h1 && h1.textContent) return h1.textContent.trim();
+    if (h1 && h1.textContent) return cleanText(h1.textContent);
 
-    return document.title || "";
+    return "";
   }
 
   function getPageDescription() {
@@ -124,43 +134,75 @@
       document.querySelector('meta[name="description"]') ||
       document.querySelector('meta[property="og:description"]');
 
-    return meta && meta.content ? meta.content.trim() : "";
+    return meta && meta.content ? cleanText(meta.content) : "";
   }
 
-  function cleanText(text) {
-    return String(text || "")
-      .replace(/\s+/g, " ")
-      .replace(/\u00A0/g, " ")
-      .trim();
+  function getPageH1() {
+    var h1 = document.querySelector("h1");
+    return h1 && h1.textContent ? cleanText(h1.textContent) : "";
   }
 
-  function getMainContentText() {
+  function getHeadingsText() {
+    var headings = [];
+    var nodes = document.querySelectorAll("h1, h2, h3");
+
+    for (var i = 0; i < nodes.length; i++) {
+      var text = cleanText(nodes[i].innerText || nodes[i].textContent || "");
+      if (text && headings.indexOf(text) === -1) {
+        headings.push(text);
+      }
+      if (headings.length >= 12) break;
+    }
+
+    return headings;
+  }
+
+  function removeNodes(root, selectors) {
+    for (var i = 0; i < selectors.length; i++) {
+      var nodes = root.querySelectorAll(selectors[i]);
+      for (var j = 0; j < nodes.length; j++) {
+        if (nodes[j] && nodes[j].remove) {
+          nodes[j].remove();
+        }
+      }
+    }
+  }
+
+  function getBestContentRoot() {
     var selectors = [
       "article",
       "main",
+      '[role="main"]',
       ".post-body",
       ".entry-content",
+      ".post-content",
+      ".article-content",
+      ".article-body",
+      ".blog-post",
       ".post",
       ".content",
       "#content",
-      ".article-content"
+      ".main-content",
+      ".page-content"
     ];
-
-    var root = null;
 
     for (var i = 0; i < selectors.length; i++) {
       var el = document.querySelector(selectors[i]);
-      if (el) {
-        root = el;
-        break;
+      if (el && cleanText(el.innerText || el.textContent || "").length > 120) {
+        return el;
       }
     }
 
-    if (!root) root = document.body;
+    return document.body;
+  }
+
+  function getMainContentText() {
+    var root = getBestContentRoot();
+    if (!root) return "";
 
     var clone = root.cloneNode(true);
 
-    var removeSelectors = [
+    removeNodes(clone, [
       "script",
       "style",
       "noscript",
@@ -178,6 +220,7 @@
       "nav",
       "footer",
       "header",
+      "aside",
       ".sidebar",
       ".menu",
       ".nav",
@@ -189,35 +232,128 @@
       ".advertisement",
       ".adsbygoogle",
       ".cookie-banner",
+      ".cookie-consent",
       ".newsletter",
       ".popup",
+      ".modal",
       ".chat-widget",
       "#sitemind-widget-root"
-    ];
-
-    for (var j = 0; j < removeSelectors.length; j++) {
-      var nodes = clone.querySelectorAll(removeSelectors[j]);
-      for (var k = 0; k < nodes.length; k++) {
-        nodes[k].remove();
-      }
-    }
+    ]);
 
     var text = cleanText(clone.innerText || clone.textContent || "");
 
-    if (text.length > 3000) {
-      text = text.slice(0, 3000);
+    if (!text || text.length < 200) {
+      var bodyClone = document.body.cloneNode(true);
+
+      removeNodes(bodyClone, [
+        "script",
+        "style",
+        "noscript",
+        "iframe",
+        "svg",
+        "canvas",
+        "img",
+        "video",
+        "audio",
+        "form",
+        "button",
+        "input",
+        "textarea",
+        "select",
+        "nav",
+        "footer",
+        "header",
+        "aside",
+        ".sidebar",
+        ".menu",
+        ".nav",
+        ".comments",
+        "#comments",
+        ".related-posts",
+        ".share-buttons",
+        ".social-share",
+        ".advertisement",
+        ".adsbygoogle",
+        ".cookie-banner",
+        ".cookie-consent",
+        ".newsletter",
+        ".popup",
+        ".modal",
+        ".chat-widget",
+        "#sitemind-widget-root"
+      ]);
+
+      text = cleanText(bodyClone.innerText || bodyClone.textContent || "");
+    }
+
+    if (text.length > 7000) {
+      text = text.slice(0, 7000);
     }
 
     return text;
   }
 
+  function getPageTypeHint() {
+    var url = (window.location.href || "").toLowerCase();
+    var title = getPageTitle().toLowerCase();
+    var desc = getPageDescription().toLowerCase();
+    var h1 = getPageH1().toLowerCase();
+    var text = getMainContentText().slice(0, 2500).toLowerCase();
+    var blob = [url, title, desc, h1, text].join(" ");
+
+    function hasAny(words) {
+      for (var i = 0; i < words.length; i++) {
+        if (blob.indexOf(words[i]) !== -1) return true;
+      }
+      return false;
+    }
+
+    if (hasAny(["course", "lesson", "lektira", "schule", "school", "lernen", "guide for students", "učen", "student", "unterricht"])) {
+      return "education";
+    }
+
+    if (hasAny(["api", "developer", "sdk", "documentation", "docs", "integration", "javascript", "code", "vercel", "supabase"])) {
+      return "technical";
+    }
+
+    if (hasAny(["pricing", "plan", "saas", "subscription", "business", "service", "agency", "software"])) {
+      return "business";
+    }
+
+    if (hasAny(["shop", "product", "cart", "buy", "checkout", "store", "price"])) {
+      return "ecommerce";
+    }
+
+    if (hasAny(["news", "article", "blog", "post"])) {
+      return "blog";
+    }
+
+    if (hasAny(["travel", "hotel", "apartment", "booking", "guest"])) {
+      return "travel";
+    }
+
+    if (hasAny(["movie", "fun", "entertainment", "music", "game", "show"])) {
+      return "entertainment";
+    }
+
+    return "general";
+  }
+
   function getPageContextPayload() {
+    var pageText = getMainContentText();
+
     return {
       type: "sitemind-page-context",
+      agentId: agentId,
+      language: detectPageLanguage(),
+      pageTypeHint: getPageTypeHint(),
       pageTitle: getPageTitle(),
       pageDescription: getPageDescription(),
       pageUrl: window.location.href,
-      pageContext: getMainContentText()
+      h1: getPageH1(),
+      headings: getHeadingsText(),
+      pageContext: pageText,
+      pageText: pageText
     };
   }
 
@@ -437,14 +573,18 @@
     panel.style.overflow = "hidden";
 
     iframe = document.createElement("iframe");
-    iframe.src = BASE_URL + "/widget-frame.html?agentId=" + encodeURIComponent(agentId);
+    iframe.src =
+      BASE_URL +
+      "/widget-frame.html?agentId=" +
+      encodeURIComponent(agentId) +
+      "&lang=" +
+      encodeURIComponent(detectedLang);
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "0";
     iframe.setAttribute("title", "SiteMind AI Chat");
 
     panel.appendChild(iframe);
-
     root.appendChild(panel);
     root.appendChild(bubble);
 
@@ -461,9 +601,14 @@
   }
 
   window.addEventListener("message", function (event) {
+    if (event.origin !== BASE_URL && event.origin !== window.location.origin) return;
     if (!event.data || typeof event.data !== "object") return;
 
     if (event.data.type === "sitemind-widget-ready") {
+      sendPageContext();
+    }
+
+    if (event.data.type === "sitemind-refresh-page-context") {
       sendPageContext();
     }
 
