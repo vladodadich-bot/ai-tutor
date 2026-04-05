@@ -347,6 +347,17 @@ function normalizeCrawlResultToRows(crawlResult, agentId) {
           ? page.internalLinks
           : [];
 
+      const safeHeadings = headings
+        .map((item) => String(item || '').trim())
+        .filter(Boolean);
+
+      const safeInternalLinks = internalLinks
+        .map((link) => ({
+          text: String(link?.text || '').trim(),
+          href: String(link?.href || '').trim()
+        }))
+        .filter((link) => link.href);
+
       return {
         agent_id: agentId,
         url: normalizeUrlValue(page?.url),
@@ -354,8 +365,8 @@ function normalizeCrawlResultToRows(crawlResult, agentId) {
         page_title: String(page?.page_title || page?.pageTitle || ''),
         meta_description: String(page?.meta_description || page?.metaDescription || ''),
         h1: String(page?.h1 || ''),
-        headings: JSON.stringify(headings),
-        internal_links: JSON.stringify(internalLinks),
+        headings: safeHeadings,
+        internal_links: safeInternalLinks,
         text_preview: String(page?.text_preview || page?.textPreview || '')
       };
     })
@@ -363,7 +374,6 @@ function normalizeCrawlResultToRows(crawlResult, agentId) {
 
   return normalizedRows;
 }
-
 // ========================================
 // CRAWL HELPERS - END
 // ========================================
