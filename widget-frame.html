@@ -482,9 +482,10 @@
     <div class="chat-header-top">
       <div class="chat-header-left">
         <div class="sm-header-brand">
-          <div class="sm-face" id="smFace" aria-hidden="true">
-            <div class="sm-eyes">
-              <div class="sm-eye">
+         <div class="sm-face" id="smFace" aria-hidden="true">
+  <div class="sm-eyes">
+    <div class="sm-eye"></div>
+    <div class="sm-eye"></div>
                 <div class="sm-pupil" id="smPupilLeft"></div>
               </div>
               <div class="sm-eye">
@@ -1126,17 +1127,7 @@
   <script>
 (function () {
   const face = document.getElementById('smFace');
-  const leftPupil = document.getElementById('smPupilLeft');
-  const rightPupil = document.getElementById('smPupilRight');
-
-  if (!face || !leftPupil || !rightPupil) return;
-
-  function setPupils(x, y) {
-    leftPupil.style.left = x + 'px';
-    leftPupil.style.top = y + 'px';
-    rightPupil.style.left = x + 'px';
-    rightPupil.style.top = y + 'px';
-  }
+  if (!face) return;
 
   function blink() {
     face.classList.add('sm-blink');
@@ -1145,23 +1136,8 @@
     }, 140);
   }
 
-  function randomLook() {
-    const positions = [
-      { x: 3.5, y: 3.5 },
-      { x: 2.2, y: 3.5 },
-      { x: 4.8, y: 3.5 },
-      { x: 3.5, y: 2.2 },
-      { x: 3.5, y: 4.6 }
-    ];
-    const p = positions[Math.floor(Math.random() * positions.length)];
-    setPupils(p.x, p.y);
-  }
-
-  setPupils(3.5, 3.5);
-
   setInterval(() => {
     blink();
-    randomLook();
   }, 3500);
 })();
 </script>
