@@ -1001,7 +1001,7 @@ async function handleChat(req, res, body) {
     history
   });
 
- try {
+try {
   const openaiRes = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
@@ -1014,69 +1014,110 @@ async function handleChat(req, res, body) {
       input: [
         {
           role: 'system',
-          content: [{ type: 'input_text', text: systemPrompt }]
+          content: [
+            {
+              type: 'input_text',
+              text: systemPrompt
+            }
+          ]
         },
         {
           role: 'user',
-          content: [{ type: 'input_text', text: userPrompt }]
+          content: [
+            {
+              type: 'input_text',
+              text: userPrompt
+            }
+          ]
         }
       ]
     })
   });
 
-  if (!openaiRes.ok || !openaiRes.body) {
-    const text = await openaiRes.text();
+  if (!openaiRes.ok) {
+    const errorText = await openaiRes.text();
     return res.status(500).json({
-      error: 'Streaming failed',
-      details: text.slice(0, 500)
+      error: 'OpenAI streaming request failed',
+      details: errorText.slice(0, 1000)
     });
   }
 
-  // 🔥 STREAM HEADERS
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.setHeader('Transfer-Encoding', 'chunked');
+  if (!openaiRes.body) {
+    return res.status(500).json({
+      error: 'OpenAI stream body is missing'
+    });
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive'
+  });
 
   const reader = openaiRes.body.getReader();
   const decoder = new TextDecoder();
+
+  let buffer = '';
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    const chunk = decoder.decode(value, { stream: true });
+    buffer += decoder.decode(value, { stream: true });
 
-    // OpenAI šalje SSE → filtriramo samo tekst
-    const lines = chunk.split('\n');
+    const parts = buffer.split('\n');
+    buffer = parts.pop() || '';
 
-    for (const line of lines) {
-      if (line.startsWith('data:')) {
-        const jsonStr = line.replace('data:', '').trim();
+    for (const line of parts) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
 
-        if (jsonStr === '[DONE]') {
+      const payload = trimmed.slice(5).trim();
+
+      if (!payload || payload === '[DONE]') {
+        continue;
+      }
+
+      try {
+        const parsed = JSON.parse(payload);
+
+        if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+          res.write(parsed.delta);
+        }
+
+        if (parsed.type === 'response.completed') {
           res.end();
           return;
         }
 
-        try {
-          const parsed = JSON.parse(jsonStr);
-
-          if (parsed.type === 'response.output_text.delta') {
-            const text = parsed.delta || '';
-            res.write(text);
-          }
-
-        } catch (e) {
-          // ignoriši parsing greške
+        if (parsed.type === 'response.failed') {
+          console.error('OPENAI STREAM FAILED:', parsed);
+          res.end();
+          return;
         }
+      } catch (e) {
+        // parcijalni ili nebitni SSE event — ignoriši
       }
     }
   }
 
-  res.end();
+  if (buffer.trim().startsWith('data:')) {
+    const payload = buffer.trim().slice(5).trim();
+    if (payload && payload !== '[DONE]') {
+      try {
+        const parsed = JSON.parse(payload);
+        if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+          res.write(parsed.delta);
+        }
+      } catch (e) {}
+    }
+  }
 
+  res.end();
 } catch (err) {
+  console.error('CHAT STREAM ERROR:', err);
   return res.status(500).json({
-    error: err && err.message ? err.message : 'Streaming failed'
+    error: err && err.message ? err.message : 'Chat stream failed'
   });
 }
 
