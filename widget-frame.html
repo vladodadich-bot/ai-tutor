@@ -450,6 +450,7 @@
           send: "Pošalji",
           sending: "...",
           loading: "Samo trenutak...",
+          streaming: "AI odgovara...",
           errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
           errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
           welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
@@ -463,6 +464,7 @@
           send: "Senden",
           sending: "...",
           loading: "Einen Moment...",
+          streaming: "KI antwortet...",
           errorGeneric: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
           errorTimeout: "Die Anfrage hat zu lange gedauert. Versuche eine kürzere Frage.",
           welcome: "Hallo! Ich kann dir mit dem Inhalt dieser Seite, Services, Produkten oder allgemeinen Fragen helfen.",
@@ -476,6 +478,7 @@
           send: "Invia",
           sending: "...",
           loading: "Un momento...",
+          streaming: "L'AI sta rispondendo...",
           errorGeneric: "Si è verificato un errore. Riprova.",
           errorTimeout: "La richiesta ha richiesto troppo tempo. Prova con una domanda più breve.",
           welcome: "Ciao! Posso aiutarti con il contenuto di questa pagina, servizi, prodotti o domande generali.",
@@ -489,6 +492,7 @@
           send: "Send",
           sending: "...",
           loading: "One moment...",
+          streaming: "AI is replying...",
           errorGeneric: "Something went wrong. Please try again.",
           errorTimeout: "The request took too long. Try a shorter question.",
           welcome: "Hello! I can help with this page, services, products, or general questions.",
@@ -775,7 +779,28 @@
         } catch (e) {}
       }
 
-      async function sendMessageToApi(userMessage) {
+      function parseErrorText(text) {
+        var fallback = t("errorGeneric");
+        var raw = String(text || "").trim();
+        if (!raw) return fallback;
+
+        try {
+          var data = JSON.parse(raw);
+          if (data && typeof data === "object") {
+            if (data.details) {
+              return typeof data.details === "string"
+                ? data.details
+                : JSON.stringify(data.details);
+            }
+            if (data.message) return String(data.message);
+            if (data.error) return String(data.error);
+          }
+        } catch (e) {}
+
+        return raw.slice(0, 500);
+      }
+
+      async function sendMessageToApi(userMessage, onChunk) {
         var history = normalizeHistory(getStoredHistory());
 
         if (activeController) {
@@ -816,28 +841,40 @@
             })
           });
 
-          var text = await response.text();
-          var data = {};
-
-          try {
-            data = text ? JSON.parse(text) : {};
-          } catch (e) {
-            throw new Error("Server did not return JSON: " + String(text || "").slice(0, 500));
-          }
-
           if (!response.ok) {
-            throw new Error(
-              data.details
-                ? (typeof data.details === "string" ? data.details : JSON.stringify(data.details))
-                : (data.error || t("errorGeneric"))
-            );
+            var errorText = await response.text();
+            throw new Error(parseErrorText(errorText));
           }
 
-          if (!data.reply) {
+          if (!response.body) {
+            throw new Error("No response body received.");
+          }
+
+          var reader = response.body.getReader();
+          var decoder = new TextDecoder();
+          var fullText = "";
+
+          while (true) {
+            var result = await reader.read();
+            if (result.done) break;
+
+            var chunk = decoder.decode(result.value, { stream: true });
+            if (!chunk) continue;
+
+            fullText += chunk;
+
+            if (typeof onChunk === "function") {
+              onChunk(fullText);
+            }
+          }
+
+          fullText = String(fullText || "").trim();
+
+          if (!fullText) {
             throw new Error("No reply received.");
           }
 
-          return String(data.reply).trim();
+          return fullText;
         } finally {
           clearTimeout(timeoutId);
           activeController = null;
@@ -857,15 +894,20 @@
         setLoading(true);
 
         var placeholder = addMessage("assistant", t("loading"));
+        var finalAnswer = "";
 
         try {
-          var answer = await sendMessageToApi(userMessage);
+          setStatus(t("streaming"));
 
-          updateMessage(placeholder, answer);
+          finalAnswer = await sendMessageToApi(userMessage, function (partialText) {
+            updateMessage(placeholder, partialText || t("loading"));
+          });
+
+          updateMessage(placeholder, finalAnswer);
 
           var history = normalizeHistory(getStoredHistory());
           history.push({ role: "user", content: userMessage });
-          history.push({ role: "assistant", content: answer });
+          history.push({ role: "assistant", content: finalAnswer });
           saveStoredHistory(history);
         } catch (error) {
           var msg = t("errorGeneric");
