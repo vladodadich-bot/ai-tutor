@@ -1,5 +1,5 @@
-const { createClient } = require('@supabase/supabase-js');
-const { crawlSinglePage } = require('../lib/crawl');
+import { createClient } from '@supabase/supabase-js';
+import { crawlSinglePage } from '../lib/crawl.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -506,26 +506,6 @@ async function handleAgentConfig(req, res, body) {
 // CHAT HELPERS - START
 // ========================================
 
-function extractResponseText(data) {
-  if (data && typeof data.output_text === 'string' && data.output_text.trim()) {
-    return data.output_text.trim();
-  }
-
-  const parts = [];
-  const output = Array.isArray(data && data.output) ? data.output : [];
-
-  for (const item of output) {
-    const content = Array.isArray(item && item.content) ? item.content : [];
-    for (const block of content) {
-      if (block && block.type === 'output_text' && typeof block.text === 'string') {
-        parts.push(block.text);
-      }
-    }
-  }
-
-  return parts.join('\n').trim();
-}
-
 function cleanText(value) {
   return String(value || '')
     .replace(/\u00A0/g, ' ')
@@ -569,11 +549,13 @@ You help users using:
 
 You can combine information from these sources to give the best possible answer.
 When helpful, include a relevant internal link.
+
 RULES:
 - Prioritize relevant content from the current page and site data
 - Do not invent facts, links, or information
 - If exact information is not available, guide the user to the most relevant page or topic
 - Keep answers short, clear, and useful (max ~150 words)
+- Answer in ${languageLabel}
 
 STYLE:
 - Natural, confident, and helpful
@@ -624,7 +606,7 @@ ${payload.crawlContext || 'N/A'}
 
 Recent conversation:
 ${historyText}
-`.trim();
+  `.trim();
 }
 
 function buildLinkSuggestionReply(language, candidates) {
@@ -871,6 +853,126 @@ async function getAgentWithAccess(agentId) {
   };
 }
 
+function createUtf8StreamWriter(res) {
+  let headersSent = false;
+  let ended = false;
+
+  function ensureHeaders() {
+    if (headersSent) return;
+    headersSent = true;
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    });
+  }
+
+  return {
+    write(chunk) {
+      if (ended) return;
+      if (!chunk) return;
+      ensureHeaders();
+      res.write(chunk);
+    },
+    end() {
+      if (ended) return;
+      ensureHeaders();
+      ended = true;
+      res.end();
+    },
+    get ended() {
+      return ended;
+    },
+    get headersSent() {
+      return headersSent || res.headersSent;
+    }
+  };
+}
+
+async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
+  if (!openaiRes.body) {
+    throw new Error('OpenAI stream body is missing');
+  }
+
+  const writer = createUtf8StreamWriter(res);
+  const reader = openaiRes.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+
+    for (const eventBlock of events) {
+      const lines = eventBlock.split('\n');
+      let payload = '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data:')) {
+          payload += trimmed.slice(5).trim();
+        }
+      }
+
+      if (!payload || payload === '[DONE]') {
+        continue;
+      }
+
+      try {
+        const parsed = JSON.parse(payload);
+
+        if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+          writer.write(parsed.delta);
+        }
+
+        if (parsed.type === 'response.completed') {
+          writer.end();
+          return;
+        }
+
+        if (parsed.type === 'response.failed') {
+          console.error('OPENAI STREAM FAILED:', parsed);
+          writer.end();
+          return;
+        }
+      } catch (err) {
+        // ignore incomplete event chunk
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    const lines = buffer.split('\n');
+    let payload = '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('data:')) {
+        payload += trimmed.slice(5).trim();
+      }
+    }
+
+    if (payload && payload !== '[DONE]') {
+      try {
+        const parsed = JSON.parse(payload);
+        if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+          writer.write(parsed.delta);
+        }
+      } catch (err) {
+        // ignore trailing partial event
+      }
+    }
+  }
+
+  writer.end();
+}
+
 // ========================================
 // CRAWL CHAT HELPERS - END
 // ========================================
@@ -962,7 +1064,7 @@ async function handleChat(req, res, body) {
       : crawledRows.slice(0, 3);
 
     if (rowsToUse.length > 0) {
-      const shortRows = rowsToUse.map(function (row) {
+      const shortRows = rowsToUse.map((row) => {
         const headingsValue = safeJsonArray(row.headings);
         const linksValue = safeJsonArray(row.internal_links);
 
@@ -1007,7 +1109,7 @@ async function handleChat(req, res, body) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + process.env.OPENAI_API_KEY
+        'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY
       },
       body: JSON.stringify({
         model: 'gpt-5.4-mini',
@@ -1043,98 +1145,8 @@ async function handleChat(req, res, body) {
       });
     }
 
-    if (!openaiRes.body) {
-      return res.status(500).json({
-        error: 'OpenAI stream body is missing'
-      });
-    }
-
-    res.writeHead(200, {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive'
-    });
-
-    const reader = openaiRes.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let ended = false;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      const events = buffer.split('\n\n');
-      buffer = events.pop() || '';
-
-      for (const eventBlock of events) {
-        const lines = eventBlock.split('\n');
-        let payload = '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data:')) {
-            payload += trimmed.slice(5).trim();
-          }
-        }
-
-        if (!payload || payload === '[DONE]') {
-          continue;
-        }
-
-        try {
-          const parsed = JSON.parse(payload);
-
-          if (parsed.type === 'response.output_text.delta' && parsed.delta) {
-            res.write(parsed.delta);
-          }
-
-          if (parsed.type === 'response.completed') {
-            ended = true;
-            res.end();
-            return;
-          }
-
-          if (parsed.type === 'response.failed') {
-            console.error('OPENAI STREAM FAILED:', parsed);
-            ended = true;
-            res.end();
-            return;
-          }
-        } catch (e) {
-          // ignore incomplete/non-json event chunks
-        }
-      }
-    }
-
-    if (!ended && buffer) {
-      const lines = buffer.split('\n');
-      let payload = '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('data:')) {
-          payload += trimmed.slice(5).trim();
-        }
-      }
-
-      if (payload && payload !== '[DONE]') {
-        try {
-          const parsed = JSON.parse(payload);
-          if (parsed.type === 'response.output_text.delta' && parsed.delta) {
-            res.write(parsed.delta);
-          }
-        } catch (e) {
-          // ignore trailing partial
-        }
-      }
-    }
-
-    if (!ended) {
-      res.end();
-    }
+    await streamOpenAIResponseToNodeResponse(openaiRes, res);
+    return;
   } catch (err) {
     console.error('CHAT STREAM ERROR:', err);
 
@@ -1146,7 +1158,9 @@ async function handleChat(req, res, body) {
 
     try {
       res.end();
-    } catch (e) {}
+    } catch (e) {
+      // ignore
+    }
 
     return;
   }
@@ -1160,7 +1174,7 @@ async function handleChat(req, res, body) {
 // MAIN HANDLER - START
 // ========================================
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -1221,7 +1235,7 @@ module.exports = async function handler(req, res) {
       details: err && err.stack ? String(err.stack).slice(0, 2000) : ''
     });
   }
-};
+}
 
 // ========================================
 // MAIN HANDLER - END
