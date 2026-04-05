@@ -369,23 +369,147 @@
         font-size: 15px;
       }
     }
+    .sm-header-brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+
+.sm-title-wrap{
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+}
+
+.sm-face{
+  width:42px;
+  height:42px;
+  min-width:42px;
+  border-radius:12px;
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)),
+    linear-gradient(135deg, #0f172a, #1e293b 60%, #0b1220);
+  border:1px solid rgba(255,255,255,0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 8px 20px rgba(0,0,0,0.22);
+  overflow:hidden;
+}
+
+.sm-face::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,0.12), transparent 35%),
+    radial-gradient(circle at 70% 75%, rgba(96,165,250,0.08), transparent 30%);
+  pointer-events:none;
+}
+
+.sm-eyes{
+  position:relative;
+  z-index:1;
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+
+.sm-eye{
+  width:11px;
+  height:11px;
+  border-radius:3px;
+  position:relative;
+  overflow:hidden;
+  background:linear-gradient(180deg, #8fd3ff, #38bdf8);
+  box-shadow:
+    0 0 8px rgba(56,189,248,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.35);
+  transition:height 0.14s ease, transform 0.2s ease;
+}
+
+.sm-pupil{
+  width:4px;
+  height:4px;
+  border-radius:1.5px;
+  position:absolute;
+  left:3.5px;
+  top:3.5px;
+  background:#082032;
+  transition:left 0.18s ease, top 0.18s ease, transform 0.18s ease;
+}
+
+.sm-face.sm-blink .sm-eye{
+  height:3px;
+}
+
+.sm-face.sm-thinking .sm-eye{
+  transform:translateY(-0.5px);
+}
+
+@media (max-width: 480px){
+  .sm-face{
+    width:38px;
+    height:38px;
+    min-width:38px;
+    border-radius:11px;
+  }
+
+  .sm-eye{
+    width:10px;
+    height:10px;
+  }
+
+  .sm-pupil{
+    width:4px;
+    height:4px;
+    left:3px;
+    top:3px;
+  }
+
+  .sm-header-brand{
+    gap:10px;
+  }
+}
   </style>
 </head>
 <body>
-  <div class="chat-shell">
-    <div class="chat-header" id="chatHeader">
-      <div class="chat-header-top">
-        <div class="chat-header-left">
-          <a class="brand-link" href="https://sitemindai.app" target="_blank" rel="noopener noreferrer">sitemindai.app</a>
-          <div class="chat-title" id="chatTitle">SiteMind AI</div>
+<div class="chat-shell">
+  <div class="chat-header" id="chatHeader">
+    <div class="chat-header-top">
+      <div class="chat-header-left">
+        <div class="sm-header-brand">
+          <div class="sm-face" id="smFace" aria-hidden="true">
+            <div class="sm-eyes">
+              <div class="sm-eye">
+                <div class="sm-pupil" id="smPupilLeft"></div>
+              </div>
+              <div class="sm-eye">
+                <div class="sm-pupil" id="smPupilRight"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sm-title-wrap">
+            <a class="brand-link" href="https://sitemindai.app" target="_blank" rel="noopener noreferrer">sitemindai.app</a>
+            <div class="chat-title" id="chatTitle">SiteMind AI</div>
+          </div>
         </div>
-        <button type="button" class="chat-close" id="chatClose" aria-label="Close chat">×</button>
       </div>
-      <div class="chat-subtitle" id="chatSubtitle">Ask AI Agent</div>
+
+      <button type="button" class="chat-close" id="chatClose" aria-label="Close chat">×</button>
     </div>
 
-    <div class="chat-messages" id="chatMessages"></div>
-    <div class="chat-status" id="chatStatus"></div>
+    <div class="chat-subtitle" id="chatSubtitle">Ask AI Agent</div>
+  </div>
+
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-status" id="chatStatus"></div>
+</div>
 
     <form class="chat-form" id="chatForm">
       <textarea
@@ -1001,5 +1125,47 @@
       }
     })();
   </script>
+  <script>
+(function () {
+  const face = document.getElementById('smFace');
+  const leftPupil = document.getElementById('smPupilLeft');
+  const rightPupil = document.getElementById('smPupilRight');
+
+  if (!face || !leftPupil || !rightPupil) return;
+
+  function setPupils(x, y) {
+    leftPupil.style.left = x + 'px';
+    leftPupil.style.top = y + 'px';
+    rightPupil.style.left = x + 'px';
+    rightPupil.style.top = y + 'px';
+  }
+
+  function blink() {
+    face.classList.add('sm-blink');
+    setTimeout(() => {
+      face.classList.remove('sm-blink');
+    }, 140);
+  }
+
+  function randomLook() {
+    const positions = [
+      { x: 3.5, y: 3.5 },
+      { x: 2.2, y: 3.5 },
+      { x: 4.8, y: 3.5 },
+      { x: 3.5, y: 2.2 },
+      { x: 3.5, y: 4.6 }
+    ];
+    const p = positions[Math.floor(Math.random() * positions.length)];
+    setPupils(p.x, p.y);
+  }
+
+  setPupils(3.5, 3.5);
+
+  setInterval(() => {
+    blink();
+    randomLook();
+  }, 3500);
+})();
+</script>
 </body>
 </html>
