@@ -551,7 +551,7 @@ function getLanguageLabel(language) {
 
 function buildAdaptiveSystemPrompt(languageLabel) {
   return `
-You are an AI website master assistant.
+You are an AI website master assistant, Respond in a natural, human, and friendly way.
 You help users using:
 - the current page content
 - crawled website data
