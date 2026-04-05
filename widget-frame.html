@@ -435,7 +435,20 @@
     border-radius 0.22s ease;
   transform-origin:center center;
 }
-
+.sm-face::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:11px;
+  transform:translateX(-50%);
+  width:10px;
+  height:4px;
+  border-radius:0 0 6px 6px;
+  border-bottom:2px solid rgba(140, 225, 255, 0.9);
+  opacity:0.9;
+  z-index:1;
+  box-shadow:0 0 6px rgba(56,189,248,0.18);
+}
 /* blink */
 .sm-face.sm-blink .sm-eye{
   height:4px;
