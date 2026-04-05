@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-import { crawlSinglePage } from '../lib/crawl.js';
+const { createClient } = require('@supabase/supabase-js');
+const { crawlSinglePage } = require('../lib/crawl');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -657,6 +657,7 @@ function buildLinkSuggestionReply(language, candidates) {
   if (items.length === 1) {
     return `I do not have the full content for that topic here, but there is a relevant page on the website: ${items[0].title} – ${items[0].url}`;
   }
+
   return `I do not have the full content for that topic here, but there are relevant pages on the website:\n- ${items[0].title} – ${items[0].url}\n- ${items[1].title} – ${items[1].url}`;
 }
 
@@ -691,7 +692,7 @@ function scorePageForMessage(page, message) {
   const h1 = String(page.h1 || '').toLowerCase();
   const headings = safeJsonArray(page.headings).join(' ').toLowerCase();
   const links = safeJsonArray(page.internal_links)
-    .map(link => ((link && link.text) || '') + ' ' + ((link && link.href) || ''))
+    .map((link) => ((link && link.text) || '') + ' ' + ((link && link.href) || ''))
     .join(' ')
     .toLowerCase();
   const content = String(page.content || page.text_preview || '').toLowerCase();
@@ -733,13 +734,13 @@ function scoreLinkMatch(link, message) {
 
 function pickRelevantCrawledPages(rows, message, limit = 3) {
   const scored = (rows || [])
-    .map(row => ({
+    .map((row) => ({
       ...row,
       _score: scorePageForMessage(row, message)
     }))
     .sort((a, b) => b._score - a._score);
 
-  const useful = scored.filter(row => row._score > 0).slice(0, limit);
+  const useful = scored.filter((row) => row._score > 0).slice(0, limit);
   if (useful.length) return useful;
 
   return scored.slice(0, limit);
@@ -1001,124 +1002,154 @@ async function handleChat(req, res, body) {
     history
   });
 
-try {
-  const openaiRes = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY
-    },
-    body: JSON.stringify({
-      model: 'gpt-5.4-mini',
-      stream: true,
-      input: [
-        {
-          role: 'system',
-          content: [
-            {
-              type: 'input_text',
-              text: systemPrompt
-            }
-          ]
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text: userPrompt
-            }
-          ]
-        }
-      ]
-    })
-  });
-
-  if (!openaiRes.ok) {
-    const errorText = await openaiRes.text();
-    return res.status(500).json({
-      error: 'OpenAI streaming request failed',
-      details: errorText.slice(0, 1000)
+  try {
+    const openaiRes = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + process.env.OPENAI_API_KEY
+      },
+      body: JSON.stringify({
+        model: 'gpt-5.4-mini',
+        stream: true,
+        input: [
+          {
+            role: 'system',
+            content: [
+              {
+                type: 'input_text',
+                text: systemPrompt
+              }
+            ]
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: userPrompt
+              }
+            ]
+          }
+        ]
+      })
     });
-  }
 
-  if (!openaiRes.body) {
-    return res.status(500).json({
-      error: 'OpenAI stream body is missing'
+    if (!openaiRes.ok) {
+      const errorText = await openaiRes.text();
+      return res.status(500).json({
+        error: 'OpenAI streaming request failed',
+        details: errorText.slice(0, 1000)
+      });
+    }
+
+    if (!openaiRes.body) {
+      return res.status(500).json({
+        error: 'OpenAI stream body is missing'
+      });
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive'
     });
-  }
 
-  res.writeHead(200, {
-    'Content-Type': 'text/plain; charset=utf-8',
-    'Cache-Control': 'no-cache, no-transform',
-    'Connection': 'keep-alive'
-  });
+    const reader = openaiRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let ended = false;
 
-  const reader = openaiRes.body.getReader();
-  const decoder = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-  let buffer = '';
+      buffer += decoder.decode(value, { stream: true });
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
 
-    buffer += decoder.decode(value, { stream: true });
+      for (const eventBlock of events) {
+        const lines = eventBlock.split('\n');
+        let payload = '';
 
-    const parts = buffer.split('\n');
-    buffer = parts.pop() || '';
-
-    for (const line of parts) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith('data:')) continue;
-
-      const payload = trimmed.slice(5).trim();
-
-      if (!payload || payload === '[DONE]') {
-        continue;
-      }
-
-      try {
-        const parsed = JSON.parse(payload);
-
-        if (parsed.type === 'response.output_text.delta' && parsed.delta) {
-          res.write(parsed.delta);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data:')) {
+            payload += trimmed.slice(5).trim();
+          }
         }
 
-        if (parsed.type === 'response.completed') {
-          res.end();
-          return;
+        if (!payload || payload === '[DONE]') {
+          continue;
         }
 
-        if (parsed.type === 'response.failed') {
-          console.error('OPENAI STREAM FAILED:', parsed);
-          res.end();
-          return;
+        try {
+          const parsed = JSON.parse(payload);
+
+          if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+            res.write(parsed.delta);
+          }
+
+          if (parsed.type === 'response.completed') {
+            ended = true;
+            res.end();
+            return;
+          }
+
+          if (parsed.type === 'response.failed') {
+            console.error('OPENAI STREAM FAILED:', parsed);
+            ended = true;
+            res.end();
+            return;
+          }
+        } catch (e) {
+          // ignore incomplete/non-json event chunks
         }
-      } catch (e) {
-        // parcijalni ili nebitni SSE event — ignoriši
       }
     }
-  }
 
-  if (buffer.trim().startsWith('data:')) {
-    const payload = buffer.trim().slice(5).trim();
-    if (payload && payload !== '[DONE]') {
-      try {
-        const parsed = JSON.parse(payload);
-        if (parsed.type === 'response.output_text.delta' && parsed.delta) {
-          res.write(parsed.delta);
+    if (!ended && buffer) {
+      const lines = buffer.split('\n');
+      let payload = '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data:')) {
+          payload += trimmed.slice(5).trim();
         }
-      } catch (e) {}
-    }
-  }
+      }
 
-  res.end();
-} catch (err) {
-  console.error('CHAT STREAM ERROR:', err);
-  return res.status(500).json({
-    error: err && err.message ? err.message : 'Chat stream failed'
-  });
+      if (payload && payload !== '[DONE]') {
+        try {
+          const parsed = JSON.parse(payload);
+          if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+            res.write(parsed.delta);
+          }
+        } catch (e) {
+          // ignore trailing partial
+        }
+      }
+    }
+
+    if (!ended) {
+      res.end();
+    }
+  } catch (err) {
+    console.error('CHAT STREAM ERROR:', err);
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        error: err && err.message ? err.message : 'Chat stream failed'
+      });
+    }
+
+    try {
+      res.end();
+    } catch (e) {}
+
+    return;
+  }
 }
 
 // ========================================
@@ -1129,7 +1160,7 @@ try {
 // MAIN HANDLER - START
 // ========================================
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -1190,7 +1221,7 @@ export default async function handler(req, res) {
       details: err && err.stack ? String(err.stack).slice(0, 2000) : ''
     });
   }
-}
+};
 
 // ========================================
 // MAIN HANDLER - END
