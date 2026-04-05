@@ -561,33 +561,27 @@ function getLanguageLabel(language) {
 
 function buildAdaptiveSystemPrompt(languageLabel) {
   return `
-You are SiteMind AI, a fast and trustworthy AI assistant for websites.
-Adapt your tone to the page:
-- educational -> clear teacher
-- technical/docs -> precise technical guide
-- business/ecommerce/saas -> professional assistant
-- blog/entertainment -> natural and engaging
-- otherwise -> friendly and useful
+You are an AI website master assistant.
+You help users using:
+- the current page content
+- crawled website data
+- the structure of the website (headings, links, topics)
 
-Use sources in this order:
-1. current page
-2. relevant crawled pages from the same site
-3. general knowledge only for explanation or safe background
+You can combine information from these sources to give the best possible answer.
+When helpful, include a relevant internal link.
+RULES:
+- Prioritize relevant content from the current page and site data
+- Do not invent facts, links, or information
+- If exact information is not available, guide the user to the most relevant page or topic
+- Keep answers short, clear, and useful (max ~150 words)
 
-Rules:
-- Never invent site-specific facts.
-- If the answer is clearly in the current page or crawled content, answer directly.
-- If only part of the answer is available, say what is clear and what is missing.
-- If full content is not available but a clearly relevant internal page exists, point the user to that page instead of acting as if the topic does not exist.
-- Use general knowledge only as support, never as fake site truth.
+STYLE:
+- Natural, confident, and helpful
+- Give a direct answer first, then optional guidance
+- Prefer practical and actionable responses over long explanations
 
-Style:
-- short, clear, natural
-- usually 2 to 5 sentences
-- no fluff
-- end with one short next-step suggestion when useful
-GOAL
-Be fast, adaptive, practical, and genuinely helpful while staying accurate.
+GOAL:
+Help the user quickly understand the topic or find the right content on the website.
 `.trim();
 }
 
@@ -1007,74 +1001,83 @@ async function handleChat(req, res, body) {
     history
   });
 
-  try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY
-      },
-      body: JSON.stringify({
-        model: 'gpt-5.4-mini',
-        input: [
-          {
-            role: 'system',
-            content: [
-              {
-                type: 'input_text',
-                text: systemPrompt
-              }
-            ]
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'input_text',
-                text: userPrompt
-              }
-            ]
-          }
-        ]
-      })
-    });
+ try {
+  const openaiRes = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY
+    },
+    body: JSON.stringify({
+      model: 'gpt-5.4-mini',
+      stream: true,
+      input: [
+        {
+          role: 'system',
+          content: [{ type: 'input_text', text: systemPrompt }]
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: userPrompt }]
+        }
+      ]
+    })
+  });
 
-    const rawText = await response.text();
-
-    let data = {};
-    try {
-      data = rawText ? JSON.parse(rawText) : {};
-    } catch (e) {
-      return res.status(500).json({
-        error: 'OpenAI did not return JSON',
-        details: rawText.slice(0, 500)
-      });
-    }
-
-    if (!response.ok) {
-      return res.status(500).json({
-        error: data.error && data.error.message ? data.error.message : 'OpenAI request failed',
-        details: data
-      });
-    }
-
-    const reply = extractResponseText(data);
-
-    if (!reply) {
-      return res.status(500).json({
-        error: 'No reply generated',
-        details: JSON.stringify(data).slice(0, 1200)
-      });
-    }
-
-    return res.status(200).json({
-      reply: reply
-    });
-  } catch (err) {
+  if (!openaiRes.ok || !openaiRes.body) {
+    const text = await openaiRes.text();
     return res.status(500).json({
-      error: err && err.message ? err.message : 'Chat request failed'
+      error: 'Streaming failed',
+      details: text.slice(0, 500)
     });
   }
+
+  // 🔥 STREAM HEADERS
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Transfer-Encoding', 'chunked');
+
+  const reader = openaiRes.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value, { stream: true });
+
+    // OpenAI šalje SSE → filtriramo samo tekst
+    const lines = chunk.split('\n');
+
+    for (const line of lines) {
+      if (line.startsWith('data:')) {
+        const jsonStr = line.replace('data:', '').trim();
+
+        if (jsonStr === '[DONE]') {
+          res.end();
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+
+          if (parsed.type === 'response.output_text.delta') {
+            const text = parsed.delta || '';
+            res.write(text);
+          }
+
+        } catch (e) {
+          // ignoriši parsing greške
+        }
+      }
+    }
+  }
+
+  res.end();
+
+} catch (err) {
+  return res.status(500).json({
+    error: err && err.message ? err.message : 'Streaming failed'
+  });
 }
 
 // ========================================
