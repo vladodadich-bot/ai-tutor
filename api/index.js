@@ -565,7 +565,7 @@ RULES:
 - Prioritize relevant content from the current page and site data
 - Do not invent facts, links, or information
 - If exact information is not available, guide the user to the most relevant page or topic
-- Keep answers short, clear, and useful max ~150 words
+- Keep answers short, clear, and useful max ~200 words
 - If a user repeats the same question several times, do not repeat the full answer again
 - In repeated-question cases, reply very briefly and tell the user to look above
 - If a question is unrelated to this website’s content or asks for unsafe, harmful, illegal, or technical instructions, politely refuse and redirect the user to questions about this website.
@@ -734,7 +734,8 @@ function getMeaningfulWords(value) {
     'redoslijed', 'dogadjaja', 'događaja', 'radnja', 'radnje', 'pisac',
     'autor', 'glavni', 'sporedni', 'vrsta', 'mjesto', 'vrijeme',
     'figuren', 'figur', 'charakterisierung', 'zusammenfassung', 'inhalt',
-    'analyse', 'thema', 'motive', 'roman', 'pripovijetka'
+    'analyse', 'thema', 'motive', 'roman', 'pripovijetka',
+    'please', 'molim', 'moze', 'može', 'daj', 'imas', 'imaš'
   ]);
 
   return normalizeSearchText(value)
@@ -827,6 +828,138 @@ function isUniversalQuestion(message, pageTypeHint) {
   if (generalSignals.some((signal) => text.includes(signal))) return true;
 
   return false;
+}
+
+function extractEntityPhrase(message) {
+  const normalized = normalizeSearchText(message);
+  if (!normalized) return '';
+
+  const removablePrefixes = [
+    'lektira ',
+    'analiza ',
+    'kratki sadrzaj ',
+    'kratki sadržaj ',
+    'sadrzaj ',
+    'sadržaj ',
+    'likovi ',
+    'tema ',
+    'poruka ',
+    'pouka ',
+    'opis likova ',
+    'redoslijed dogadjaja ',
+    'redoslijed događaja ',
+    'figuren ',
+    'zusammenfassung ',
+    'inhalt ',
+    'analyse '
+  ];
+
+  let text = normalized;
+  for (const prefix of removablePrefixes) {
+    if (text.startsWith(prefix)) {
+      text = text.slice(prefix.length).trim();
+      break;
+    }
+  }
+
+  return text.trim();
+}
+
+function isTitleSearchIntent(message) {
+  const normalized = normalizeSearchText(message);
+  if (!normalized) return false;
+
+  const patterns = [
+    'lektira ',
+    'analiza ',
+    'kratki sadrzaj ',
+    'kratki sadržaj ',
+    'likovi ',
+    'tema ',
+    'poruka ',
+    'pouka ',
+    'figuren ',
+    'zusammenfassung ',
+    'analyse '
+  ];
+
+  if (patterns.some((pattern) => normalized.startsWith(pattern))) return true;
+
+  const words = getMeaningfulWords(normalized);
+  return words.length >= 2 && normalized.length <= 80;
+}
+
+function scoreExactFieldMatch(fieldValue, phrase, words) {
+  const field = normalizeSearchText(fieldValue);
+  if (!field) return 0;
+
+  let score = 0;
+
+  if (phrase && field.includes(phrase)) score += 100;
+  if (phrase && field === phrase) score += 80;
+
+  for (const word of words) {
+    if (field.includes(word)) score += 15;
+  }
+
+  return score;
+}
+
+function findExactTitleOrLinkMatch(rows, message) {
+  const phrase = extractEntityPhrase(message);
+  const words = getMeaningfulWords(phrase || message);
+
+  if (!phrase && !words.length) return null;
+
+  const candidates = [];
+
+  for (const row of rows || []) {
+    const pageTitle = String(row.page_title || '').trim();
+    const pageH1 = String(row.h1 || '').trim();
+    const pageUrl = String(row.url || '').trim();
+
+    let rowScore = 0;
+    rowScore += scoreExactFieldMatch(pageTitle, phrase, words);
+    rowScore += scoreExactFieldMatch(pageH1, phrase, words);
+    rowScore += scoreExactFieldMatch(pageUrl, phrase, words);
+
+    if (rowScore > 0 && pageUrl) {
+      candidates.push({
+        title: pageTitle || pageH1 || pageUrl,
+        url: pageUrl,
+        score: rowScore,
+        type: 'page'
+      });
+    }
+
+    const links = safeJsonArray(row.internal_links);
+    for (const link of links) {
+      const text = String(link?.text || '').trim();
+      const href = String(link?.href || '').trim();
+
+      let linkScore = 0;
+      linkScore += scoreExactFieldMatch(text, phrase, words);
+      linkScore += scoreExactFieldMatch(href, phrase, words);
+
+      if (linkScore > 0 && href) {
+        candidates.push({
+          title: text || href,
+          url: href,
+          score: linkScore,
+          type: 'link'
+        });
+      }
+    }
+  }
+
+  if (!candidates.length) return null;
+
+  candidates.sort((a, b) => b.score - a.score);
+
+  const best = candidates[0];
+  if (best.score < 40) return null;
+
+  return best;
 }
 
 function pickRelevantCrawledPages(rows, message, limit = 1) {
@@ -1216,12 +1349,14 @@ async function handleChat(req, res, body) {
   });
 
   const allowUniversalKnowledge = isUniversalQuestion(message, pageTypeHint);
+  const titleSearchIntent = isTitleSearchIntent(message);
 
   let crawledRows = [];
+  let exactMatch = null;
   let bestMatch = null;
   let linkCandidates = [];
 
-  if (!useCurrentPageOnly && !allowUniversalKnowledge) {
+  if (!useCurrentPageOnly) {
     try {
       const { data, error } = await supabase
         .from('site_content')
@@ -1234,7 +1369,24 @@ async function handleChat(req, res, body) {
     } catch (e) {
       crawledRows = [];
     }
+  }
 
+  if (!useCurrentPageOnly && crawledRows.length > 0) {
+    exactMatch = findExactTitleOrLinkMatch(crawledRows, message);
+
+    if (exactMatch && titleSearchIntent) {
+      return res.status(200).json({
+        reply: buildLinkSuggestionReply(language, [
+          {
+            title: exactMatch.title,
+            url: exactMatch.url
+          }
+        ])
+      });
+    }
+  }
+
+  if (!useCurrentPageOnly && !allowUniversalKnowledge && crawledRows.length > 0) {
     bestMatch = findBestCrawlMatch(crawledRows, message);
     linkCandidates = findRelevantLinkCandidates(crawledRows, message, 2);
 
@@ -1309,6 +1461,7 @@ Extra answering rules:
 - If Source mode is single_best_crawl_match, use only the provided relevant snippet or link context and do not assume more than what is shown.
 - Never expand to unrelated pages or unrelated topics.
 - If one relevant crawl match is already enough, stop there.
+- If the user is clearly searching for a title/page and a direct site match was already found earlier, do not claim the content does not exist.
 - Keep the answer concise and directly relevant to the user's question.
 `;
 
