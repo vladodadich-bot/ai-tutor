@@ -591,7 +591,10 @@ PRAVILA:
 function buildUserPrompt(payload) {
   const headingsText = Array.isArray(payload.headings) ? payload.headings.join(' | ') : '';
   const historyText = Array.isArray(payload.history) && payload.history.length
-    ? payload.history.map((item) => `${item.role}: ${item.content}`).join('\n')
+    ? payload.history
+        .slice(-2)
+        .map((item) => `${item.role}: ${item.content}`)
+        .join('\n')
     : 'N/A';
 
   return `
