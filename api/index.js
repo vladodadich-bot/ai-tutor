@@ -1124,7 +1124,7 @@ async function handleChat(req, res, body) {
         'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY
       },
       body: JSON.stringify({
-        model: "gpt-5-mini",
+        model: "gpt-5.4-nano",
         stream: true,
         input: [
           {
