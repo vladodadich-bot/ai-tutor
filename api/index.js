@@ -681,14 +681,15 @@ function scorePageForMessage(page, message) {
   const text = String(message || '').toLowerCase();
   if (!text) return 0;
 
-  const title = String(page.page_title || '').toLowerCase();
-  const meta = String(page.meta_description || '').toLowerCase();
-  const h1 = String(page.h1 || '').toLowerCase();
-  const headings = safeJsonArray(page.headings).join(' ').toLowerCase();
-  const links = safeJsonArray(page.internal_links)
-    .map((link) => ((link && link.text) || '') + ' ' + ((link && link.href) || ''))
-    .join(' ')
-    .toLowerCase();
+const title = String(page.page_title || '').toLowerCase();
+const meta = String(page.meta_description || '').toLowerCase();
+const h1 = String(page.h1 || '').toLowerCase();
+const headings = safeJsonArray(page.headings).join(' ').toLowerCase();
+const links = safeJsonArray(page.internal_links)
+  .map(link => String(link || '').trim())
+  .filter(Boolean)
+  .join(' ')
+  .toLowerCase();
   const content = String(page.content || page.text_preview || '').toLowerCase();
 
   let score = 0;
