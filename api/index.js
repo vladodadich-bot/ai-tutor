@@ -1320,7 +1320,7 @@ Extra answering rules:
         'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY
       },
       body: JSON.stringify({
-        model: "gpt-4,5-mini",
+        model: "gpt-4.5-mini",
         stream: true,
         input: [
           {
