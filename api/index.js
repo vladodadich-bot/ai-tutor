@@ -716,53 +716,117 @@ function safeJsonArray(value) {
   return [];
 }
 
-function scorePageForMessage(page, message) {
-  const text = String(message || '').toLowerCase();
-  if (!text) return 0;
+function normalizeSearchText(value) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  const title = String(page.page_title || '').toLowerCase();
-  const meta = String(page.meta_description || '').toLowerCase();
-  const h1 = String(page.h1 || '').toLowerCase();
-  const headings = safeJsonArray(page.headings).join(' ').toLowerCase();
-  const links = safeJsonArray(page.internal_links)
-    .map((link) => ((link && link.text) || '') + ' ' + ((link && link.href) || ''))
-    .join(' ')
-    .toLowerCase();
-  const content = String(page.content || page.text_preview || '').toLowerCase();
+function getMeaningfulWords(value) {
+  const stopWords = new Set([
+    'a', 'ali', 'ako', 'da', 'do', 'ga', 'i', 'ili', 'iz', 'je', 'još', 'ju',
+    'li', 'na', 'ne', 'no', 'od', 'o', 'po', 'sa', 'se', 'su', 'to', 'u', 'uz',
+    'za', 'the', 'and', 'for', 'are', 'with', 'from', 'this', 'that',
+    'kratki', 'kratka', 'kratko', 'sadrzaj', 'sadržaj', 'lektira', 'likovi',
+    'tema', 'ideja', 'analiza', 'opis', 'poruka', 'pouka', 'djelo', 'djela',
+    'redoslijed', 'dogadjaja', 'događaja', 'radnja', 'radnje', 'pisac',
+    'autor', 'glavni', 'sporedni', 'vrsta', 'mjesto', 'vrijeme',
+    'figuren', 'figur', 'charakterisierung', 'zusammenfassung', 'inhalt',
+    'analyse', 'thema', 'motive', 'roman', 'pripovijetka'
+  ]);
 
+  return normalizeSearchText(value)
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((word) => word.length >= 3 && !stopWords.has(word));
+}
+
+function scoreTextByWords(text, words, weight) {
+  if (!text || !words.length) return 0;
+
+  const haystack = normalizeSearchText(text);
   let score = 0;
-  const words = text.split(/\s+/).filter(Boolean);
 
   for (const word of words) {
-    if (word.length < 2) continue;
-    if (title.includes(word)) score += 5;
-    if (h1.includes(word)) score += 4;
-    if (headings.includes(word)) score += 3;
-    if (meta.includes(word)) score += 2;
-    if (links.includes(word)) score += 1;
-    if (content.includes(word)) score += 6;
+    if (haystack.includes(word)) score += weight;
   }
 
   return score;
 }
 
-function scoreLinkMatch(link, message) {
-  const text = String(message || '').toLowerCase();
-  if (!text) return 0;
-
-  const linkText = String(link && link.text ? link.text : '').toLowerCase();
-  const linkHref = String(link && link.href ? link.href : '').toLowerCase();
+function scorePageForMessage(page, message) {
+  const words = getMeaningfulWords(message);
+  if (!words.length) return 0;
 
   let score = 0;
-  const words = text.split(/\s+/).filter(Boolean);
 
-  for (const word of words) {
-    if (word.length < 2) continue;
-    if (linkText.includes(word)) score += 5;
-    if (linkHref.includes(word)) score += 3;
-  }
+  score += scoreTextByWords(page.page_title || '', words, 10);
+  score += scoreTextByWords(page.h1 || '', words, 9);
+  score += scoreTextByWords(safeJsonArray(page.headings).join(' '), words, 5);
+  score += scoreTextByWords(page.meta_description || '', words, 3);
+  score += scoreTextByWords(page.text_preview || '', words, 7);
+
+  const linksText = safeJsonArray(page.internal_links)
+    .map((link) => `${link?.text || ''} ${link?.href || ''}`)
+    .join(' ');
+  score += scoreTextByWords(linksText, words, 2);
 
   return score;
+}
+
+function currentPageCanAnswer({ message, pageTitle, h1, pageText, pageContext }) {
+  const sourceText = String(pageText || pageContext || '').trim();
+  if (sourceText.length < 120) return false;
+
+  const words = getMeaningfulWords(message);
+
+  if (!words.length) {
+    return sourceText.length > 250;
+  }
+
+  const combined = normalizeSearchText(`${pageTitle || ''} ${h1 || ''} ${sourceText}`);
+  let hits = 0;
+
+  for (const word of words) {
+    if (combined.includes(word)) hits += 1;
+  }
+
+  if (hits >= 2) return true;
+
+  const titleZone = normalizeSearchText(`${pageTitle || ''} ${h1 || ''}`);
+  for (const word of words) {
+    if (titleZone.includes(word)) return true;
+  }
+
+  return false;
+}
+
+function isUniversalQuestion(message, pageTypeHint) {
+  const text = normalizeSearchText(`${pageTypeHint || ''} ${message || ''}`);
+
+  const patterns = [
+    'sta je ', 'što je ', 'what is ', 'was ist ', 'cos è ', 'che cos è ',
+    'kako ', 'how to ', 'wie ', 'come ',
+    'objasni ', 'explain ', 'erkläre ', 'spiega ',
+    'razlika izmedju ', 'razlika između ', 'difference between ',
+    'definicija ', 'definition ', 'bedeutung '
+  ];
+
+  const generalSignals = [
+    'tema knjizevnog djela', 'tema književnog djela',
+    'karakterizacija lika', 'pripovjedac', 'pripovjedač',
+    'metafora', 'personifikacija', 'epitet', 'uvod', 'zakljucak', 'zaključak',
+    'esej', 'sastav', 'seminarski', 'kolokvij',
+    'api', 'frontend', 'backend', 'hosting', 'html', 'css', 'javascript',
+    'fotosinteza', 'gravitacija'
+  ];
+
+  if (patterns.some((pattern) => text.startsWith(pattern))) return true;
+  if (generalSignals.some((signal) => text.includes(signal))) return true;
+
+  return false;
 }
 
 function pickRelevantCrawledPages(rows, message, limit = 1) {
@@ -771,12 +835,68 @@ function pickRelevantCrawledPages(rows, message, limit = 1) {
       ...row,
       _score: scorePageForMessage(row, message)
     }))
+    .filter((row) => row._score > 0)
     .sort((a, b) => b._score - a._score);
 
-  const useful = scored.filter((row) => row._score > 0).slice(0, limit);
-  if (useful.length) return useful;
-
   return scored.slice(0, limit);
+}
+
+function extractRelevantSnippet(page, message, maxLen = 700) {
+  const baseText = String(page?.text_preview || page?.content || '').trim();
+  if (!baseText) return '';
+
+  const words = getMeaningfulWords(message);
+  if (!words.length) {
+    return limitText(baseText, maxLen);
+  }
+
+  const lowered = baseText.toLowerCase();
+  let bestIndex = -1;
+
+  for (const word of words) {
+    const idx = lowered.indexOf(word.toLowerCase());
+    if (idx !== -1) {
+      bestIndex = idx;
+      break;
+    }
+  }
+
+  if (bestIndex === -1) {
+    return limitText(baseText, maxLen);
+  }
+
+  const half = Math.floor(maxLen / 2);
+  let start = Math.max(0, bestIndex - half);
+  let end = Math.min(baseText.length, bestIndex + half);
+
+  while (start > 0 && baseText[start] !== ' ') start -= 1;
+  while (end < baseText.length && baseText[end] !== ' ') end += 1;
+
+  const snippet = baseText.slice(start, end).trim();
+
+  if (snippet.length <= maxLen) return snippet;
+  return limitText(snippet, maxLen);
+}
+
+function findBestCrawlMatch(rows, message) {
+  const matches = pickRelevantCrawledPages(rows, message, 1);
+  if (!matches.length) return null;
+
+  const best = matches[0];
+  const snippet = extractRelevantSnippet(best, message, 700);
+
+  return {
+    page: best,
+    score: best._score || 0,
+    snippet
+  };
+}
+
+function shouldStopAfterMatch(bestMatch) {
+  if (!bestMatch) return false;
+  if ((bestMatch.score || 0) >= 10) return true;
+  if (String(bestMatch.snippet || '').trim().length >= 120) return true;
+  return false;
 }
 
 function findRelevantLinkCandidates(rows, message, limit = 2) {
@@ -798,13 +918,15 @@ function findRelevantLinkCandidates(rows, message, limit = 2) {
     }
 
     for (const link of links) {
-      const score = scoreLinkMatch(link, message);
-      const href = String(link && link.href ? link.href : '').trim();
-      const title = String(link && link.text ? link.text : '').trim() || href;
+      const linkText = String(link?.text || '').trim();
+      const href = String(link?.href || '').trim();
+      const score =
+        scoreTextByWords(linkText, getMeaningfulWords(message), 5) +
+        scoreTextByWords(href, getMeaningfulWords(message), 2);
 
       if (score > 0 && href) {
         matches.push({
-          title,
+          title: linkText || href,
           url: href,
           score
         });
@@ -1063,7 +1185,6 @@ async function handleChat(req, res, body) {
 
   const repeatedCount = countRecentRepeatedUserQuestions(history, message);
 
-  // Treći put isto pitanje -> bez OpenAI poziva
   if (repeatedCount >= 2) {
     return res.status(200).json({
       reply: buildRepeatedQuestionReply(language)
@@ -1086,71 +1207,83 @@ async function handleChat(req, res, body) {
     });
   }
 
-  let crawledRows = [];
-
-  try {
-    const { data, error } = await supabase
-      .from('site_content')
-      .select('url, page_title, meta_description, h1, headings, internal_links, text_preview, content')
-      .eq('agent_id', agentId);
-
-    if (!error && Array.isArray(data)) {
-      crawledRows = data;
-    }
-  } catch (e) {
-    crawledRows = [];
-  }
-
-  const relevantPages = pickRelevantCrawledPages(crawledRows, message, 1);
-  const linkCandidates = findRelevantLinkCandidates(crawledRows, message, 2);
-
-  const hasStrongCurrentPageContent = pageText.length > 180 || pageContext.length > 180;
-  const hasStrongRelevantContent = Array.isArray(relevantPages) && relevantPages.some((row) => {
-    const content = String(row.text_preview || row.content || '');
-    return content.trim().length > 180 && scorePageForMessage(row, message) >= 4;
+  const useCurrentPageOnly = currentPageCanAnswer({
+    message,
+    pageTitle,
+    h1,
+    pageText,
+    pageContext
   });
 
-  if (!hasStrongCurrentPageContent && !hasStrongRelevantContent && linkCandidates.length > 0) {
-    return res.status(200).json({
-      reply: buildLinkSuggestionReply(language, linkCandidates)
-    });
+  const allowUniversalKnowledge = isUniversalQuestion(message, pageTypeHint);
+
+  let crawledRows = [];
+  let bestMatch = null;
+  let linkCandidates = [];
+
+  if (!useCurrentPageOnly && !allowUniversalKnowledge) {
+    try {
+      const { data, error } = await supabase
+        .from('site_content')
+        .select('url, page_title, meta_description, h1, headings, internal_links, text_preview')
+        .eq('agent_id', agentId);
+
+      if (!error && Array.isArray(data)) {
+        crawledRows = data;
+      }
+    } catch (e) {
+      crawledRows = [];
+    }
+
+    bestMatch = findBestCrawlMatch(crawledRows, message);
+    linkCandidates = findRelevantLinkCandidates(crawledRows, message, 2);
+
+    if (!bestMatch && linkCandidates.length > 0) {
+      return res.status(200).json({
+        reply: buildLinkSuggestionReply(language, linkCandidates)
+      });
+    }
+
+    if (bestMatch && shouldStopAfterMatch(bestMatch) && bestMatch.page?.url) {
+      linkCandidates = [
+        {
+          title: bestMatch.page.page_title || bestMatch.page.h1 || bestMatch.page.url,
+          url: bestMatch.page.url
+        }
+      ];
+    }
   }
 
   let crawlContext = '';
 
-  try {
-    const rowsToUse = Array.isArray(relevantPages) && relevantPages.length
-      ? relevantPages
-      : crawledRows.slice(0, 1);
+  if (!useCurrentPageOnly && !allowUniversalKnowledge && bestMatch) {
+    try {
+      const headingsValue = safeJsonArray(bestMatch.page.headings);
+      const linksValue = safeJsonArray(bestMatch.page.internal_links);
 
-    if (rowsToUse.length > 0) {
-      const shortRows = rowsToUse.map((row) => {
-        const headingsValue = safeJsonArray(row.headings);
-        const linksValue = safeJsonArray(row.internal_links);
-
-        const shortContent = row.text_preview
-          ? limitText(row.text_preview || '', 900)
-          : limitText(row.content || '', 1200);
-
-        return {
-          url: row.url || '',
-          page_title: row.page_title || '',
-          meta_description: row.meta_description || '',
-          h1: row.h1 || '',
+      crawlContext = JSON.stringify([
+        {
+          url: bestMatch.page.url || '',
+          page_title: bestMatch.page.page_title || '',
+          h1: bestMatch.page.h1 || '',
           headings: headingsValue.slice(0, 6),
-          internal_links: linksValue.slice(0, 6),
-          content: shortContent
-        };
-      });
-
-      crawlContext = JSON.stringify(shortRows, null, 2);
+          relevant_snippet: limitText(bestMatch.snippet || '', 700),
+          internal_links: linksValue.slice(0, 4)
+        }
+      ], null, 2);
+    } catch (e) {
+      crawlContext = '';
     }
-  } catch (e) {
-    crawlContext = '';
   }
 
   const languageLabel = getLanguageLabel(language);
   const systemPrompt = buildAdaptiveSystemPrompt(languageLabel);
+
+  const sourceMode = useCurrentPageOnly
+    ? 'current_page_only'
+    : allowUniversalKnowledge
+      ? 'general_knowledge_allowed'
+      : 'single_best_crawl_match';
 
   const userPrompt = buildUserPrompt({
     message,
@@ -1161,11 +1294,23 @@ async function handleChat(req, res, body) {
     pageUrl,
     h1,
     headings,
-    pageContext,
-    pageText,
+    pageContext: useCurrentPageOnly ? pageContext : '',
+    pageText: useCurrentPageOnly ? pageText : '',
     crawlContext,
     history
-  });
+  }) + `
+
+Source mode:
+${sourceMode}
+
+Extra answering rules:
+- If Source mode is current_page_only, answer from the current page content first.
+- If Source mode is general_knowledge_allowed, you may answer from general knowledge without using crawled site data.
+- If Source mode is single_best_crawl_match, use only the provided relevant snippet or link context and do not assume more than what is shown.
+- Never expand to unrelated pages or unrelated topics.
+- If one relevant crawl match is already enough, stop there.
+- Keep the answer concise and directly relevant to the user's question.
+`;
 
   try {
     const openaiRes = await fetch('https://api.openai.com/v1/responses', {
