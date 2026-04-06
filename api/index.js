@@ -565,7 +565,9 @@ RULES:
 - Prioritize relevant content from the current page and site data
 - Do not invent facts, links, or information
 - If exact information is not available, guide the user to the most relevant page or topic
-- Keep answers short, clear, and useful (max ~150 words)
+- Keep answers short, clear, and useful max ~150 words
+- If a user repeats the same question several times, do not repeat the full answer again
+- In repeated-question cases, reply very briefly and tell the user to look above
 - If a question is unrelated to this website’s content or asks for unsafe, harmful, illegal, or technical instructions, politely refuse and redirect the user to questions about this website.
 - Answer in ${languageLabel}
 
@@ -655,6 +657,43 @@ function buildLinkSuggestionReply(language, candidates) {
   return `I do not have the full content for that topic here, but there are relevant pages on the website:\n- ${items[0].title} – ${items[0].url}\n- ${items[1].title} – ${items[1].url}`;
 }
 
+function normalizeQuestionForRepeat(value) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function countRecentRepeatedUserQuestions(history, message) {
+  const normalizedMessage = normalizeQuestionForRepeat(message);
+  if (!normalizedMessage) return 0;
+
+  let count = 0;
+
+  for (const item of history || []) {
+    if (item.role !== 'user') continue;
+
+    const normalizedHistoryMessage = normalizeQuestionForRepeat(item.content);
+    if (!normalizedHistoryMessage) continue;
+
+    if (normalizedHistoryMessage === normalizedMessage) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function buildRepeatedQuestionReply(language) {
+  const lang = String(language || 'en').toLowerCase();
+
+  if (lang.startsWith('de')) return 'Schon beantwortet — oben schauen.';
+  if (lang.startsWith('hr')) return 'Već odgovoreno — pogledaj iznad.';
+  if (lang.startsWith('it')) return 'Già risposto — guarda sopra.';
+  return 'Already answered — look above.';
+}
+
 // ========================================
 // CHAT HELPERS - END
 // ========================================
@@ -726,7 +765,7 @@ function scoreLinkMatch(link, message) {
   return score;
 }
 
-function pickRelevantCrawledPages(rows, message, limit = 3) {
+function pickRelevantCrawledPages(rows, message, limit = 1) {
   const scored = (rows || [])
     .map((row) => ({
       ...row,
@@ -740,7 +779,7 @@ function pickRelevantCrawledPages(rows, message, limit = 3) {
   return scored.slice(0, limit);
 }
 
-function findRelevantLinkCandidates(rows, message, limit = 3) {
+function findRelevantLinkCandidates(rows, message, limit = 2) {
   const matches = [];
 
   for (const row of rows || []) {
@@ -1022,6 +1061,15 @@ async function handleChat(req, res, body) {
     return res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
   }
 
+  const repeatedCount = countRecentRepeatedUserQuestions(history, message);
+
+  // Treći put isto pitanje -> bez OpenAI poziva
+  if (repeatedCount >= 2) {
+    return res.status(200).json({
+      reply: buildRepeatedQuestionReply(language)
+    });
+  }
+
   const accessCheck = await getAgentWithAccess(agentId);
 
   if (!accessCheck.agent) {
@@ -1053,12 +1101,12 @@ async function handleChat(req, res, body) {
     crawledRows = [];
   }
 
-  const relevantPages = pickRelevantCrawledPages(crawledRows, message, 3);
-  const linkCandidates = findRelevantLinkCandidates(crawledRows, message, 3);
+  const relevantPages = pickRelevantCrawledPages(crawledRows, message, 1);
+  const linkCandidates = findRelevantLinkCandidates(crawledRows, message, 2);
 
   const hasStrongCurrentPageContent = pageText.length > 180 || pageContext.length > 180;
   const hasStrongRelevantContent = Array.isArray(relevantPages) && relevantPages.some((row) => {
-    const content = String(row.content || row.text_preview || '');
+    const content = String(row.text_preview || row.content || '');
     return content.trim().length > 180 && scorePageForMessage(row, message) >= 4;
   });
 
@@ -1073,22 +1121,25 @@ async function handleChat(req, res, body) {
   try {
     const rowsToUse = Array.isArray(relevantPages) && relevantPages.length
       ? relevantPages
-      : crawledRows.slice(0, 3);
+      : crawledRows.slice(0, 1);
 
     if (rowsToUse.length > 0) {
       const shortRows = rowsToUse.map((row) => {
         const headingsValue = safeJsonArray(row.headings);
         const linksValue = safeJsonArray(row.internal_links);
 
+        const shortContent = row.text_preview
+          ? limitText(row.text_preview || '', 900)
+          : limitText(row.content || '', 1200);
+
         return {
           url: row.url || '',
           page_title: row.page_title || '',
           meta_description: row.meta_description || '',
           h1: row.h1 || '',
-          headings: headingsValue.slice(0, 8),
-          internal_links: linksValue.slice(0, 12),
-          text_preview: limitText(row.text_preview || '', 1000),
-          content: limitText(row.content || '', 2500)
+          headings: headingsValue.slice(0, 6),
+          internal_links: linksValue.slice(0, 6),
+          content: shortContent
         };
       });
 
