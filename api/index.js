@@ -567,7 +567,6 @@ PRILAGODI SVOJU ULOGU PREMA TIPU STRANICE:
 - Ako je stranica vijesti → ti si informativni analitičar koji jasno i neutralno objašnjava informacije.
 
 KORISTI:
-Koristi:
 - sadržaj stranice
 - podatke iz crawla
 - svoje opće znanje 
