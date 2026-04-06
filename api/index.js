@@ -686,11 +686,10 @@ const meta = String(page.meta_description || '').toLowerCase();
 const h1 = String(page.h1 || '').toLowerCase();
 const headings = safeJsonArray(page.headings).join(' ').toLowerCase();
 const links = safeJsonArray(page.internal_links)
-  .map(link => String(link || '').trim())
-  .filter(Boolean)
+  .map((link) => ((link && link.text) || '') + ' ' + ((link && link.href) || ''))
   .join(' ')
   .toLowerCase();
-  const content = String(page.content || page.text_preview || '').toLowerCase();
+const content = '';
 
   let score = 0;
   const words = text.split(/\s+/).filter(Boolean);
