@@ -569,18 +569,6 @@ RULES:
 - If a question is unrelated to this website’s content or asks for unsafe, harmful, illegal, or technical instructions, politely refuse and redirect the user to questions about this website.
 - Answer in ${languageLabel}
 
-Use this priority:
-1. Current page content
-2. General knowledge for common, well-known questions
-3. Crawled site data only if needed
-
-When using crawled site data:
-- first look for a direct title, URL, or link match
-- if one strong match is found, stop there
-- use only one best match
-- prefer a short relevant snippet over full page text
-- never expand to multiple unrelated pages
-
 STYLE:
 - Natural, confident, and helpful
 - Give a direct answer first, then optional guidance
@@ -1034,14 +1022,6 @@ async function handleChat(req, res, body) {
     return res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
   }
 
-  const repeatedCount = countRecentRepeatedUserQuestions(history, message);
-
-  if (repeatedCount >= 2) {
-    return res.status(200).json({
-      reply: buildRepeatedQuestionReply(language)
-    });
-  }
-
   const accessCheck = await getAgentWithAccess(agentId);
 
   if (!accessCheck.agent) {
@@ -1058,184 +1038,68 @@ async function handleChat(req, res, body) {
     });
   }
 
-  // ----------------------------------------
-  // Local helpers for lightweight crawl search
-  // ----------------------------------------
+  let crawledRows = [];
 
-  function normalizeSearchText(value) {
-    return cleanText(value)
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
+  try {
+    const { data, error } = await supabase
+      .from('site_content')
+      .select('url, page_title, meta_description, h1, headings, internal_links, text_preview, content')
+      .eq('agent_id', agentId);
 
-  function getSearchWords(value) {
-    return normalizeSearchText(value)
-      .split(/\s+/)
-      .filter(Boolean)
-      .filter((word) => word.length >= 3);
-  }
-
-  function scoreField(fieldValue, words, weight) {
-    const text = normalizeSearchText(fieldValue || '');
-    if (!text || !words.length) return 0;
-
-    let score = 0;
-    for (const word of words) {
-      if (text.includes(word)) score += weight;
+    if (!error && Array.isArray(data)) {
+      crawledRows = data;
     }
-    return score;
+  } catch (e) {
+    crawledRows = [];
   }
 
-  function findExactLinkMatch(rows, queryText) {
-    const phrase = normalizeSearchText(queryText);
-    if (!phrase) return null;
+  const relevantPages = pickRelevantCrawledPages(crawledRows, message, 3);
+  const linkCandidates = findRelevantLinkCandidates(crawledRows, message, 3);
 
-    const candidates = [];
+  const hasStrongCurrentPageContent = pageText.length > 180 || pageContext.length > 180;
+  const hasStrongRelevantContent = Array.isArray(relevantPages) && relevantPages.some((row) => {
+    const content = String(row.content || row.text_preview || '');
+    return content.trim().length > 180 && scorePageForMessage(row, message) >= 4;
+  });
 
-    for (const row of rows || []) {
-      const titleScore =
-        (normalizeSearchText(row.page_title || '').includes(phrase) ? 100 : 0) +
-        (normalizeSearchText(row.h1 || '').includes(phrase) ? 90 : 0) +
-        (normalizeSearchText(row.url || '').includes(phrase) ? 80 : 0);
-
-      if (titleScore > 0 && row.url) {
-        candidates.push({
-          title: row.page_title || row.h1 || row.url,
-          url: row.url,
-          score: titleScore
-        });
-      }
-
-      const links = safeJsonArray(row.internal_links);
-      for (const link of links) {
-        const linkText = normalizeSearchText(link?.text || '');
-        const linkHref = normalizeSearchText(link?.href || '');
-        const score =
-          (linkText.includes(phrase) ? 95 : 0) +
-          (linkHref.includes(phrase) ? 85 : 0);
-
-        if (score > 0 && link?.href) {
-          candidates.push({
-            title: link?.text || link?.href,
-            url: link?.href,
-            score
-          });
-        }
-      }
-    }
-
-    if (!candidates.length) return null;
-
-    candidates.sort((a, b) => b.score - a.score);
-    return candidates[0];
+  if (!hasStrongCurrentPageContent && !hasStrongRelevantContent && linkCandidates.length > 0) {
+    return res.status(200).json({
+      reply: buildLinkSuggestionReply(language, linkCandidates)
+    });
   }
-
-  function findBestPageMatch(rows, queryText) {
-    const words = getSearchWords(queryText);
-    if (!words.length) return null;
-
-    let best = null;
-
-    for (const row of rows || []) {
-      const score =
-        scoreField(row.page_title || '', words, 10) +
-        scoreField(row.h1 || '', words, 9) +
-        scoreField(safeJsonArray(row.headings).join(' '), words, 5) +
-        scoreField(row.text_preview || '', words, 6);
-
-      if (!best || score > best.score) {
-        best = {
-          page: row,
-          score
-        };
-      }
-    }
-
-    if (!best || best.score <= 0) return null;
-    return best;
-  }
-
-  function currentPageLooksEnough() {
-    return String(pageText || pageContext || '').trim().length > 180;
-  }
-
-  function looksGeneralQuestion(text) {
-    const q = normalizeSearchText(text);
-
-    const starters = [
-      'sta je ', 'što je ', 'kako ', 'objasni ',
-      'what is ', 'how ', 'explain ',
-      'was ist ', 'wie ',
-      'come ', 'cos e ', 'cos è '
-    ];
-
-    return starters.some((item) => q.startsWith(item));
-  }
-
-  // ----------------------------------------
-  // Source selection
-  // ----------------------------------------
-
-  const useCurrentPageOnly = currentPageLooksEnough();
-  const allowGeneralKnowledge = looksGeneralQuestion(message);
 
   let crawlContext = '';
 
-  if (!useCurrentPageOnly) {
-    let crawledRows = [];
+  try {
+    const rowsToUse = Array.isArray(relevantPages) && relevantPages.length
+      ? relevantPages
+      : crawledRows.slice(0, 3);
 
-    try {
-      const { data, error } = await supabase
-        .from('site_content')
-        .select('url, page_title, h1, headings, text_preview, internal_links')
-        .eq('agent_id', agentId);
+    if (rowsToUse.length > 0) {
+      const shortRows = rowsToUse.map((row) => {
+        const headingsValue = safeJsonArray(row.headings);
+        const linksValue = safeJsonArray(row.internal_links);
 
-      if (!error && Array.isArray(data)) {
-        crawledRows = data;
-      }
-    } catch (e) {
-      crawledRows = [];
-    }
-
-    // 1) First try direct title / URL / link match and stop immediately
-    const exactMatch = findExactLinkMatch(crawledRows, message);
-
-    if (exactMatch) {
-      return res.status(200).json({
-        reply: `Na stranici imaš traženi sadržaj:\n👉 ${exactMatch.title}\n${exactMatch.url}`
+        return {
+          url: row.url || '',
+          page_title: row.page_title || '',
+          meta_description: row.meta_description || '',
+          h1: row.h1 || '',
+          headings: headingsValue.slice(0, 8),
+          internal_links: linksValue.slice(0, 12),
+          text_preview: limitText(row.text_preview || '', 1000),
+          content: limitText(row.content || '', 2500)
+        };
       });
-    }
 
-    // 2) Otherwise choose only ONE best page match
-    const bestMatch = findBestPageMatch(crawledRows, message);
-
-    if (bestMatch && bestMatch.page) {
-      crawlContext = JSON.stringify([
-        {
-          url: bestMatch.page.url || '',
-          page_title: bestMatch.page.page_title || '',
-          h1: bestMatch.page.h1 || '',
-          headings: safeJsonArray(bestMatch.page.headings).slice(0, 8),
-          text_preview: limitText(bestMatch.page.text_preview || '', 350)
-        }
-      ], null, 2);
-    } else if (!allowGeneralKnowledge) {
-      return res.status(200).json({
-        reply: 'Trenutno nemam jasan rezultat za to pitanje na ovoj stranici.'
-      });
+      crawlContext = JSON.stringify(shortRows, null, 2);
     }
+  } catch (e) {
+    crawlContext = '';
   }
 
   const languageLabel = getLanguageLabel(language);
   const systemPrompt = buildAdaptiveSystemPrompt(languageLabel);
-
-  const sourceMode = useCurrentPageOnly
-    ? 'current_page_only'
-    : allowGeneralKnowledge && !crawlContext
-      ? 'general_knowledge_allowed'
-      : 'single_best_crawl_page';
 
   const userPrompt = buildUserPrompt({
     message,
@@ -1246,26 +1110,11 @@ async function handleChat(req, res, body) {
     pageUrl,
     h1,
     headings,
-    pageContext: useCurrentPageOnly ? pageContext : '',
-    pageText: useCurrentPageOnly ? pageText : '',
+    pageContext,
+    pageText,
     crawlContext,
     history
-  }) + `
-
-Source mode:
-${sourceMode}
-
-Extra answering rules:
-- Use the current page first whenever it already contains the answer.
-- If the question is general and does not depend on this website, you may answer from general knowledge.
-- If using crawled site data, use only the single provided best matching page.
-- Use only page title, H1, section headings, and short preview text from that page.
-- Do not assume access to full crawled page content.
-- Do not expand to multiple pages.
-- Do not use unrelated page information.
-- Keep the answer concise and directly relevant.
-- Include the relevant page link when it helps the user.
-`;
+  });
 
   try {
     const openaiRes = await fetch('https://api.openai.com/v1/responses', {
