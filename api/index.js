@@ -1045,7 +1045,7 @@ async function handleChat(req, res, body) {
     return res.status(403).json({
       error: 'TRIAL_EXPIRED',
       code: accessCheck.reason || 'ACCESS_DENIED',
-      message: 'Trial ili pretplata nisu aktivni. Aktivirajte plan za nastavak korištenja.'
+      message: 'Subscription expired.'
     });
   }
 
