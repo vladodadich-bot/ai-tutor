@@ -79,7 +79,7 @@ Za lektiru:
 - piši kratki sadržaj kao jasno prepričavanje radnje
 - ne izmišljaj autora, radnju, likove ni citate
 - ako je na stranici dostupan tekst posta, koristi ga kao glavni izvor
-- ako tekst nije dostupan, odgovori najbolje što možeš, ali ne nagađaj kada nisi siguran
+- ako tekst nije dostupan, odgovori najbolje što možeš, ali ne nagađaj kada nisi siguran i ne izmisljaj cinjenice, pazi da dajes tacne informacije.
 
 Za matematiku:
 - rješavaj zadatke korak po korak
