@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -369,133 +369,134 @@
         font-size: 15px;
       }
     }
+
     .sm-header-brand{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  min-width:0;
-}
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-width:0;
+    }
 
-.sm-title-wrap{
-  display:flex;
-  flex-direction:column;
-  min-width:0;
-}
+    .sm-title-wrap{
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+    }
 
-.sm-face{
-  width:52px;
-  height:52px;
-  min-width:52px;
-  border-radius:14px;
-  position:relative;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  overflow:hidden;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05)),
-    linear-gradient(135deg, #0b1220, #182435 60%, #0a101a);
-  border:1px solid rgba(255,255,255,0.14);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.06),
-    0 8px 20px rgba(0,0,0,0.24);
-}
+    .sm-face{
+      width:52px;
+      height:52px;
+      min-width:52px;
+      border-radius:14px;
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05)),
+        linear-gradient(135deg, #0b1220, #182435 60%, #0a101a);
+      border:1px solid rgba(255,255,255,0.14);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.06),
+        0 8px 20px rgba(0,0,0,0.24);
+    }
 
-.sm-face::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  background:
-    radial-gradient(circle at 30% 25%, rgba(255,255,255,0.10), transparent 35%),
-    radial-gradient(circle at 75% 75%, rgba(56,189,248,0.10), transparent 30%);
-  pointer-events:none;
-}
+    .sm-face::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(circle at 30% 25%, rgba(255,255,255,0.10), transparent 35%),
+        radial-gradient(circle at 75% 75%, rgba(56,189,248,0.10), transparent 30%);
+      pointer-events:none;
+    }
 
-.sm-eyes{
-  position:relative;
-  z-index:1;
-  display:flex;
-  align-items:center;
-  gap:5px;
-}
+    .sm-eyes{
+      position:relative;
+      z-index:1;
+      display:flex;
+      align-items:center;
+      gap:5px;
+    }
 
-.sm-eye{
-  width:16px;
-  height:22px;
-  border-radius:4px;
-  background:linear-gradient(180deg, #b8ecff 0%, #66d9ff 45%, #2ebcff 100%);
-  box-shadow:
-    0 0 10px rgba(56,189,248,0.35),
-    0 0 18px rgba(56,189,248,0.18),
-    inset 0 1px 0 rgba(255,255,255,0.45);
-  transition:
-    height 0.14s ease,
-    transform 0.22s ease,
-    opacity 0.22s ease,
-    border-radius 0.22s ease;
-  transform-origin:center center;
-}
-.sm-face::after{
-  content:"";
-  position:absolute;
-  left:50%;
-  bottom:5px;
-  transform:translateX(-50%);
-  width:10px;
-  height:4px;
-  border-radius:0 0 6px 6px;
-  border-bottom:2px solid rgba(140, 225, 255, 0.9);
-  opacity:0.9;
-  z-index:1;
-  box-shadow:0 0 6px rgba(56,189,248,0.18);
-}
-/* blink */
-.sm-face.sm-blink .sm-eye{
-  height:4px;
-  border-radius:6px;
-}
+    .sm-eye{
+      width:16px;
+      height:22px;
+      border-radius:4px;
+      background:linear-gradient(180deg, #b8ecff 0%, #66d9ff 45%, #2ebcff 100%);
+      box-shadow:
+        0 0 10px rgba(56,189,248,0.35),
+        0 0 18px rgba(56,189,248,0.18),
+        inset 0 1px 0 rgba(255,255,255,0.45);
+      transition:
+        height 0.14s ease,
+        transform 0.22s ease,
+        opacity 0.22s ease,
+        border-radius 0.22s ease;
+      transform-origin:center center;
+    }
 
-/* thinking / slight tilt */
-.sm-face.sm-think-1 .sm-eye-left{
-  transform:rotate(-10deg) translateY(1px);
-}
+    .sm-face::after{
+      content:"";
+      position:absolute;
+      left:50%;
+      bottom:5px;
+      transform:translateX(-50%);
+      width:10px;
+      height:4px;
+      border-radius:0 0 6px 6px;
+      border-bottom:2px solid rgba(140, 225, 255, 0.9);
+      opacity:0.9;
+      z-index:1;
+      box-shadow:0 0 6px rgba(56,189,248,0.18);
+    }
 
-.sm-face.sm-think-1 .sm-eye-right{
-  transform:rotate(10deg) translateY(1px);
-}
+    .sm-face.sm-blink .sm-eye{
+      height:4px;
+      border-radius:6px;
+    }
 
-.sm-face.sm-think-2 .sm-eye-left{
-  transform:rotate(-16deg) translateY(2px) scaleY(0.92);
-}
+    .sm-face.sm-think-1 .sm-eye-left{
+      transform:rotate(-10deg) translateY(1px);
+    }
 
-.sm-face.sm-think-2 .sm-eye-right{
-  transform:rotate(16deg) translateY(2px) scaleY(0.92);
-}
+    .sm-face.sm-think-1 .sm-eye-right{
+      transform:rotate(10deg) translateY(1px);
+    }
 
-.sm-face.sm-think-3 .sm-eye-left{
-  transform:skewY(-8deg) translateY(1px);
-}
+    .sm-face.sm-think-2 .sm-eye-left{
+      transform:rotate(-16deg) translateY(2px) scaleY(0.92);
+    }
 
-.sm-face.sm-think-3 .sm-eye-right{
-  transform:skewY(8deg) translateY(1px);
-}
+    .sm-face.sm-think-2 .sm-eye-right{
+      transform:rotate(16deg) translateY(2px) scaleY(0.92);
+    }
 
-@media (max-width: 480px){
-  .sm-face{
-    width:48px;
-    height:48px;
-    min-width:48px;
-  }
+    .sm-face.sm-think-3 .sm-eye-left{
+      transform:skewY(-8deg) translateY(1px);
+    }
 
-  .sm-eye{
-    width:14px;
-    height:21px;
-  }
+    .sm-face.sm-think-3 .sm-eye-right{
+      transform:skewY(8deg) translateY(1px);
+    }
 
-  .sm-header-brand{
-    gap:10px;
-  }
-}
+    @media (max-width: 480px){
+      .sm-face{
+        width:48px;
+        height:48px;
+        min-width:48px;
+      }
+
+      .sm-eye{
+        width:14px;
+        height:21px;
+      }
+
+      .sm-header-brand{
+        gap:10px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -538,609 +539,646 @@
   </form>
 </div>
 
-  <script>
-    (function () {
-      "use strict";
+<script>
+(function () {
+  "use strict";
 
-      var API_BASE = "https://ai-tutor-rouge-theta.vercel.app/api/index";
-      var REQUEST_TIMEOUT = 30000;
-      var MAX_HISTORY_ITEMS = 10;
-      var HISTORY_EXPIRY_MS = 45 * 60 * 1000;
+  var API_BASE = "https://ai-tutor-rouge-theta.vercel.app/api/index";
+  var REQUEST_TIMEOUT = 30000;
+  var MAX_HISTORY_ITEMS = 10;
+  var HISTORY_EXPIRY_MS = 45 * 60 * 1000;
 
-      var chatForm = document.getElementById("chatForm");
-      var chatInput = document.getElementById("chatInput");
-      var chatSend = document.getElementById("chatSend");
-      var chatMessages = document.getElementById("chatMessages");
-      var chatStatus = document.getElementById("chatStatus");
-      var chatTitle = document.getElementById("chatTitle");
-      var chatSubtitle = document.getElementById("chatSubtitle");
-      var chatHeader = document.getElementById("chatHeader");
-      var chatClose = document.getElementById("chatClose");
+  var chatForm = document.getElementById("chatForm");
+  var chatInput = document.getElementById("chatInput");
+  var chatSend = document.getElementById("chatSend");
+  var chatMessages = document.getElementById("chatMessages");
+  var chatStatus = document.getElementById("chatStatus");
+  var chatTitle = document.getElementById("chatTitle");
+  var chatSubtitle = document.getElementById("chatSubtitle");
+  var chatHeader = document.getElementById("chatHeader");
+  var chatClose = document.getElementById("chatClose");
 
-      var params = new URLSearchParams(window.location.search);
-      var agentId = params.get("agentId") || "demo-agent";
-      var initialLang = params.get("lang") || "en";
+  var params = new URLSearchParams(window.location.search);
+  var agentId = params.get("agentId") || "demo-agent";
 
-      var pageData = {
-        pageTitle: "",
-        pageDescription: "",
-        pageUrl: "",
-        pageContext: "",
-        pageText: "",
-        h1: "",
-        headings: [],
-        language: initialLang,
-        pageTypeHint: "general"
-      };
+  function normalizeLang(value) {
+    var lang = String(value || "").toLowerCase().trim();
 
-      var agentData = {
-        agentId: agentId,
-        agentName: "SiteMind AI",
-        welcomeMessage: "",
-        themeColor: "#22d3ee"
-      };
+    if (!lang) return "en";
+    if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
+    if (lang.indexOf("de") === 0) return "de";
+    if (lang.indexOf("it") === 0) return "it";
+    if (lang.indexOf("en") === 0) return "en";
 
-      var isSending = false;
-      var activeController = null;
+    return "en";
+  }
 
-      var UI_TEXT = {
-        hr: {
-          subtitleDefault: "Pitaj AI asistenta",
-          inputPlaceholder: "Napiši pitanje...",
-          send: "Pošalji",
-          sending: "...",
-          loading: "Samo trenutak...",
-          streaming: "AI odgovara...",
-          errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
-          errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
-          welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
-          askPage: "Pitaj AI o: ",
-          closeAria: "Zatvori chat",
-          openStatus: ""
+  var initialLang = normalizeLang(
+    params.get("lang") ||
+    document.documentElement.getAttribute("lang") ||
+    (navigator.language || navigator.userLanguage || "en")
+  );
+
+  var pageData = {
+    pageTitle: "",
+    pageDescription: "",
+    pageUrl: "",
+    pageContext: "",
+    pageText: "",
+    h1: "",
+    headings: [],
+    language: initialLang,
+    pageTypeHint: "general"
+  };
+
+  var agentData = {
+    agentId: agentId,
+    agentName: "SiteMind AI",
+    welcomeMessage: "",
+    themeColor: "#22d3ee"
+  };
+
+  var isSending = false;
+  var activeController = null;
+
+  var UI_TEXT = {
+    hr: {
+      subtitleDefault: "Pitaj AI asistenta",
+      inputPlaceholder: "Napiši pitanje...",
+      send: "Pošalji",
+      sending: "...",
+      loading: "Samo trenutak...",
+      streaming: "AI odgovara...",
+      errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
+      errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
+      welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
+      askPage: "Pitaj AI o: ",
+      closeAria: "Zatvori chat",
+      openStatus: ""
+    },
+    de: {
+      subtitleDefault: "Frag den KI-Assistenten",
+      inputPlaceholder: "Schreibe eine Frage...",
+      send: "Senden",
+      sending: "...",
+      loading: "Einen Moment...",
+      streaming: "KI antwortet...",
+      errorGeneric: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+      errorTimeout: "Die Anfrage hat zu lange gedauert. Versuche eine kürzere Frage.",
+      welcome: "Hallo! Ich kann dir mit dem Inhalt dieser Seite, Services, Produkten oder allgemeinen Fragen helfen.",
+      askPage: "Frage die KI zu: ",
+      closeAria: "Chat schließen",
+      openStatus: ""
+    },
+    it: {
+      subtitleDefault: "Chiedi all'assistente AI",
+      inputPlaceholder: "Scrivi una domanda...",
+      send: "Invia",
+      sending: "...",
+      loading: "Un momento...",
+      streaming: "L'AI sta rispondendo...",
+      errorGeneric: "Si è verificato un errore. Riprova.",
+      errorTimeout: "La richiesta ha richiesto troppo tempo. Prova con una domanda più breve.",
+      welcome: "Ciao! Posso aiutarti con il contenuto di questa pagina, servizi, prodotti o domande generali.",
+      askPage: "Chiedi all'AI di: ",
+      closeAria: "Chiudi chat",
+      openStatus: ""
+    },
+    en: {
+      subtitleDefault: "Ask AI Agent",
+      inputPlaceholder: "Type a question...",
+      send: "Send",
+      sending: "...",
+      loading: "One moment...",
+      streaming: "AI is replying...",
+      errorGeneric: "Something went wrong. Please try again.",
+      errorTimeout: "The request took too long. Try a shorter question.",
+      welcome: "Hello! I can help with this page, services, products, or general questions.",
+      askPage: "Ask AI about: ",
+      closeAria: "Close chat",
+      openStatus: ""
+    }
+  };
+
+  function detectPreferredLang() {
+    return normalizeLang(
+      pageData.language ||
+      params.get("lang") ||
+      document.documentElement.getAttribute("lang") ||
+      (navigator.language || navigator.userLanguage || "en")
+    );
+  }
+
+  function getLang() {
+    return detectPreferredLang();
+  }
+
+  function t(key) {
+    var lang = getLang();
+    return (UI_TEXT[lang] && UI_TEXT[lang][key]) || UI_TEXT.en[key] || "";
+  }
+
+  function getLocalizedWelcomeMessage() {
+    var lang = getLang();
+
+    if (agentData.welcomeMessage && typeof agentData.welcomeMessage === "object") {
+      return (
+        agentData.welcomeMessage[lang] ||
+        agentData.welcomeMessage.en ||
+        t("welcome")
+      );
+    }
+
+    return t("welcome");
+  }
+
+  function getHistoryPayloadKey() {
+    return "sitemind_history_payload_" + agentId;
+  }
+
+  function escapeHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function cleanText(value) {
+    return String(value || "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function truncateText(value, max) {
+    var text = cleanText(value);
+    if (text.length <= max) return text;
+    return text.slice(0, max);
+  }
+
+  function notifyParentClose() {
+    if (window.parent && window.parent !== window) {
+      try {
+        window.parent.postMessage(
+          {
+            type: "sitemind-close-widget",
+            agentId: agentId
+          },
+          "*"
+        );
+      } catch (e) {}
+    }
+  }
+
+  function requestPageContextRefresh() {
+    if (window.parent && window.parent !== window) {
+      try {
+        window.parent.postMessage(
+          {
+            type: "sitemind-refresh-page-context",
+            agentId: agentId
+          },
+          "*"
+        );
+      } catch (e) {}
+    }
+  }
+
+  function setStatus(text) {
+    chatStatus.textContent = text || "";
+  }
+
+  function autoResizeTextarea() {
+    chatInput.style.height = "auto";
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + "px";
+  }
+
+  function scrollToBottom() {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function updateUiLanguage() {
+    var lang = getLang();
+
+    document.documentElement.setAttribute("lang", lang);
+    chatInput.placeholder = t("inputPlaceholder");
+    chatSend.textContent = isSending ? t("sending") : t("send");
+    chatClose.setAttribute("aria-label", t("closeAria"));
+
+    if (pageData.pageTitle) {
+      chatSubtitle.textContent = t("askPage") + pageData.pageTitle;
+    } else {
+      chatSubtitle.textContent = t("subtitleDefault");
+    }
+  }
+
+  function setLoading(loading) {
+    isSending = !!loading;
+    chatSend.disabled = loading;
+    chatInput.disabled = loading;
+    chatSend.textContent = loading ? t("sending") : t("send");
+    setStatus(loading ? t("loading") : "");
+  }
+
+  function normalizeHistory(history) {
+    if (!Array.isArray(history)) return [];
+
+    return history
+      .map(function (item) {
+        return {
+          role: item && item.role === "assistant" ? "assistant" : "user",
+          content: truncateText(item && item.content ? item.content : "", 1200)
+        };
+      })
+      .filter(function (item) {
+        return item.content;
+      })
+      .slice(-MAX_HISTORY_ITEMS);
+  }
+
+  function clearStoredHistory() {
+    try {
+      sessionStorage.removeItem(getHistoryPayloadKey());
+    } catch (e) {}
+  }
+
+  function getStoredHistory() {
+    try {
+      var raw = sessionStorage.getItem(getHistoryPayloadKey());
+      if (!raw) return [];
+
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        clearStoredHistory();
+        return [];
+      }
+
+      var savedAt = Number(parsed.savedAt || 0);
+      var history = Array.isArray(parsed.history) ? parsed.history : [];
+
+      if (!savedAt || (Date.now() - savedAt > HISTORY_EXPIRY_MS)) {
+        clearStoredHistory();
+        return [];
+      }
+
+      return normalizeHistory(history);
+    } catch (e) {
+      clearStoredHistory();
+      return [];
+    }
+  }
+
+  function saveStoredHistory(history) {
+    try {
+      var normalized = normalizeHistory(history).slice(-MAX_HISTORY_ITEMS);
+
+      sessionStorage.setItem(
+        getHistoryPayloadKey(),
+        JSON.stringify({
+          savedAt: Date.now(),
+          history: normalized
+        })
+      );
+    } catch (e) {}
+  }
+
+  function addMessage(role, text) {
+    var row = document.createElement("div");
+    row.className = "message-row " + role;
+
+    var bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+
+    row.appendChild(bubble);
+    chatMessages.appendChild(row);
+    scrollToBottom();
+
+    return row;
+  }
+
+  function updateMessage(row, text) {
+    if (!row) return;
+    var bubble = row.querySelector(".bubble");
+    if (!bubble) return;
+    bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+    scrollToBottom();
+  }
+
+  function renderStoredHistory() {
+    var history = getStoredHistory();
+    if (!history.length) return;
+
+    history.forEach(function (item) {
+      addMessage(item.role, item.content);
+    });
+
+    saveStoredHistory(history);
+  }
+
+  function renderWelcomeIfNeeded() {
+    var history = getStoredHistory();
+    if (history.length) return;
+    addMessage("assistant", getLocalizedWelcomeMessage());
+  }
+
+  function hexToRgb(hex) {
+    var cleaned = String(hex || "").replace("#", "").trim();
+    if (cleaned.length === 3) {
+      cleaned = cleaned.split("").map(function (c) { return c + c; }).join("");
+    }
+    if (cleaned.length !== 6) return null;
+
+    var num = parseInt(cleaned, 16);
+    if (isNaN(num)) return null;
+
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255
+    };
+  }
+
+  function rgbaFromHex(hex, alpha) {
+    var rgb = hexToRgb(hex);
+    if (!rgb) return "rgba(34, 211, 238, " + alpha + ")";
+    return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
+  }
+
+  function applyAgentData() {
+    var color = agentData.themeColor || "#22d3ee";
+    var glowSoft = rgbaFromHex(color, 0.10);
+
+    chatTitle.textContent = agentData.agentName || "SiteMind AI";
+
+    chatHeader.style.background =
+      "radial-gradient(circle at top right, rgba(255,255,255,0.06), transparent 24%), linear-gradient(135deg, #0b1020 0%, #111827 58%, #0f172a 100%)";
+
+    chatSend.style.background = "linear-gradient(135deg, " + color + ", #06b6d4)";
+    chatSend.style.boxShadow = "0 12px 24px " + glowSoft;
+
+    chatInput.style.borderColor = "rgba(148, 163, 184, 0.22)";
+    chatInput.onfocus = function () {
+      chatInput.style.borderColor = rgbaFromHex(color, 0.48);
+      chatInput.style.boxShadow = "0 0 0 1px " + rgbaFromHex(color, 0.12) + ", 0 0 24px " + glowSoft;
+      chatInput.style.background = "rgba(15, 23, 42, 0.96)";
+    };
+    chatInput.onblur = function () {
+      chatInput.style.borderColor = "rgba(148, 163, 184, 0.22)";
+      chatInput.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.02)";
+      chatInput.style.background = "rgba(15, 23, 42, 0.88)";
+    };
+
+    document.documentElement.style.setProperty("--user-grad-1", color);
+    document.documentElement.style.setProperty("--user-grad-2", "#06b6d4");
+
+    updateUiLanguage();
+  }
+
+  async function fetchAgentConfig() {
+    try {
+      var res = await fetch(
+        API_BASE + "?action=agent-config&agentId=" + encodeURIComponent(agentId)
+      );
+
+      if (!res.ok) return;
+
+      var data = await res.json();
+      if (!data) return;
+
+      agentData.agentId = data.agentId || agentId;
+      agentData.agentName = data.agentName || "SiteMind AI";
+      agentData.welcomeMessage = data.welcomeMessage || "";
+      agentData.themeColor = data.themeColor || "#22d3ee";
+
+      applyAgentData();
+    } catch (e) {}
+  }
+
+  function parseErrorText(text) {
+    var fallback = t("errorGeneric");
+    var raw = String(text || "").trim();
+    if (!raw) return fallback;
+
+    try {
+      var data = JSON.parse(raw);
+      if (data && typeof data === "object") {
+        if (data.details) {
+          return typeof data.details === "string"
+            ? data.details
+            : JSON.stringify(data.details);
+        }
+        if (data.message) return String(data.message);
+        if (data.error) return String(data.error);
+      }
+    } catch (e) {}
+
+    return raw.slice(0, 500);
+  }
+
+  async function sendMessageToApi(userMessage, onChunk) {
+    var history = normalizeHistory(getStoredHistory());
+
+    if (activeController) {
+      try {
+        activeController.abort();
+      } catch (e) {}
+    }
+
+    activeController = new AbortController();
+
+    var timeoutId = setTimeout(function () {
+      try {
+        activeController.abort();
+      } catch (e) {}
+    }, REQUEST_TIMEOUT);
+
+    try {
+      var response = await fetch(API_BASE, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
         },
-        de: {
-          subtitleDefault: "Frag den KI-Assistenten",
-          inputPlaceholder: "Schreibe eine Frage...",
-          send: "Senden",
-          sending: "...",
-          loading: "Einen Moment...",
-          streaming: "KI antwortet...",
-          errorGeneric: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-          errorTimeout: "Die Anfrage hat zu lange gedauert. Versuche eine kürzere Frage.",
-          welcome: "Hallo! Ich kann dir mit dem Inhalt dieser Seite, Services, Produkten oder allgemeinen Fragen helfen.",
-          askPage: "Frage die KI zu: ",
-          closeAria: "Chat schließen",
-          openStatus: ""
-        },
-        it: {
-          subtitleDefault: "Chiedi all'assistente AI",
-          inputPlaceholder: "Scrivi una domanda...",
-          send: "Invia",
-          sending: "...",
-          loading: "Un momento...",
-          streaming: "L'AI sta rispondendo...",
-          errorGeneric: "Si è verificato un errore. Riprova.",
-          errorTimeout: "La richiesta ha richiesto troppo tempo. Prova con una domanda più breve.",
-          welcome: "Ciao! Posso aiutarti con il contenuto di questa pagina, servizi, prodotti o domande generali.",
-          askPage: "Chiedi all'AI di: ",
-          closeAria: "Chiudi chat",
-          openStatus: ""
-        },
-        en: {
-          subtitleDefault: "Ask AI Agent",
-          inputPlaceholder: "Type a question...",
-          send: "Send",
-          sending: "...",
-          loading: "One moment...",
-          streaming: "AI is replying...",
-          errorGeneric: "Something went wrong. Please try again.",
-          errorTimeout: "The request took too long. Try a shorter question.",
-          welcome: "Hello! I can help with this page, services, products, or general questions.",
-          askPage: "Ask AI about: ",
-          closeAria: "Close chat",
-          openStatus: ""
-        }
-      };
+        signal: activeController.signal,
+        body: JSON.stringify({
+          action: "chat",
+          agentId: agentId,
+          language: getLang(),
+          pageTypeHint: pageData.pageTypeHint || "general",
+          message: userMessage,
+          history: history,
+          pageTitle: pageData.pageTitle,
+          pageDescription: pageData.pageDescription,
+          pageUrl: pageData.pageUrl,
+          pageContext: pageData.pageContext,
+          pageText: pageData.pageText,
+          h1: pageData.h1,
+          headings: pageData.headings
+        })
+      });
 
-      function getLang() {
-        var lang = String(pageData.language || initialLang || "en").toLowerCase();
-        if (lang.indexOf("hr") === 0) return "hr";
-        if (lang.indexOf("de") === 0) return "de";
-        if (lang.indexOf("it") === 0) return "it";
-        return "en";
+      if (!response.ok) {
+        var errorText = await response.text();
+        throw new Error(parseErrorText(errorText));
       }
 
-      function t(key) {
-        var lang = getLang();
-        return (UI_TEXT[lang] && UI_TEXT[lang][key]) || UI_TEXT.en[key] || "";
+      if (!response.body) {
+        throw new Error("No response body received.");
       }
 
-      function getHistoryPayloadKey() {
-        return "sitemind_history_payload_" + agentId;
-      }
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var fullText = "";
 
-      function escapeHtml(str) {
-        return String(str || "")
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-      }
+      while (true) {
+        var result = await reader.read();
+        if (result.done) break;
 
-      function cleanText(value) {
-        return String(value || "")
-          .replace(/\u00A0/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-      }
+        var chunk = decoder.decode(result.value, { stream: true });
+        if (!chunk) continue;
 
-      function truncateText(value, max) {
-        var text = cleanText(value);
-        if (text.length <= max) return text;
-        return text.slice(0, max);
-      }
+        fullText += chunk;
 
-      function notifyParentClose() {
-        if (window.parent && window.parent !== window) {
-          try {
-            window.parent.postMessage(
-              {
-                type: "sitemind-close-widget",
-                agentId: agentId
-              },
-              "*"
-            );
-          } catch (e) {}
+        if (typeof onChunk === "function") {
+          onChunk(fullText);
         }
       }
 
-      function requestPageContextRefresh() {
-        if (window.parent && window.parent !== window) {
-          try {
-            window.parent.postMessage(
-              {
-                type: "sitemind-refresh-page-context",
-                agentId: agentId
-              },
-              "*"
-            );
-          } catch (e) {}
-        }
+      fullText = String(fullText || "").trim();
+
+      if (!fullText) {
+        throw new Error("No reply received.");
       }
 
-      function setStatus(text) {
-        chatStatus.textContent = text || "";
+      return fullText;
+    } finally {
+      clearTimeout(timeoutId);
+      activeController = null;
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (isSending) return;
+
+    var userMessage = cleanText(chatInput.value || "");
+    if (!userMessage) return;
+
+    addMessage("user", userMessage);
+    chatInput.value = "";
+    autoResizeTextarea();
+    setLoading(true);
+
+    var placeholder = addMessage("assistant", t("loading"));
+    var finalAnswer = "";
+
+    try {
+      setStatus(t("streaming"));
+
+      finalAnswer = await sendMessageToApi(userMessage, function (partialText) {
+        updateMessage(placeholder, partialText || t("loading"));
+      });
+
+      updateMessage(placeholder, finalAnswer);
+
+      var history = normalizeHistory(getStoredHistory());
+      history.push({ role: "user", content: userMessage });
+      history.push({ role: "assistant", content: finalAnswer });
+      saveStoredHistory(history);
+    } catch (error) {
+      var msg = t("errorGeneric");
+
+      if (error && error.name === "AbortError") {
+        msg = t("errorTimeout");
+      } else if (error && error.message) {
+        msg = error.message;
       }
 
-      function autoResizeTextarea() {
-        chatInput.style.height = "auto";
-        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + "px";
-      }
+      updateMessage(placeholder, msg);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      function scrollToBottom() {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }
+  window.addEventListener("message", function (event) {
+    if (!event.data || typeof event.data !== "object") return;
 
-      function updateUiLanguage() {
-        chatInput.placeholder = t("inputPlaceholder");
-        chatSend.textContent = isSending ? t("sending") : t("send");
-        chatClose.setAttribute("aria-label", t("closeAria"));
+    if (event.data.type === "sitemind-page-context") {
+      pageData.pageTitle = truncateText(event.data.pageTitle || "", 300);
+      pageData.pageDescription = truncateText(event.data.pageDescription || "", 500);
+      pageData.pageUrl = truncateText(event.data.pageUrl || "", 500);
+      pageData.pageContext = truncateText(event.data.pageContext || "", 5000);
+      pageData.pageText = truncateText(event.data.pageText || event.data.pageContext || "", 7000);
+      pageData.h1 = truncateText(event.data.h1 || "", 300);
+      pageData.language = normalizeLang(event.data.language || initialLang || "en");
+      pageData.pageTypeHint = truncateText(event.data.pageTypeHint || "general", 50);
 
-        if (pageData.pageTitle) {
-          chatSubtitle.textContent = t("askPage") + pageData.pageTitle;
-        } else {
-          chatSubtitle.textContent = t("subtitleDefault");
-        }
-      }
-
-      function setLoading(loading) {
-        isSending = !!loading;
-        chatSend.disabled = loading;
-        chatInput.disabled = loading;
-        chatSend.textContent = loading ? t("sending") : t("send");
-        setStatus(loading ? t("loading") : "");
-      }
-
-      function normalizeHistory(history) {
-        if (!Array.isArray(history)) return [];
-
-        return history
+      if (Array.isArray(event.data.headings)) {
+        pageData.headings = event.data.headings
           .map(function (item) {
-            return {
-              role: item && item.role === "assistant" ? "assistant" : "user",
-              content: truncateText(item && item.content ? item.content : "", 1200)
-            };
+            return truncateText(item, 200);
           })
           .filter(function (item) {
-            return item.content;
+            return !!item;
           })
-          .slice(-MAX_HISTORY_ITEMS);
+          .slice(0, 12);
+      } else {
+        pageData.headings = [];
       }
 
-      function clearStoredHistory() {
-        try {
-          sessionStorage.removeItem(getHistoryPayloadKey());
-        } catch (e) {}
-      }
-
-      function getStoredHistory() {
-        try {
-          var raw = sessionStorage.getItem(getHistoryPayloadKey());
-          if (!raw) return [];
-
-          var parsed = JSON.parse(raw);
-          if (!parsed || typeof parsed !== "object") {
-            clearStoredHistory();
-            return [];
-          }
-
-          var savedAt = Number(parsed.savedAt || 0);
-          var history = Array.isArray(parsed.history) ? parsed.history : [];
-
-          if (!savedAt || (Date.now() - savedAt > HISTORY_EXPIRY_MS)) {
-            clearStoredHistory();
-            return [];
-          }
-
-          return normalizeHistory(history);
-        } catch (e) {
-          clearStoredHistory();
-          return [];
-        }
-      }
-
-      function saveStoredHistory(history) {
-        try {
-          var normalized = normalizeHistory(history).slice(-MAX_HISTORY_ITEMS);
-
-          sessionStorage.setItem(
-            getHistoryPayloadKey(),
-            JSON.stringify({
-              savedAt: Date.now(),
-              history: normalized
-            })
-          );
-        } catch (e) {}
-      }
-
-      function addMessage(role, text) {
-        var row = document.createElement("div");
-        row.className = "message-row " + role;
-
-        var bubble = document.createElement("div");
-        bubble.className = "bubble";
-        bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
-
-        row.appendChild(bubble);
-        chatMessages.appendChild(row);
-        scrollToBottom();
-
-        return row;
-      }
-
-      function updateMessage(row, text) {
-        if (!row) return;
-        var bubble = row.querySelector(".bubble");
-        if (!bubble) return;
-        bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
-        scrollToBottom();
-      }
-
-      function renderStoredHistory() {
-        var history = getStoredHistory();
-        if (!history.length) return;
-
-        history.forEach(function (item) {
-          addMessage(item.role, item.content);
-        });
-
-        saveStoredHistory(history);
-      }
-
-      function renderWelcomeIfNeeded() {
-        var history = getStoredHistory();
-        if (history.length) return;
-
-        var welcome = agentData.welcomeMessage || t("welcome");
-        addMessage("assistant", welcome);
-      }
-
-      function hexToRgb(hex) {
-        var cleaned = String(hex || "").replace("#", "").trim();
-        if (cleaned.length === 3) {
-          cleaned = cleaned.split("").map(function (c) { return c + c; }).join("");
-        }
-        if (cleaned.length !== 6) return null;
-
-        var num = parseInt(cleaned, 16);
-        if (isNaN(num)) return null;
-
-        return {
-          r: (num >> 16) & 255,
-          g: (num >> 8) & 255,
-          b: num & 255
-        };
-      }
-
-      function rgbaFromHex(hex, alpha) {
-        var rgb = hexToRgb(hex);
-        if (!rgb) return "rgba(34, 211, 238, " + alpha + ")";
-        return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
-      }
-
-      function applyAgentData() {
-        var color = agentData.themeColor || "#22d3ee";
-        var glowSoft = rgbaFromHex(color, 0.10);
-
-        chatTitle.textContent = agentData.agentName || "SiteMind AI";
-
-        chatHeader.style.background =
-          "radial-gradient(circle at top right, rgba(255,255,255,0.06), transparent 24%), linear-gradient(135deg, #0b1020 0%, #111827 58%, #0f172a 100%)";
-
-        chatSend.style.background = "linear-gradient(135deg, " + color + ", #06b6d4)";
-        chatSend.style.boxShadow = "0 12px 24px " + glowSoft;
-
-        chatInput.style.borderColor = "rgba(148, 163, 184, 0.22)";
-        chatInput.onfocus = function () {
-          chatInput.style.borderColor = rgbaFromHex(color, 0.48);
-          chatInput.style.boxShadow = "0 0 0 1px " + rgbaFromHex(color, 0.12) + ", 0 0 24px " + glowSoft;
-          chatInput.style.background = "rgba(15, 23, 42, 0.96)";
-        };
-        chatInput.onblur = function () {
-          chatInput.style.borderColor = "rgba(148, 163, 184, 0.22)";
-          chatInput.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.02)";
-          chatInput.style.background = "rgba(15, 23, 42, 0.88)";
-        };
-
-        document.documentElement.style.setProperty("--user-grad-1", color);
-        document.documentElement.style.setProperty("--user-grad-2", "#06b6d4");
-
-        updateUiLanguage();
-      }
-
-      async function fetchAgentConfig() {
-        try {
-          var res = await fetch(
-            API_BASE + "?action=agent-config&agentId=" + encodeURIComponent(agentId)
-          );
-
-          if (!res.ok) return;
-
-          var data = await res.json();
-          if (!data) return;
-
-          agentData.agentId = data.agentId || agentId;
-          agentData.agentName = data.agentName || "SiteMind AI";
-          agentData.welcomeMessage = data.welcomeMessage || "";
-          agentData.themeColor = data.themeColor || "#22d3ee";
-
-          applyAgentData();
-        } catch (e) {}
-      }
-
-      function parseErrorText(text) {
-        var fallback = t("errorGeneric");
-        var raw = String(text || "").trim();
-        if (!raw) return fallback;
-
-        try {
-          var data = JSON.parse(raw);
-          if (data && typeof data === "object") {
-            if (data.details) {
-              return typeof data.details === "string"
-                ? data.details
-                : JSON.stringify(data.details);
-            }
-            if (data.message) return String(data.message);
-            if (data.error) return String(data.error);
-          }
-        } catch (e) {}
-
-        return raw.slice(0, 500);
-      }
-
-      async function sendMessageToApi(userMessage, onChunk) {
-        var history = normalizeHistory(getStoredHistory());
-
-        if (activeController) {
-          try {
-            activeController.abort();
-          } catch (e) {}
-        }
-
-        activeController = new AbortController();
-
-        var timeoutId = setTimeout(function () {
-          try {
-            activeController.abort();
-          } catch (e) {}
-        }, REQUEST_TIMEOUT);
-
-        try {
-          var response = await fetch(API_BASE, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            signal: activeController.signal,
-            body: JSON.stringify({
-              action: "chat",
-              agentId: agentId,
-              language: getLang(),
-              pageTypeHint: pageData.pageTypeHint || "general",
-              message: userMessage,
-              history: history,
-              pageTitle: pageData.pageTitle,
-              pageDescription: pageData.pageDescription,
-              pageUrl: pageData.pageUrl,
-              pageContext: pageData.pageContext,
-              pageText: pageData.pageText,
-              h1: pageData.h1,
-              headings: pageData.headings
-            })
-          });
-
-          if (!response.ok) {
-            var errorText = await response.text();
-            throw new Error(parseErrorText(errorText));
-          }
-
-          if (!response.body) {
-            throw new Error("No response body received.");
-          }
-
-          var reader = response.body.getReader();
-          var decoder = new TextDecoder();
-          var fullText = "";
-
-          while (true) {
-            var result = await reader.read();
-            if (result.done) break;
-
-            var chunk = decoder.decode(result.value, { stream: true });
-            if (!chunk) continue;
-
-            fullText += chunk;
-
-            if (typeof onChunk === "function") {
-              onChunk(fullText);
-            }
-          }
-
-          fullText = String(fullText || "").trim();
-
-          if (!fullText) {
-            throw new Error("No reply received.");
-          }
-
-          return fullText;
-        } finally {
-          clearTimeout(timeoutId);
-          activeController = null;
-        }
-      }
-
-      async function handleSubmit(event) {
-        event.preventDefault();
-        if (isSending) return;
-
-        var userMessage = cleanText(chatInput.value || "");
-        if (!userMessage) return;
-
-        addMessage("user", userMessage);
-        chatInput.value = "";
-        autoResizeTextarea();
-        setLoading(true);
-
-        var placeholder = addMessage("assistant", t("loading"));
-        var finalAnswer = "";
-
-        try {
-          setStatus(t("streaming"));
-
-          finalAnswer = await sendMessageToApi(userMessage, function (partialText) {
-            updateMessage(placeholder, partialText || t("loading"));
-          });
-
-          updateMessage(placeholder, finalAnswer);
-
-          var history = normalizeHistory(getStoredHistory());
-          history.push({ role: "user", content: userMessage });
-          history.push({ role: "assistant", content: finalAnswer });
-          saveStoredHistory(history);
-        } catch (error) {
-          var msg = t("errorGeneric");
-
-          if (error && error.name === "AbortError") {
-            msg = t("errorTimeout");
-          } else if (error && error.message) {
-            msg = error.message;
-          }
-
-          updateMessage(placeholder, msg);
-        } finally {
-          setLoading(false);
-    
-        }
-      }
-
-      window.addEventListener("message", function (event) {
-        if (!event.data || typeof event.data !== "object") return;
-
-        if (event.data.type === "sitemind-page-context") {
-          pageData.pageTitle = truncateText(event.data.pageTitle || "", 300);
-          pageData.pageDescription = truncateText(event.data.pageDescription || "", 500);
-          pageData.pageUrl = truncateText(event.data.pageUrl || "", 500);
-          pageData.pageContext = truncateText(event.data.pageContext || "", 5000);
-          pageData.pageText = truncateText(event.data.pageText || event.data.pageContext || "", 7000);
-          pageData.h1 = truncateText(event.data.h1 || "", 300);
-          pageData.language = truncateText(event.data.language || initialLang || "en", 20);
-          pageData.pageTypeHint = truncateText(event.data.pageTypeHint || "general", 50);
-
-          if (Array.isArray(event.data.headings)) {
-            pageData.headings = event.data.headings
-              .map(function (item) {
-                return truncateText(item, 200);
-              })
-              .filter(function (item) {
-                return !!item;
-              })
-              .slice(0, 12);
-          } else {
-            pageData.headings = [];
-          }
-
-          updateUiLanguage();
-        }
-
-        if (event.data.type === "sitemind-agent-config") {
-          agentData.agentId = event.data.agentId || agentId;
-          agentData.agentName = event.data.agentName || "SiteMind AI";
-          agentData.welcomeMessage = event.data.welcomeMessage || "";
-          agentData.themeColor = event.data.themeColor || "#22d3ee";
-          applyAgentData();
-        }
-      });
-
-      chatForm.addEventListener("submit", handleSubmit);
-      chatInput.addEventListener("input", autoResizeTextarea);
-
-      chatInput.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          handleSubmit(event);
-        }
-      });
-
-      chatClose.addEventListener("click", function () {
-        notifyParentClose();
-      });
-
-      renderStoredHistory();
       updateUiLanguage();
+    }
+
+    if (event.data.type === "sitemind-agent-config") {
+      agentData.agentId = event.data.agentId || agentId;
+      agentData.agentName = event.data.agentName || "SiteMind AI";
+      agentData.welcomeMessage = event.data.welcomeMessage || "";
+      agentData.themeColor = event.data.themeColor || "#22d3ee";
       applyAgentData();
-      autoResizeTextarea();
+    }
+  });
 
-      fetchAgentConfig().finally(function () {
-        renderWelcomeIfNeeded();
-      });
+  chatForm.addEventListener("submit", handleSubmit);
+  chatInput.addEventListener("input", autoResizeTextarea);
 
-      requestPageContextRefresh();
+  chatInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      handleSubmit(event);
+    }
+  });
 
-      if (window.parent && window.parent !== window) {
-        try {
-          window.parent.postMessage(
-            {
-              type: "sitemind-widget-ready",
-              agentId: agentId
-            },
-            "*"
-          );
-        } catch (e) {}
-      }
-    })();
-  </script>
+  chatClose.addEventListener("click", function () {
+    notifyParentClose();
+  });
+
+  renderStoredHistory();
+  updateUiLanguage();
+  applyAgentData();
+  autoResizeTextarea();
+
+  fetchAgentConfig().finally(function () {
+    renderWelcomeIfNeeded();
+  });
+
+  requestPageContextRefresh();
+
+  if (window.parent && window.parent !== window) {
+    try {
+      window.parent.postMessage(
+        {
+          type: "sitemind-widget-ready",
+          agentId: agentId
+        },
+        "*"
+      );
+    } catch (e) {}
+  }
+})();
+</script>
+
 <script>
 (function () {
   const face = document.getElementById('smFace');
