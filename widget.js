@@ -36,7 +36,7 @@
         border-radius: 18px;
         padding: 18px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-        color: #1f2d3d;
+        color: #ffffff;
       }
 
       .header {
@@ -47,8 +47,8 @@
         display: inline-block;
         padding: 6px 10px;
         border-radius: 999px;
-        background: #1D2739;
-        color: #1a5fd0;
+        background: rgba(255,255,255,0.08);
+        color: #8ec5ff;
         font-size: 12px;
         font-weight: 700;
         margin-bottom: 10px;
@@ -60,34 +60,82 @@
         font-size: 24px;
         line-height: 1.3;
         font-weight: 700;
-        color: #1b2b44;
+        color: #ffffff;
       }
 
       .desc {
         margin: 0;
         font-size: 15px;
         line-height: 1.6;
-        color: #53627c;
+        color: #c9d4e5;
+      }
+
+      .status {
+        margin-top: 12px;
+        min-height: 20px;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #c9d4e5;
+      }
+
+      .answerBox {
+        margin-top: 14px;
+        padding: 14px;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 14px;
+        background: rgba(255,255,255,0.04);
+        color: #ffffff;
+        display: none;
+      }
+
+      .answerTitle {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        font-weight: 700;
+        color: #8ec5ff;
+        line-height: 1.4;
+      }
+
+      .answer {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.7;
+        color: #edf4ff;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .inputWrap {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(255,255,255,0.08);
       }
 
       .question {
         display: block;
         width: 100%;
-        min-height: 110px;
+        min-height: 84px;
         margin: 0;
         padding: 14px;
-        border: 1px solid #ccd6e3;
+        border: 1px solid #31425f;
         border-radius: 14px;
-        background: #fbfcff;
-        color: #1f2d3d;
+        background: #0f1726;
+        color: #ffffff;
         font-size: 15px;
         line-height: 1.5;
         resize: vertical;
         outline: none;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      .question:focus {
+        border-color: #5aa9ff;
+        box-shadow: 0 0 0 3px rgba(90,169,255,0.18);
       }
 
       .question::placeholder {
-        color: #1D2739;
+        color: #93a8c6;
         opacity: 1;
       }
 
@@ -106,7 +154,7 @@
         border-radius: 12px;
         padding: 12px 18px;
         background: linear-gradient(135deg, #2d7ff9 0%, #1a5fd0 100%);
-        color: #1D2739;
+        color: #ffffff;
         font-size: 15px;
         font-weight: 700;
         line-height: 1.2;
@@ -121,42 +169,8 @@
       .count {
         font-size: 14px;
         font-weight: 600;
-        color: #5c6c84;
+        color: #c9d4e5;
         line-height: 1.4;
-      }
-
-      .status {
-        margin-top: 12px;
-        min-height: 20px;
-        font-size: 14px;
-        line-height: 1.5;
-        color: #53627c;
-      }
-
-      .answerBox {
-        margin-top: 14px;
-        padding: 14px;
-        border: 1px solid #d8e5fb;
-        border-radius: 14px;
-        background: #1D2739;
-        color: #1f2d3d;
-        display: none;
-      }
-
-      .answerTitle {
-        margin: 0 0 8px 0;
-        font-size: 14px;
-        font-weight: 700;
-        color: #1b2b44;
-        line-height: 1.4;
-      }
-
-      .answer {
-        margin: 0;
-        font-size: 15px;
-        line-height: 1.65;
-        color: #26364a;
-        white-space: pre-wrap;
       }
 
       @media (max-width: 768px) {
@@ -179,7 +193,7 @@
         }
 
         .question {
-          min-height: 100px;
+          min-height: 78px;
           font-size: 16px;
         }
 
@@ -208,18 +222,28 @@
           <div class="desc">Ako ti nešto nije jasno u ovom djelu, postavi kratko pitanje i dobit ćeš brz odgovor.</div>
         </div>
 
-        <textarea class="question" placeholder="Npr. Tko je glavni lik i zašto je važan?"></textarea>
-
-        <div class="row">
-          <button class="btn" type="button">Pitaj</button>
-          <div class="count">Preostalo: 5</div>
-        </div>
-
         <div class="status"></div>
 
         <div class="answerBox">
           <div class="answerTitle">Odgovor</div>
           <div class="answer"></div>
+        </div>
+
+        <div class="inputWrap">
+          <textarea
+            class="question"
+            placeholder="Npr. Tko je glavni lik i zašto je važan?"
+            enterkeyhint="send"
+            autocomplete="off"
+            autocorrect="on"
+            autocapitalize="sentences"
+            spellcheck="true"
+          ></textarea>
+
+          <div class="row">
+            <button class="btn" type="button">Pitaj</button>
+            <div class="count">Preostalo: 5</div>
+          </div>
         </div>
       </div>
     </div>
@@ -231,6 +255,8 @@
   const box = shadow.querySelector(".answerBox");
   const status = shadow.querySelector(".status");
   const count = shadow.querySelector(".count");
+
+  const isMobile = window.matchMedia("(max-width: 768px)").matches;
 
   function getUsed() {
     return parseInt(sessionStorage.getItem(STORAGE_USED) || "0", 10);
@@ -265,9 +291,170 @@
     if (left <= 0) {
       btn.disabled = true;
       status.textContent = "Limit pitanja dosegnut.";
-    } else {
+    } else if (!status.dataset.locked) {
       btn.disabled = false;
     }
+  }
+
+  function lockUI() {
+    btn.disabled = true;
+    q.disabled = true;
+    status.dataset.locked = "1";
+  }
+
+  function unlockUI() {
+    q.disabled = false;
+    status.dataset.locked = "";
+    update();
+  }
+
+  function safeBlurInput() {
+    try {
+      q.blur();
+      if (document.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+    } catch (e) {}
+  }
+
+  function revealAnswerBox() {
+    box.style.display = "block";
+  }
+
+  function appendStreamText(chunk) {
+    ans.textContent += chunk;
+    revealAnswerBox();
+  }
+
+  function setAnswerText(text) {
+    ans.textContent = text || "Nema odgovora.";
+    revealAnswerBox();
+  }
+
+  function tryParseJsonLine(line) {
+    try {
+      return JSON.parse(line);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function readStreamResponse(res) {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+    let buffer = "";
+
+    revealAnswerBox();
+    ans.textContent = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        if (line.startsWith("data:")) {
+          const payload = line.slice(5).trim();
+
+          if (payload === "[DONE]") {
+            continue;
+          }
+
+          const parsed = tryParseJsonLine(payload);
+
+          if (parsed) {
+            const token =
+              parsed.token ||
+              parsed.delta ||
+              parsed.text ||
+              parsed.answerPart ||
+              "";
+
+            if (token) {
+              fullText += token;
+              appendStreamText(token);
+            }
+          } else {
+            fullText += payload;
+            appendStreamText(payload);
+          }
+
+          continue;
+        }
+
+        const parsed = tryParseJsonLine(line);
+
+        if (parsed) {
+          const token =
+            parsed.token ||
+            parsed.delta ||
+            parsed.text ||
+            parsed.answerPart ||
+            "";
+
+          if (token) {
+            fullText += token;
+            appendStreamText(token);
+          }
+        } else {
+          fullText += line;
+          appendStreamText(line);
+        }
+      }
+    }
+
+    if (buffer.trim()) {
+      const tail = buffer.trim();
+
+      if (tail.startsWith("data:")) {
+        const payload = tail.slice(5).trim();
+        if (payload && payload !== "[DONE]") {
+          const parsed = tryParseJsonLine(payload);
+          if (parsed) {
+            const token =
+              parsed.token ||
+              parsed.delta ||
+              parsed.text ||
+              parsed.answerPart ||
+              "";
+            if (token) {
+              fullText += token;
+              appendStreamText(token);
+            }
+          } else {
+            fullText += payload;
+            appendStreamText(payload);
+          }
+        }
+      } else {
+        const parsed = tryParseJsonLine(tail);
+        if (parsed) {
+          const token =
+            parsed.token ||
+            parsed.delta ||
+            parsed.text ||
+            parsed.answerPart ||
+            "";
+          if (token) {
+            fullText += token;
+            appendStreamText(token);
+          }
+        } else if (tail) {
+          fullText += tail;
+          appendStreamText(tail);
+        }
+      }
+    }
+
+    return fullText.trim();
   }
 
   async function ask() {
@@ -280,9 +467,14 @@
       return;
     }
 
-    btn.disabled = true;
+    lockUI();
     status.textContent = "AI razmišlja...";
     box.style.display = "none";
+    ans.textContent = "";
+
+    if (isMobile) {
+      safeBlurInput();
+    }
 
     const history = getHistory();
 
@@ -290,26 +482,52 @@
       const res = await fetch(API_URL, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Accept": "application/json, text/plain, text/event-stream"
         },
         body: JSON.stringify({
           question,
           history,
-          postTitle: getTitle()
+          postTitle: getTitle(),
+          stream: true
         })
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        status.textContent = data.error || "Greška.";
-        btn.disabled = false;
+        let errorText = "Greška.";
+        try {
+          const errData = await res.json();
+          errorText = errData.error || errorText;
+        } catch (e) {}
+        status.textContent = errorText;
+        unlockUI();
         return;
       }
 
-      const answer = data.answer || "Nema odgovora.";
-      ans.textContent = answer;
-      box.style.display = "block";
+      let answer = "";
+
+      const contentType = (res.headers.get("content-type") || "").toLowerCase();
+
+      if (
+        res.body &&
+        (
+          contentType.includes("text/event-stream") ||
+          contentType.includes("text/plain") ||
+          contentType.includes("application/x-ndjson")
+        )
+      ) {
+        answer = await readStreamResponse(res);
+      } else {
+        const data = await res.json();
+        answer = data.answer || "Nema odgovora.";
+        setAnswerText(answer);
+      }
+
+      if (!answer) {
+        answer = "Nema odgovora.";
+        setAnswerText(answer);
+      }
+
       status.textContent = "Odgovor je spreman.";
 
       const newHistory = history.concat([{ question, answer }]);
@@ -320,10 +538,32 @@
       status.textContent = "Greška povezivanja.";
     }
 
-    btn.disabled = false;
-    update();
+    if (isMobile) {
+      safeBlurInput();
+    }
+
+    unlockUI();
   }
 
   btn.addEventListener("click", ask);
+
+  q.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      ask();
+    }
+  });
+
+  q.addEventListener("focus", function () {
+    status.textContent = status.textContent === "Upiši pitanje." ? "" : status.textContent;
+  });
+
+  if (isMobile) {
+    setTimeout(safeBlurInput, 50);
+    window.addEventListener("resize", function () {
+      if (document.activeElement !== q) return;
+    });
+  }
+
   update();
 })();
