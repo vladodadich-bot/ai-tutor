@@ -18,6 +18,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", corsOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Vary", "Origin");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { question, history, postTitle } = req.body || {};
+    const { question, history, postTitle, stream } = req.body || {};
 
     if (!question || !question.trim()) {
       return res.status(400).json({ error: "No question" });
@@ -44,7 +45,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
     }
 
-    const cleanQuestion = question.trim().slice(0, 300);
+    const cleanQuestion = String(question).trim().slice(0, 300);
 
     const safeHistory = Array.isArray(history)
       ? history
@@ -65,7 +66,6 @@ export default async function handler(req, res) {
       : "Nema prethodnih pitanja.";
 
     const prompt = `
-    
 Ti si AI Tutor – pametni učitelj za učenike osnovne i srednje škole.
 
 Pomažeš u:
@@ -99,8 +99,8 @@ To znači:
 - ne dodaj informacije koje nisu utemeljene
 
 Ako informacija nije dostupna:
-➡️ jasno reci da nije pronađena u dostupnom sadržaju  
-➡️ možeš ponuditi opće znanje SAMO ako si siguran da je tačno  
+➡️ jasno reci da nije pronađena u dostupnom sadržaju
+➡️ možeš ponuditi opće znanje SAMO ako si siguran da je tačno
 ➡️ ako nisi siguran → nemoj odgovarati napamet
 
 -----------------------------------
@@ -159,6 +159,7 @@ PONAŠANJE:
 - budi strpljiv, prijateljski i koristan
 - odgovaraj kao stvarni učitelj koji želi pomoći
 - ne zvuči kao robot
+
 Naslov posta:
 ${postTitle ? postTitle : "Nepoznato djelo"}
 
@@ -168,6 +169,128 @@ ${historyText}
 Novo pitanje korisnika:
 ${cleanQuestion}
     `.trim();
+
+    if (stream) {
+      const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "gpt-4.1-mini",
+          input: prompt,
+          stream: true
+        })
+      });
+
+      if (!openaiResponse.ok) {
+        const errorText = await openaiResponse.text();
+        return res.status(openaiResponse.status).json({
+          error: "OpenAI API error",
+          details: errorText
+        });
+      }
+
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+        "Access-Control-Allow-Origin": corsOrigin,
+        Vary: "Origin"
+      });
+
+      const reader = openaiResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      const sendToken = (token) => {
+        if (!token) return;
+        res.write(`data: ${JSON.stringify({ token })}\n\n`);
+      };
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line || !line.startsWith("data:")) continue;
+
+            const payload = line.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+
+            let eventData;
+            try {
+              eventData = JSON.parse(payload);
+            } catch (e) {
+              continue;
+            }
+
+            if (
+              eventData.type === "response.output_text.delta" &&
+              typeof eventData.delta === "string"
+            ) {
+              sendToken(eventData.delta);
+              continue;
+            }
+
+            if (
+              eventData.type === "response.output_text" &&
+              typeof eventData.text === "string"
+            ) {
+              sendToken(eventData.text);
+              continue;
+            }
+
+            if (
+              eventData.type === "response.completed" &&
+              eventData.response &&
+              Array.isArray(eventData.response.output)
+            ) {
+              continue;
+            }
+          }
+        }
+
+        if (buffer.trim().startsWith("data:")) {
+          const payload = buffer.trim().slice(5).trim();
+          if (payload && payload !== "[DONE]") {
+            try {
+              const eventData = JSON.parse(payload);
+
+              if (
+                eventData.type === "response.output_text.delta" &&
+                typeof eventData.delta === "string"
+              ) {
+                sendToken(eventData.delta);
+              } else if (
+                eventData.type === "response.output_text" &&
+                typeof eventData.text === "string"
+              ) {
+                sendToken(eventData.text);
+              }
+            } catch (e) {}
+          }
+        }
+
+        res.write("data: [DONE]\n\n");
+        return res.end();
+      } catch (error) {
+        try {
+          res.write(`data: ${JSON.stringify({ error: "Stream error" })}\n\n`);
+          res.write("data: [DONE]\n\n");
+        } catch (e) {}
+        return res.end();
+      }
+    }
 
     const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
