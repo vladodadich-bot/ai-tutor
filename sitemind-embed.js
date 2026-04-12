@@ -30,7 +30,7 @@
 
   var themeColor =
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-color")) ||
-    "#22d3ee";
+    "#2563eb";
 
   var iframe = null;
   var bubble = null;
@@ -105,7 +105,7 @@
 
   function rgbaFromHex(hex, alpha) {
     var rgb = hexToRgb(hex);
-    if (!rgb) return "rgba(34, 211, 238, " + alpha + ")";
+    if (!rgb) return "rgba(37, 99, 235, " + alpha + ")";
     return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
   }
 
@@ -388,9 +388,9 @@
   function styleBubble() {
     if (!bubble) return;
 
-    var glowSoft = rgbaFromHex(themeColor, 0.18);
-    var glowStrong = rgbaFromHex(themeColor, 0.28);
-    var borderGlow = rgbaFromHex(themeColor, 0.24);
+    var glowSoft = rgbaFromHex(themeColor, 0.14);
+    var glowStrong = rgbaFromHex(themeColor, 0.22);
+    var borderGlow = rgbaFromHex(themeColor, 0.18);
 
     bubble.style.position = "fixed";
     bubble.style.zIndex = "999999";
@@ -398,21 +398,21 @@
     bubble.style.borderRadius = "999px";
     bubble.style.padding = "14px 22px";
     bubble.style.background =
-      "radial-gradient(circle at top right, rgba(255,255,255,0.08), transparent 32%), linear-gradient(135deg, rgba(11,16,32,0.96), rgba(15,23,42,0.96))";
-    bubble.style.color = "#e6eef8";
+      "radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 34%), linear-gradient(135deg, " + themeColor + ", #1d4ed8)";
+    bubble.style.color = "#ffffff";
     bubble.style.fontSize = "14px";
     bubble.style.fontWeight = "700";
     bubble.style.lineHeight = "1.35";
     bubble.style.textAlign = "center";
     bubble.style.maxWidth = "255px";
     bubble.style.boxShadow =
-      "0 18px 38px rgba(2,8,23,0.34), 0 0 0 1px rgba(255,255,255,0.03), 0 0 24px " + glowSoft;
+      "0 16px 34px rgba(37,99,235,0.18), 0 0 0 1px rgba(255,255,255,0.08), 0 0 20px " + glowSoft;
     bubble.style.cursor = "pointer";
     bubble.style.whiteSpace = "normal";
-    bubble.style.backdropFilter = "blur(12px)";
-    bubble.style.webkitBackdropFilter = "blur(12px)";
+    bubble.style.backdropFilter = "blur(10px)";
+    bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-      "transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease, border-color 0.18s ease";
+      "transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease, border-color 0.18s ease, filter 0.18s ease";
 
     if (window.innerWidth < 520) {
       bubble.style.maxWidth = "220px";
@@ -422,16 +422,18 @@
 
     bubble.onmouseenter = function () {
       bubble.style.transform = "translateY(-1px)";
-      bubble.style.borderColor = rgbaFromHex(themeColor, 0.34);
+      bubble.style.borderColor = rgbaFromHex(themeColor, 0.28);
       bubble.style.boxShadow =
-        "0 20px 42px rgba(2,8,23,0.38), 0 0 0 1px rgba(255,255,255,0.04), 0 0 30px " + glowStrong;
+        "0 18px 38px rgba(37,99,235,0.22), 0 0 0 1px rgba(255,255,255,0.10), 0 0 26px " + glowStrong;
+      bubble.style.filter = "brightness(1.03)";
     };
 
     bubble.onmouseleave = function () {
       bubble.style.transform = "translateY(0)";
       bubble.style.borderColor = borderGlow;
       bubble.style.boxShadow =
-        "0 18px 38px rgba(2,8,23,0.34), 0 0 0 1px rgba(255,255,255,0.03), 0 0 24px " + glowSoft;
+        "0 16px 34px rgba(37,99,235,0.18), 0 0 0 1px rgba(255,255,255,0.08), 0 0 20px " + glowSoft;
+      bubble.style.filter = "brightness(1)";
     };
   }
 
@@ -449,20 +451,20 @@
     panel.style.borderRadius = "";
     panel.style.borderLeft = "";
     panel.style.borderRight = "";
-    panel.style.background = "#0f172a";
+    panel.style.background = "#ffffff";
     panel.style.overflow = "hidden";
-    panel.style.boxShadow = "0 18px 50px rgba(2,8,23,0.34)";
+    panel.style.boxShadow = "0 18px 50px rgba(15,23,42,0.16)";
     panel.style.display = isOpen ? "block" : "none";
 
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "0";
-    iframe.style.background = "#0f172a";
+    iframe.style.background = "#ffffff";
 
     if (isDesktop()) {
-      panel.style.width = "400px";
+      panel.style.width = "420px";
       panel.style.height = "100vh";
-      panel.style.maxWidth = "400px";
+      panel.style.maxWidth = "420px";
       panel.style.maxHeight = "100vh";
       panel.style.top = "0";
       panel.style.bottom = "0";
@@ -470,12 +472,12 @@
 
       if (position === "bottom-left") {
         panel.style.left = "0";
-        panel.style.borderRight = "1px solid rgba(148,163,184,0.12)";
-        panel.style.boxShadow = "12px 0 40px rgba(2,8,23,0.28)";
+        panel.style.borderRight = "1px solid rgba(37,99,235,0.10)";
+        panel.style.boxShadow = "12px 0 36px rgba(15,23,42,0.12)";
       } else {
         panel.style.right = "0";
-        panel.style.borderLeft = "1px solid rgba(148,163,184,0.12)";
-        panel.style.boxShadow = "-12px 0 40px rgba(2,8,23,0.28)";
+        panel.style.borderLeft = "1px solid rgba(37,99,235,0.10)";
+        panel.style.boxShadow = "-12px 0 36px rgba(15,23,42,0.12)";
       }
     } else {
       panel.style.width = window.innerWidth < 520 ? "calc(100vw - 16px)" : "380px";
@@ -483,7 +485,7 @@
       panel.style.height = window.innerWidth < 520 ? "min(78vh, 620px)" : "620px";
       panel.style.maxHeight = "calc(100vh - 90px)";
       panel.style.borderRadius = "18px";
-      panel.style.border = "1px solid rgba(148,163,184,0.14)";
+      panel.style.border = "1px solid rgba(37,99,235,0.10)";
 
       if (position === "bottom-left") {
         panel.style.left = "16px";
@@ -518,10 +520,10 @@
     document.body.style.transition = "padding-right 0.28s ease, padding-left 0.28s ease";
 
     if (position === "bottom-left") {
-      document.body.style.paddingLeft = "400px";
+      document.body.style.paddingLeft = "420px";
       document.body.style.paddingRight = originalBodyPaddingRight;
     } else {
-      document.body.style.paddingRight = "400px";
+      document.body.style.paddingRight = "420px";
       document.body.style.paddingLeft = originalBodyPaddingLeft;
     }
   }
@@ -569,7 +571,7 @@
     panel = document.createElement("div");
     panel.style.position = "fixed";
     panel.style.zIndex = "999999";
-    panel.style.background = "#0f172a";
+    panel.style.background = "#ffffff";
     panel.style.overflow = "hidden";
 
     iframe = document.createElement("iframe");
