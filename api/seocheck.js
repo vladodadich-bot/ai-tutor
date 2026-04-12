@@ -1,3 +1,19 @@
+const allowedOrigins = [
+  'https://sitemindai.app',
+  'https://www.sitemindai.app',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+];
+
+function applyCors(req, res) {
+  const origin = req.headers.origin || '';
+  const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
 import { createClient } from '@supabase/supabase-js';
 import { crawlSinglePage } from '../lib/crawl.js';
 
@@ -306,6 +322,11 @@ Rule audit quick fixes: ${ruleAudit.quickFixes.join(' | ')}
 }
 
 export default async function handler(req, res) {
+    applyCors(req, res);
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
   if (req.method !== 'POST') {
     return sendJson(res, 405, { error: 'Method not allowed' });
   }
