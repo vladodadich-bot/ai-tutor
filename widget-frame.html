@@ -227,7 +227,20 @@
       border-bottom-left-radius: 6px;
       box-shadow: var(--shadow-lg);
     }
+.bubble a {
+  color: #1d4ed8;
+  text-decoration: underline;
+  font-weight: 600;
+  word-break: break-word;
+}
 
+.bubble a:hover {
+  color: #1e40af;
+}
+
+.message-row.user .bubble a {
+  color: #ffffff;
+}
     .chat-status {
       position: relative;
       z-index: 1;
@@ -721,7 +734,17 @@
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
   }
+function formatMessageHtml(text) {
+  var escaped = escapeHtml(text).replace(/\n/g, "<br>");
 
+  return escaped.replace(
+    /(https?:\/\/[^\s<]+)/g,
+    function (url) {
+      var cleanUrl = url.replace(/&lt;br&gt;$/, "");
+      return '<a href="' + cleanUrl + '" target="_blank" rel="noopener noreferrer">' + cleanUrl + "</a>";
+    }
+  );
+}
   function cleanText(value) {
     return String(value || "")
       .replace(/\u00A0/g, " ")
@@ -867,7 +890,7 @@
 
     var bubble = document.createElement("div");
     bubble.className = "bubble";
-    bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+    bubble.innerHTML = formatMessageHtml(text);
 
     row.appendChild(bubble);
     chatMessages.appendChild(row);
@@ -880,7 +903,7 @@
     if (!row) return;
     var bubble = row.querySelector(".bubble");
     if (!bubble) return;
-    bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+    bubble.innerHTML = formatMessageHtml(text);
     scrollToBottom();
   }
 
