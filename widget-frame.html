@@ -563,17 +563,18 @@
   var params = new URLSearchParams(window.location.search);
   var agentId = params.get("agentId") || "demo-agent";
 
-  function normalizeLang(value) {
-    var lang = String(value || "").toLowerCase().trim();
+ function normalizeLang(value) {
+  var lang = String(value || "").toLowerCase().trim();
 
-    if (!lang) return "en";
-    if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
-    if (lang.indexOf("de") === 0) return "de";
-    if (lang.indexOf("it") === 0) return "it";
-    if (lang.indexOf("en") === 0) return "en";
+  if (!lang) return "en";
+  if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
+  if (lang.indexOf("de") === 0) return "de";
+  if (lang.indexOf("it") === 0) return "it";
+  if (lang.indexOf("fr") === 0) return "fr";
+  if (lang.indexOf("en") === 0) return "en";
 
-    return "en";
-  }
+  return "en";
+}
 
   var initialLang = normalizeLang(
     params.get("lang") ||
@@ -646,6 +647,20 @@
       closeAria: "Chiudi chat",
       openStatus: ""
     },
+    fr: {
+  subtitleDefault: "Demandez à l’assistant IA",
+  inputPlaceholder: "Écrivez une question...",
+  send: "Envoyer",
+  sending: "...",
+  loading: "Un instant...",
+  streaming: "L’IA répond...",
+  errorGeneric: "Une erreur s’est produite. Veuillez réessayer.",
+  errorTimeout: "La requête a pris trop de temps. Essayez une question plus courte.",
+  welcome: "Bonjour ! Je peux vous aider avec le contenu de cette page, les services, les produits ou des questions générales.",
+  askPage: "Demandez à l’IA à propos de : ",
+  closeAria: "Fermer le chat",
+  openStatus: ""
+},
     en: {
       subtitleDefault: "Ask AI Agent",
       inputPlaceholder: "Type a question...",
