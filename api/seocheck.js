@@ -725,80 +725,13 @@ You are a senior SEO strategist and content quality evaluator.
 
 ${languageInstruction}
 
-Your job is to evaluate SEO in a realistic way, closer to how a strong search quality reviewer would think, not like a simplistic technical checker.
-
-Core principles:
-- Do not judge a page only by mechanical SEO formulas.
-- Repeated structural section headings across a site are NOT automatically a problem.
-- Focus on whether this specific page is useful, relevant, clear, well-targeted, and aligned with search intent.
-- Evaluate the page as an individual URL, not as if repeated section labels alone create duplicate content.
-- For educational, literary summary, article, or structured content pages, headings like "summary", "characters", "theme", "analysis", FAQ-like blocks, or similar recurring section labels can be completely normal.
-- The real question is whether the CONTENT under those sections is useful, specific, and relevant to the page topic.
-- Prefer practical, specific SEO advice over generic recommendations.
-- Do not invent facts not supported by the page data.
-- Keep recommendations realistic and implementable.
-
-What matters most:
-1. Search intent match
-2. Clarity of primary topic
-3. Title quality
-4. Meta description usefulness and click appeal
-5. H1 relevance
-6. Content depth and usefulness
-7. Logical structure
-8. Overall page quality for the target query
-9. Image optimization opportunities
-10. Technical basics that are actually missing or weak
-
-What should NOT be treated as an automatic SEO issue:
-- recurring H2 naming patterns across different pages
-- a site-wide article structure template
-- educational pages using repeated section labels
-- standard formatting patterns across a content series
-
-Return only valid JSON.
-Do not use markdown.
-Do not include explanations outside JSON.
+Return concise, practical SEO recommendations.
+Do not invent facts not supported by the page data.
+Focus on search intent, clarity, title quality, meta quality, content usefulness, image optimization, and technical basics.
 `.trim();
 
     const userPrompt = `
 Analyze this webpage for SEO quality and practical optimization opportunities.
-
-Return JSON in exactly this shape:
-{
-  "summary": "2-4 sentence practical summary",
-  "issues": [
-    "specific issue 1",
-    "specific issue 2",
-    "specific issue 3"
-  ],
-  "suggestions": [
-    "specific action 1",
-    "specific action 2",
-    "specific action 3",
-    "specific action 4"
-  ],
-  "quick_wins": [
-    {
-      "title": "short quick win title",
-      "description": "1 sentence practical explanation"
-    }
-  ],
-  "improved_title": "better SEO title, ideally natural and not spammy",
-  "improved_meta_description": "better meta description, ideally compelling and readable"
-}
-
-Evaluation rules:
-- Judge the page primarily by relevance, clarity, usefulness, and search intent alignment.
-- Do NOT flag repeated section titles alone as an SEO problem.
-- If the page seems to use a structured editorial template, evaluate whether the actual page topic is still clear and well covered.
-- If title, H1, and content are aligned, treat that as a positive signal.
-- If the page has thin content, weak topic clarity, weak title, weak meta description, weak image usage, or poor structure, mention that clearly.
-- Suggestions must be concrete and useful.
-- Avoid vague filler advice.
-- Prioritize improvements that could realistically improve rankings and click-through rate.
-- Prefer user usefulness over formulaic SEO myths.
-- Quick wins should be fast, realistic changes that the user can implement soon.
 
 Page data:
 URL: ${page.url || ''}
@@ -814,11 +747,6 @@ Rule audit quick fixes: ${ruleAudit.quickFixes.join(' | ')}
 Page speed signals: ${JSON.stringify(ruleAudit.page_speed || {})}
 Image SEO signals: ${JSON.stringify(ruleAudit.image_seo || {})}
 Technical SEO signals: ${JSON.stringify(ruleAudit.technical_seo || {})}
-
-Important output style:
-- Write the summary, issues, suggestions, and quick_wins in the requested page language.
-- Keep improved_title and improved_meta_description in the requested page language.
-- Make the title and meta feel natural for real users, not robotic.
 `.trim();
 
     const controller = new AbortController();
@@ -843,7 +771,50 @@ Important output style:
               role: 'user',
               content: [{ type: 'input_text', text: userPrompt }]
             }
-          ]
+          ],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'seo_ai_audit',
+              schema: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  summary: { type: 'string' },
+                  issues: {
+                    type: 'array',
+                    items: { type: 'string' }
+                  },
+                  suggestions: {
+                    type: 'array',
+                    items: { type: 'string' }
+                  },
+                  quick_wins: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      additionalProperties: false,
+                      properties: {
+                        title: { type: 'string' },
+                        description: { type: 'string' }
+                      },
+                      required: ['title', 'description']
+                    }
+                  },
+                  improved_title: { type: 'string' },
+                  improved_meta_description: { type: 'string' }
+                },
+                required: [
+                  'summary',
+                  'issues',
+                  'suggestions',
+                  'quick_wins',
+                  'improved_title',
+                  'improved_meta_description'
+                ]
+              }
+            }
+          }
         })
       });
 
@@ -860,26 +831,16 @@ Important output style:
         ).join('\n') ||
         '';
 
-      try {
-        const parsed = JSON.parse(text);
-        return {
-          summary: parsed?.summary || '',
-          issues: safeArray(parsed?.issues),
-          suggestions: safeArray(parsed?.suggestions),
-          quick_wins: safeArray(parsed?.quick_wins),
-          improved_title: parsed?.improved_title || '',
-          improved_meta_description: parsed?.improved_meta_description || ''
-        };
-      } catch {
-        return {
-          summary: getAiFallbackMessage(safeLang),
-          issues: [],
-          suggestions: [],
-          quick_wins: [],
-          improved_title: '',
-          improved_meta_description: ''
-        };
-      }
+      const parsed = JSON.parse(text);
+
+      return {
+        summary: parsed?.summary || '',
+        issues: safeArray(parsed?.issues),
+        suggestions: safeArray(parsed?.suggestions),
+        quick_wins: safeArray(parsed?.quick_wins),
+        improved_title: parsed?.improved_title || '',
+        improved_meta_description: parsed?.improved_meta_description || ''
+      };
     } finally {
       clearTimeout(timeout);
     }
