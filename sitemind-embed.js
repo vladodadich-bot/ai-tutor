@@ -467,9 +467,9 @@
     iframe.style.background = "#ffffff";
 
     if (isDesktop()) {
-      panel.style.width = "420px";
+      panel.style.width = "450px";
       panel.style.height = "100vh";
-      panel.style.maxWidth = "420px";
+      panel.style.maxWidth = "450px";
       panel.style.maxHeight = "100vh";
       panel.style.top = "0";
       panel.style.bottom = "0";
@@ -525,10 +525,10 @@
     document.body.style.transition = "padding-right 0.28s ease, padding-left 0.28s ease";
 
     if (position === "bottom-left") {
-      document.body.style.paddingLeft = "420px";
+      document.body.style.paddingLeft = "450px";
       document.body.style.paddingRight = originalBodyPaddingRight;
     } else {
-      document.body.style.paddingRight = "420px";
+      document.body.style.paddingRight = "450px";
       document.body.style.paddingLeft = originalBodyPaddingLeft;
     }
   }
