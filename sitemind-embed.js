@@ -43,34 +43,39 @@
   var originalBodyOverflowX = "";
 
   function detectPageLanguage() {
-    var htmlLang = document.documentElement.getAttribute("lang") || "";
-    var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
-    var ogLocale = ogLocaleMeta && ogLocaleMeta.content ? ogLocaleMeta.content : "";
-    var browserLang = navigator.language || navigator.userLanguage || "";
+  var htmlLang = document.documentElement.getAttribute("lang") || "";
+  var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
+  var ogLocale = ogLocaleMeta && ogLocaleMeta.content ? ogLocaleMeta.content : "";
+  var browserLang = navigator.language || navigator.userLanguage || "";
 
-    var lang = (htmlLang || ogLocale || browserLang || "en").toLowerCase();
+  var lang = (htmlLang || ogLocale || browserLang || "en").toLowerCase();
 
-    if (lang.indexOf("hr") === 0) return "hr";
-    if (lang.indexOf("de") === 0) return "de";
-    if (lang.indexOf("it") === 0) return "it";
-    return "en";
-  }
+  if (lang.indexOf("hr") === 0) return "hr";
+  if (lang.indexOf("de") === 0) return "de";
+  if (lang.indexOf("it") === 0) return "it";
+  if (lang.indexOf("fr") === 0) return "fr";
+  return "en";
+}
 
   function getDefaultBubbleText(lang) {
-    if (lang === "hr") {
-      return "💬 Trebaš pomoć?<br>Pitaj AI asistenta";
-    }
-
-    if (lang === "de") {
-      return "💬 Brauchst du Hilfe?<br>Frag den KI-Assistenten";
-    }
-
-    if (lang === "it") {
-      return "💬 Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
-    }
-
-    return "💬 Need help?<br>Ask the AI assistant";
+  if (lang === "hr") {
+    return "💬 Trebaš pomoć?<br>Pitaj AI asistenta";
   }
+
+  if (lang === "de") {
+    return "💬 Brauchst du Hilfe?<br>Frag den KI-Assistenten";
+  }
+
+  if (lang === "it") {
+    return "💬 Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
+  }
+
+  if (lang === "fr") {
+    return "💬 Besoin d’aide ?<br>Demandez à l’assistant IA";
+  }
+
+  return "💬 Need help?<br>Ask the AI assistant";
+}
 
   var detectedLang = detectPageLanguage();
 
