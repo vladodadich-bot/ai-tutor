@@ -37,45 +37,40 @@
   var panel = null;
   var isOpen = false;
 
-  var originalBodyPaddingRight = "";
-  var originalBodyPaddingLeft = "";
-  var originalHtmlOverflowX = "";
-  var originalBodyOverflowX = "";
-
   function detectPageLanguage() {
-  var htmlLang = document.documentElement.getAttribute("lang") || "";
-  var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
-  var ogLocale = ogLocaleMeta && ogLocaleMeta.content ? ogLocaleMeta.content : "";
-  var browserLang = navigator.language || navigator.userLanguage || "";
+    var htmlLang = document.documentElement.getAttribute("lang") || "";
+    var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
+    var ogLocale = ogLocaleMeta && ogLocaleMeta.content ? ogLocaleMeta.content : "";
+    var browserLang = navigator.language || navigator.userLanguage || "";
 
-  var lang = (htmlLang || ogLocale || browserLang || "en").toLowerCase();
+    var lang = (htmlLang || ogLocale || browserLang || "en").toLowerCase();
 
-  if (lang.indexOf("hr") === 0) return "hr";
-  if (lang.indexOf("de") === 0) return "de";
-  if (lang.indexOf("it") === 0) return "it";
-  if (lang.indexOf("fr") === 0) return "fr";
-  return "en";
-}
+    if (lang.indexOf("hr") === 0) return "hr";
+    if (lang.indexOf("de") === 0) return "de";
+    if (lang.indexOf("it") === 0) return "it";
+    if (lang.indexOf("fr") === 0) return "fr";
+    return "en";
+  }
 
   function getDefaultBubbleText(lang) {
-  if (lang === "hr") {
-    return "💬 Trebaš pomoć?<br>Pitaj AI asistenta";
-  }
+    if (lang === "hr") {
+      return "💬 Trebaš pomoć?<br>Pitaj AI asistenta";
+    }
 
-  if (lang === "de") {
-    return "💬 Brauchst du Hilfe?<br>Frag den KI-Assistenten";
-  }
+    if (lang === "de") {
+      return "💬 Brauchst du Hilfe?<br>Frag den KI-Assistenten";
+    }
 
-  if (lang === "it") {
-    return "💬 Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
-  }
+    if (lang === "it") {
+      return "💬 Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
+    }
 
-  if (lang === "fr") {
-    return "💬 Besoin d’aide ?<br>Demandez à l’assistant IA";
-  }
+    if (lang === "fr") {
+      return "💬 Besoin d’aide ?<br>Demandez à l’assistant IA";
+    }
 
-  return "💬 Need help?<br>Ask the AI assistant";
-}
+    return "💬 Need help?<br>Ask the AI assistant";
+  }
 
   var detectedLang = detectPageLanguage();
 
@@ -456,6 +451,7 @@
     panel.style.borderRadius = "";
     panel.style.borderLeft = "";
     panel.style.borderRight = "";
+    panel.style.border = "";
     panel.style.background = "#ffffff";
     panel.style.overflow = "hidden";
     panel.style.boxShadow = "0 18px 50px rgba(15,23,42,0.16)";
@@ -468,9 +464,9 @@
 
     if (isDesktop()) {
       panel.style.width = "450px";
-      panel.style.height = "100vh";
+      panel.style.height = "100dvh";
       panel.style.maxWidth = "450px";
-      panel.style.maxHeight = "100vh";
+      panel.style.maxHeight = "100dvh";
       panel.style.top = "0";
       panel.style.bottom = "0";
       panel.style.borderRadius = "0";
@@ -504,53 +500,15 @@
     bubble.style.display = isOpen ? "none" : "block";
   }
 
-  function applyPageShrink() {
-    if (!isDesktop()) return;
-
-    if (originalBodyPaddingRight === "") {
-      originalBodyPaddingRight = document.body.style.paddingRight || "";
-    }
-    if (originalBodyPaddingLeft === "") {
-      originalBodyPaddingLeft = document.body.style.paddingLeft || "";
-    }
-    if (originalHtmlOverflowX === "") {
-      originalHtmlOverflowX = document.documentElement.style.overflowX || "";
-    }
-    if (originalBodyOverflowX === "") {
-      originalBodyOverflowX = document.body.style.overflowX || "";
-    }
-
-    document.documentElement.style.overflowX = "hidden";
-    document.body.style.overflowX = "hidden";
-    document.body.style.transition = "padding-right 0.28s ease, padding-left 0.28s ease";
-
-    if (position === "bottom-left") {
-      document.body.style.paddingLeft = "450px";
-      document.body.style.paddingRight = originalBodyPaddingRight;
-    } else {
-      document.body.style.paddingRight = "450px";
-      document.body.style.paddingLeft = originalBodyPaddingLeft;
-    }
-  }
-
-  function resetPageShrink() {
-    document.body.style.paddingRight = originalBodyPaddingRight;
-    document.body.style.paddingLeft = originalBodyPaddingLeft;
-    document.documentElement.style.overflowX = originalHtmlOverflowX;
-    document.body.style.overflowX = originalBodyOverflowX;
-  }
-
   function openPanel() {
     isOpen = true;
     applyPanelLayout();
-    applyPageShrink();
     sendPageContext();
   }
 
   function closePanel() {
     isOpen = false;
     applyPanelLayout();
-    resetPageShrink();
   }
 
   function togglePanel() {
@@ -566,6 +524,8 @@
 
     var root = document.createElement("div");
     root.id = "sitemind-widget-root";
+    root.style.position = "relative";
+    root.style.zIndex = "999999";
     document.body.appendChild(root);
 
     bubble = document.createElement("button");
@@ -628,16 +588,6 @@
     applyBubblePosition();
     styleBubble();
     applyPanelLayout();
-
-    if (isOpen) {
-      if (isDesktop()) {
-        applyPageShrink();
-      } else {
-        resetPageShrink();
-      }
-    } else {
-      resetPageShrink();
-    }
   });
 
   if (document.readyState === "loading") {
