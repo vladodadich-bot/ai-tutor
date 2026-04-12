@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js';
+
 const allowedOrigins = [
   'https://sitemindai.app',
   'https://www.sitemindai.app',
@@ -14,8 +16,6 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
-import { createClient } from '@supabase/supabase-js';
-import { crawlSinglePage } from '../lib/crawl.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -71,7 +71,13 @@ function stripHtml(html = '') {
   return String(html)
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -87,6 +93,79 @@ function scoreLength(value, min, max) {
 
   const distance = len < min ? (min - len) : (len - max);
   return Math.max(0, 100 - distance * 5);
+}
+
+function extractMetaContent(html, name) {
+  const regex = new RegExp(
+    `<meta[^>]+(?:name|property)=["']${name}["'][^>]+content=["']([^"']*)["'][^>]*>`,
+    'i'
+  );
+  const match = html.match(regex);
+  return match?.[1]?.trim() || '';
+}
+
+function extractTagText(html, tagName) {
+  const regex = new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'i');
+  const match = html.match(regex);
+  return match ? stripHtml(match[1]) : '';
+}
+
+function extractAllTagTexts(html, tagName) {
+  const regex = new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'gi');
+  const results = [];
+  let match;
+
+  while ((match = regex.exec(html)) !== null) {
+    const text = stripHtml(match[1]);
+    if (text) results.push(text);
+  }
+
+  return results;
+}
+
+async function fetchSinglePage(url) {
+  const response = await fetch(url, {
+    method: 'GET',
+    redirect: 'follow',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; SiteMindAiLabsBot/1.0; +https://sitemindai.app)'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch page (${response.status})`);
+  }
+
+  const html = await response.text();
+
+  if (!html || html.length < 50) {
+    throw new Error('Fetched page is empty or too short');
+  }
+
+  const title = extractTagText(html, 'title');
+  const metaDescription =
+    extractMetaContent(html, 'description') ||
+    extractMetaContent(html, 'og:description');
+
+  const h1 = extractTagText(html, 'h1');
+  const h2s = extractAllTagTexts(html, 'h2');
+  const h3s = extractAllTagTexts(html, 'h3');
+
+  const textContent = stripHtml(html);
+  const textPreview = textContent.slice(0, 5000);
+
+  return {
+    url,
+    page_title: title,
+    meta_description: metaDescription,
+    h1,
+    headings: [
+      ...h2s.map((text) => `H2: ${text}`),
+      ...h3s.slice(0, 8).map((text) => `H3: ${text}`)
+    ],
+    text_preview: textPreview,
+    content: textContent
+  };
 }
 
 function buildRuleAudit(page) {
@@ -231,6 +310,16 @@ function userHasProAccess(subscription) {
 }
 
 async function callOpenAISeoAnalysis(page, ruleAudit) {
+  if (!process.env.OPENAI_API_KEY) {
+    return {
+      summary: 'OpenAI API key is missing.',
+      issues: [],
+      suggestions: [],
+      improved_title: '',
+      improved_meta_description: ''
+    };
+  }
+
   const title = String(page.page_title || '').trim();
   const meta = String(page.meta_description || '').trim();
   const h1 = String(page.h1 || '').trim();
@@ -322,11 +411,12 @@ Rule audit quick fixes: ${ruleAudit.quickFixes.join(' | ')}
 }
 
 export default async function handler(req, res) {
-    applyCors(req, res);
+  applyCors(req, res);
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
+
   if (req.method !== 'POST') {
     return sendJson(res, 405, { error: 'Method not allowed' });
   }
@@ -350,21 +440,13 @@ export default async function handler(req, res) {
       return sendJson(res, 400, { error: 'Missing or invalid URL' });
     }
 
-    const crawlResult = await crawlSinglePage(pageUrl);
+    console.log('SEO CHECK URL:', pageUrl);
 
-    if (!crawlResult) {
-      return sendJson(res, 500, { error: 'Failed to crawl page' });
+    const page = await fetchSinglePage(pageUrl);
+
+    if (!page || !page.content) {
+      return sendJson(res, 500, { error: 'Failed to fetch page content' });
     }
-
-    const page = {
-      url: pageUrl,
-      page_title: crawlResult.page_title || crawlResult.title || '',
-      meta_description: crawlResult.meta_description || '',
-      h1: crawlResult.h1 || '',
-      headings: crawlResult.headings || [],
-      text_preview: crawlResult.text_preview || '',
-      content: stripHtml(crawlResult.content || crawlResult.text_preview || '')
-    };
 
     const ruleAudit = buildRuleAudit(page);
     const aiAudit = await callOpenAISeoAnalysis(page, ruleAudit);
@@ -374,10 +456,16 @@ export default async function handler(req, res) {
       url: page.url,
       score: ruleAudit.score,
       rule_audit: ruleAudit,
-      ai_audit: aiAudit
+      ai_audit: aiAudit,
+      page: {
+        title: page.page_title,
+        meta_description: page.meta_description,
+        h1: page.h1
+      }
     });
   } catch (err) {
     console.error('seocheck.js error:', err);
+
     return sendJson(res, 500, {
       error: err?.message || 'SEO check failed'
     });
