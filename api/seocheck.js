@@ -705,32 +705,30 @@ async function callOpenAISeoAnalysis(page, ruleAudit, lang = 'en') {
     };
   }
 
-  try {
-    const safeLang = normalizeUiLanguage(lang);
-    const languageInstruction = getLanguageInstruction(safeLang);
+  const safeLang = normalizeUiLanguage(lang);
+  const languageInstruction = getLanguageInstruction(safeLang);
 
-    const title = String(page.page_title || '').trim();
-    const meta = String(page.meta_description || '').trim();
-    const h1 = String(page.h1 || '').trim();
-    const headings = safeArray(page.headings).slice(0, 16).join(' | ');
-    const content =
-      String(page.content || '').trim() ||
-      String(page.text_preview || '').trim() ||
-      '';
+  const title = String(page.page_title || '').trim();
+  const meta = String(page.meta_description || '').trim();
+  const h1 = String(page.h1 || '').trim();
+  const headings = safeArray(page.headings).slice(0, 16).join(' | ');
+  const content =
+    String(page.content || '').trim() ||
+    String(page.text_preview || '').trim() ||
+    '';
 
-    const trimmedContent = content.slice(0, OPENAI_CONTENT_LIMIT);
+  const trimmedContent = content.slice(0, OPENAI_CONTENT_LIMIT);
 
-    const systemPrompt = `
+  const systemPrompt = `
 You are a senior SEO strategist and content quality evaluator.
-
 ${languageInstruction}
-
 Return concise, practical SEO recommendations.
 Do not invent facts not supported by the page data.
 Focus on search intent, clarity, title quality, meta quality, content usefulness, image optimization, and technical basics.
+Return only content that matches the provided JSON schema.
 `.trim();
 
-    const userPrompt = `
+  const userPrompt = `
 Analyze this webpage for SEO quality and practical optimization opportunities.
 
 Page data:
@@ -749,101 +747,113 @@ Image SEO signals: ${JSON.stringify(ruleAudit.image_seo || {})}
 Technical SEO signals: ${JSON.stringify(ruleAudit.technical_seo || {})}
 `.trim();
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
 
-    try {
-      const response = await fetch('https://api.openai.com/v1/responses', {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-5-mini',
-          input: [
-            {
-              role: 'system',
-              content: [{ type: 'input_text', text: systemPrompt }]
-            },
-            {
-              role: 'user',
-              content: [{ type: 'input_text', text: userPrompt }]
-            }
-          ],
-          text: {
-            format: {
-              type: 'json_schema',
-              name: 'seo_ai_audit',
-              schema: {
-                type: 'object',
-                additionalProperties: false,
-                properties: {
-                  summary: { type: 'string' },
-                  issues: {
-                    type: 'array',
-                    items: { type: 'string' }
-                  },
-                  suggestions: {
-                    type: 'array',
-                    items: { type: 'string' }
-                  },
-                  quick_wins: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      additionalProperties: false,
-                      properties: {
-                        title: { type: 'string' },
-                        description: { type: 'string' }
-                      },
-                      required: ['title', 'description']
-                    }
-                  },
-                  improved_title: { type: 'string' },
-                  improved_meta_description: { type: 'string' }
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-mini',
+        input: [
+          {
+            role: 'system',
+            content: [{ type: 'input_text', text: systemPrompt }]
+          },
+          {
+            role: 'user',
+            content: [{ type: 'input_text', text: userPrompt }]
+          }
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'seo_ai_audit',
+            strict: true,
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                summary: { type: 'string' },
+                issues: {
+                  type: 'array',
+                  items: { type: 'string' }
                 },
-                required: [
-                  'summary',
-                  'issues',
-                  'suggestions',
-                  'quick_wins',
-                  'improved_title',
-                  'improved_meta_description'
-                ]
-              }
+                suggestions: {
+                  type: 'array',
+                  items: { type: 'string' }
+                },
+                quick_wins: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: {
+                      title: { type: 'string' },
+                      description: { type: 'string' }
+                    },
+                    required: ['title', 'description']
+                  }
+                },
+                improved_title: { type: 'string' },
+                improved_meta_description: { type: 'string' }
+              },
+              required: [
+                'summary',
+                'issues',
+                'suggestions',
+                'quick_wins',
+                'improved_title',
+                'improved_meta_description'
+              ]
             }
           }
-        })
-      });
+        }
+      })
+    });
 
-      const raw = await response.json();
+    const raw = await response.json();
 
-      if (!response.ok) {
-        throw new Error(raw?.error?.message || 'OpenAI SEO analysis failed');
-      }
-
-      const text =
-        raw?.output_text ||
-        raw?.output?.map((item) =>
-          safeArray(item?.content).map((c) => c?.text || '').join('\n')
-        ).join('\n') ||
-        '';
-
-      const parsed = JSON.parse(text);
-
-      return {
-        summary: parsed?.summary || '',
-        issues: safeArray(parsed?.issues),
-        suggestions: safeArray(parsed?.suggestions),
-        quick_wins: safeArray(parsed?.quick_wins),
-        improved_title: parsed?.improved_title || '',
-        improved_meta_description: parsed?.improved_meta_description || ''
-      };
-    } finally {
-      clearTimeout(timeout);
+    if (!response.ok) {
+      console.error('OpenAI HTTP error:', raw);
+      throw new Error(raw?.error?.message || 'OpenAI SEO analysis failed');
     }
+
+    const text =
+      raw?.output_text ||
+      raw?.output?.map((item) =>
+        safeArray(item?.content).map((c) => c?.text || '').join('\n')
+      ).join('\n') ||
+      '';
+
+    if (!text) {
+      console.error('OpenAI empty structured output:', raw);
+      throw new Error('OpenAI returned empty structured output');
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (parseErr) {
+      console.error('OpenAI JSON parse error:', parseErr);
+      console.error('OpenAI raw text:', text);
+      console.error('OpenAI raw payload:', raw);
+      throw new Error('Failed to parse OpenAI structured JSON');
+    }
+
+    return {
+      summary: parsed?.summary || '',
+      issues: safeArray(parsed?.issues),
+      suggestions: safeArray(parsed?.suggestions),
+      quick_wins: safeArray(parsed?.quick_wins),
+      improved_title: parsed?.improved_title || '',
+      improved_meta_description: parsed?.improved_meta_description || ''
+    };
   } catch (err) {
     console.error('OpenAI SEO analysis timeout/error:', err);
 
@@ -855,6 +865,8 @@ Technical SEO signals: ${JSON.stringify(ruleAudit.technical_seo || {})}
       improved_title: '',
       improved_meta_description: ''
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
