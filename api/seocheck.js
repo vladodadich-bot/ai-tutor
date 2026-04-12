@@ -67,6 +67,21 @@ function normalizeUrl(value = '') {
   }
 }
 
+function normalizeUiLanguage(lang = '') {
+  const short = String(lang || '').toLowerCase().slice(0, 2);
+  return ['en', 'de', 'fr', 'it', 'hr'].includes(short) ? short : 'en';
+}
+
+function getLanguageInstruction(lang) {
+  const safeLang = normalizeUiLanguage(lang);
+
+  if (safeLang === 'de') return 'Respond in German.';
+  if (safeLang === 'fr') return 'Respond in French.';
+  if (safeLang === 'it') return 'Respond in Italian.';
+  if (safeLang === 'hr') return 'Respond in Croatian.';
+  return 'Respond in English.';
+}
+
 function stripHtml(html = '') {
   return String(html)
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -152,7 +167,7 @@ async function fetchSinglePage(url) {
   const h3s = extractAllTagTexts(html, 'h3');
 
   const textContent = stripHtml(html);
-  const textPreview = textContent.slice(0, 5000);
+  const textPreview = textContent.slice(0, 7000);
 
   return {
     url,
@@ -309,7 +324,7 @@ function userHasProAccess(subscription) {
   return String(subscription.plan_id || '').toLowerCase() === 'pro';
 }
 
-async function callOpenAISeoAnalysis(page, ruleAudit) {
+async function callOpenAISeoAnalysis(page, ruleAudit, lang = 'en') {
   if (!process.env.OPENAI_API_KEY) {
     return {
       summary: 'OpenAI API key is missing.',
@@ -320,47 +335,107 @@ async function callOpenAISeoAnalysis(page, ruleAudit) {
     };
   }
 
+  const safeLang = normalizeUiLanguage(lang);
+  const languageInstruction = getLanguageInstruction(safeLang);
+
   const title = String(page.page_title || '').trim();
   const meta = String(page.meta_description || '').trim();
   const h1 = String(page.h1 || '').trim();
-  const headings = safeArray(page.headings).slice(0, 12).join(' | ');
+  const headings = safeArray(page.headings).slice(0, 16).join(' | ');
   const content =
     String(page.content || '').trim() ||
     String(page.text_preview || '').trim() ||
     '';
 
-  const trimmedContent = content.slice(0, 5000);
+  const trimmedContent = content.slice(0, 8000);
 
   const systemPrompt = `
-You are a practical SEO auditor.
+You are a senior SEO strategist and content quality evaluator.
+
+${languageInstruction}
+
+Your job is to evaluate SEO in a realistic way, closer to how a strong search quality reviewer would think, not like a simplistic technical checker.
+
+Core principles:
+- Do not judge a page only by mechanical SEO formulas.
+- Repeated structural section headings across a site are NOT automatically a problem.
+- Focus on whether this specific page is useful, relevant, clear, well-targeted, and aligned with search intent.
+- Evaluate the page as an individual URL, not as if repeated section labels alone create duplicate content.
+- For educational, literary summary, article, or structured content pages, headings like "summary", "characters", "theme", "analysis", FAQ-like blocks, or similar recurring section labels can be completely normal.
+- The real question is whether the CONTENT under those sections is useful, specific, and relevant to the page topic.
+- Prefer practical, specific SEO advice over generic recommendations.
+- Do not invent facts not supported by the page data.
+- Keep recommendations realistic and implementable.
+
+What matters most:
+1. Search intent match
+2. Clarity of primary topic
+3. Title quality
+4. Meta description usefulness and click appeal
+5. H1 relevance
+6. Content depth and usefulness
+7. Logical structure
+8. Overall page quality for the target query
+
+What should NOT be treated as an automatic SEO issue:
+- recurring H2 naming patterns across different pages
+- a site-wide article structure template
+- educational pages using repeated section labels
+- standard formatting patterns across a content series
+
 Return only valid JSON.
 Do not use markdown.
-Keep suggestions concrete and useful.
+Do not include explanations outside JSON.
 `.trim();
 
   const userPrompt = `
-Analyze this webpage for SEO.
+Analyze this webpage for SEO quality and practical optimization opportunities.
 
-Return JSON with this exact shape:
+Return JSON in exactly this shape:
 {
-  "summary": "short summary",
-  "issues": ["..."],
-  "suggestions": ["..."],
-  "improved_title": "...",
-  "improved_meta_description": "..."
+  "summary": "2-4 sentence practical summary",
+  "issues": [
+    "specific issue 1",
+    "specific issue 2",
+    "specific issue 3"
+  ],
+  "suggestions": [
+    "specific action 1",
+    "specific action 2",
+    "specific action 3",
+    "specific action 4"
+  ],
+  "improved_title": "better SEO title, ideally natural and not spammy",
+  "improved_meta_description": "better meta description, ideally compelling and readable"
 }
 
-Context:
+Evaluation rules:
+- Judge the page primarily by relevance, clarity, usefulness, and search intent alignment.
+- Do NOT flag repeated section titles alone as an SEO problem.
+- If the page seems to use a structured editorial template, evaluate whether the actual page topic is still clear and well covered.
+- If title, H1, and content are aligned, treat that as a positive signal.
+- If the page has thin content, weak topic clarity, weak title, weak meta description, or poor structure, mention that clearly.
+- Suggestions must be concrete and useful.
+- Avoid vague filler advice.
+- Prioritize improvements that could realistically improve rankings and click-through rate.
+- Prefer user usefulness over formulaic SEO myths.
+
+Page data:
 URL: ${page.url || ''}
-Title: ${title}
-Meta description: ${meta}
-H1: ${h1}
+Current title: ${title}
+Current meta description: ${meta}
+Current H1: ${h1}
 Headings: ${headings}
-Content: ${trimmedContent}
+Main content excerpt: ${trimmedContent}
 
 Rule audit score: ${ruleAudit.score}
 Rule audit issues: ${ruleAudit.issues.join(' | ')}
 Rule audit quick fixes: ${ruleAudit.quickFixes.join(' | ')}
+
+Important output style:
+- Write the summary, issues, and suggestions in the requested page language.
+- Keep improved_title and improved_meta_description in the requested page language.
+- Make the title and meta feel natural for real users, not robotic.
 `.trim();
 
   const response = await fetch('https://api.openai.com/v1/responses', {
@@ -435,12 +510,14 @@ export default async function handler(req, res) {
     }
 
     const pageUrl = normalizeUrl(req.body?.url || '');
+    const uiLang = normalizeUiLanguage(req.body?.lang || 'en');
 
     if (!pageUrl) {
       return sendJson(res, 400, { error: 'Missing or invalid URL' });
     }
 
     console.log('SEO CHECK URL:', pageUrl);
+    console.log('SEO CHECK LANG:', uiLang);
 
     const page = await fetchSinglePage(pageUrl);
 
@@ -449,7 +526,7 @@ export default async function handler(req, res) {
     }
 
     const ruleAudit = buildRuleAudit(page);
-    const aiAudit = await callOpenAISeoAnalysis(page, ruleAudit);
+    const aiAudit = await callOpenAISeoAnalysis(page, ruleAudit, uiLang);
 
     return sendJson(res, 200, {
       ok: true,
