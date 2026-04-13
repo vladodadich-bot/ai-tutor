@@ -817,24 +817,25 @@ Technical SEO signals: ${JSON.stringify(ruleAudit.technical_seo || {})}
       })
     });
 
-    const raw = await response.json();
+  const raw = await response.json();
 
-    if (!response.ok) {
-      console.error('OpenAI HTTP error:', raw);
-      throw new Error(raw?.error?.message || 'OpenAI SEO analysis failed');
-    }
+if (!response.ok) {
+  console.error('OpenAI HTTP error:', raw);
+  throw new Error(raw?.error?.message || 'OpenAI SEO analysis failed');
+}
 
-    const text =
-      raw?.output_text ||
-      raw?.output?.map((item) =>
-        safeArray(item?.content).map((c) => c?.text || '').join('\n')
-      ).join('\n') ||
-      '';
+const text =
+  raw?.output_text ||
+  raw?.output?.[0]?.content?.[0]?.text ||
+  '';
 
-    if (!text) {
-      console.error('OpenAI empty structured output:', raw);
-      throw new Error('OpenAI returned empty structured output');
-    }
+console.log('OPENAI RAW:', JSON.stringify(raw, null, 2));
+console.log('OPENAI TEXT:', text);
+
+if (!text) {
+  console.error('OpenAI empty structured output:', raw);
+  throw new Error('OpenAI returned empty structured output');
+}
 
     let parsed;
     try {
