@@ -1,3 +1,9 @@
+import { createClient } from '@supabase/supabase-js';
+
+const PAGE_FETCH_TIMEOUT_MS = 12000;
+const OPENAI_TIMEOUT_MS = 15000;
+const OPENAI_CONTENT_LIMIT = 3500;
+
 function applyCors(req, res) {
   const origin = req.headers.origin || '';
 
@@ -26,7 +32,7 @@ const supabase = createClient(
 );
 
 function sendJson(res, status, payload) {
-  res.status(status).json(payload);
+  return res.status(status).json(payload);
 }
 
 function getBearerToken(req) {
@@ -93,6 +99,16 @@ function getAiFallbackMessage(lang = 'en') {
   if (safeLang === 'it') return 'L’analisi AI non è temporaneamente disponibile. Vengono mostrati i risultati SEO basati su regole.';
   if (safeLang === 'hr') return 'AI analiza trenutno nije dostupna. Prikazani su rule-based SEO rezultati.';
   return 'AI analysis is temporarily unavailable. Rule-based SEO results are shown.';
+}
+
+function getImproveMetaFallbackMessage(lang = 'en') {
+  const safeLang = normalizeUiLanguage(lang);
+
+  if (safeLang === 'de') return 'Die KI-Optimierung für Titel und Meta-Beschreibung ist momentan nicht verfügbar.';
+  if (safeLang === 'fr') return 'L’optimisation IA du titre et de la meta description est momentanément indisponible.';
+  if (safeLang === 'it') return 'L’ottimizzazione AI di title e meta description non è temporaneamente disponibile.';
+  if (safeLang === 'hr') return 'AI optimizacija naslova i meta opisa trenutno nije dostupna.';
+  return 'AI optimization for title and meta description is temporarily unavailable.';
 }
 
 function stripHtml(html = '') {
@@ -675,10 +691,7 @@ async function getUserSubscription(userId) {
     .limit(1)
     .maybeSingle();
 
-  if (error) {
-    throw error;
-  }
-
+  if (error) throw error;
   return data || null;
 }
 
@@ -691,6 +704,182 @@ function userHasProAccess(subscription) {
 
   return String(subscription.plan_id || '').toLowerCase() === 'pro';
 }
+
+async function callOpenAISeoAnalysis(page, ruleAudit, lang = 'en') {
+  if (!process.env.OPENAI_API_KEY) {
+    return {
+      summary: 'OpenAI API key is missing.',
+      issues: [],
+      suggestions: [],
+      quick_wins: [],
+      improved_title: '',
+      improved_meta_description: ''
+    };
+  }
+
+  const safeLang = normalizeUiLanguage(lang);
+  const languageInstruction = getLanguageInstruction(safeLang);
+
+  const title = String(page.page_title || '').trim();
+  const meta = String(page.meta_description || '').trim();
+  const h1 = String(page.h1 || '').trim();
+  const headings = safeArray(page.headings).slice(0, 16).join(' | ');
+  const content =
+    String(page.content || '').trim() ||
+    String(page.text_preview || '').trim() ||
+    '';
+
+  const trimmedContent = content.slice(0, OPENAI_CONTENT_LIMIT);
+
+  const systemPrompt = `
+You are a senior SEO strategist and content quality evaluator.
+${languageInstruction}
+Return concise, practical SEO recommendations.
+Do not invent facts not supported by the page data.
+Focus on search intent, clarity, title quality, meta quality, content usefulness, image optimization, and technical basics.
+Return only content that matches the provided JSON schema.
+`.trim();
+
+  const userPrompt = `
+Analyze this webpage for SEO quality and practical optimization opportunities.
+
+Page data:
+URL: ${page.url || ''}
+Current title: ${title}
+Current meta description: ${meta}
+Current H1: ${h1}
+Headings: ${headings}
+Main content excerpt: ${trimmedContent}
+
+Rule audit score: ${ruleAudit.score}
+Rule audit issues: ${ruleAudit.issues.join(' | ')}
+Rule audit quick fixes: ${ruleAudit.quickFixes.join(' | ')}
+Page speed signals: ${JSON.stringify(ruleAudit.page_speed || {})}
+Image SEO signals: ${JSON.stringify(ruleAudit.image_seo || {})}
+Technical SEO signals: ${JSON.stringify(ruleAudit.technical_seo || {})}
+`.trim();
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-mini',
+        input: [
+          {
+            role: 'system',
+            content: [{ type: 'input_text', text: systemPrompt }]
+          },
+          {
+            role: 'user',
+            content: [{ type: 'input_text', text: userPrompt }]
+          }
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'seo_ai_audit',
+            strict: true,
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                summary: { type: 'string' },
+                issues: {
+                  type: 'array',
+                  items: { type: 'string' }
+                },
+                suggestions: {
+                  type: 'array',
+                  items: { type: 'string' }
+                },
+                quick_wins: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: {
+                      title: { type: 'string' },
+                      description: { type: 'string' }
+                    },
+                    required: ['title', 'description']
+                  }
+                },
+                improved_title: { type: 'string' },
+                improved_meta_description: { type: 'string' }
+              },
+              required: [
+                'summary',
+                'issues',
+                'suggestions',
+                'quick_wins',
+                'improved_title',
+                'improved_meta_description'
+              ]
+            }
+          }
+        }
+      })
+    });
+
+    const raw = await response.json();
+
+    if (!response.ok) {
+      console.error('OpenAI HTTP error:', raw);
+      throw new Error(raw?.error?.message || 'OpenAI SEO analysis failed');
+    }
+
+    const text =
+      raw?.output_text ||
+      raw?.output?.[0]?.content?.find?.((item) => item?.type === 'output_text')?.text ||
+      raw?.output?.[0]?.content?.[0]?.text ||
+      '';
+
+    if (!text) {
+      console.error('OpenAI empty structured output:', raw);
+      throw new Error('OpenAI returned empty structured output');
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (parseErr) {
+      console.error('OpenAI JSON parse error:', parseErr);
+      console.error('OpenAI raw text:', text);
+      throw new Error('Failed to parse OpenAI structured JSON');
+    }
+
+    return {
+      summary: parsed?.summary || '',
+      issues: safeArray(parsed?.issues),
+      suggestions: safeArray(parsed?.suggestions),
+      quick_wins: safeArray(parsed?.quick_wins),
+      improved_title: parsed?.improved_title || '',
+      improved_meta_description: parsed?.improved_meta_description || ''
+    };
+  } catch (err) {
+    console.error('OpenAI SEO analysis timeout/error:', err);
+
+    return {
+      summary: getAiFallbackMessage(lang),
+      issues: [],
+      suggestions: [],
+      quick_wins: [],
+      improved_title: '',
+      improved_meta_description: ''
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function callOpenAIImproveMeta(inputData = {}, lang = 'en') {
   const pageUrl = normalizeUrl(inputData.url || '');
   const title = String(inputData.title || '').trim();
@@ -791,17 +980,23 @@ Return:
 
     const text =
       raw?.output_text ||
+      raw?.output?.[0]?.content?.find?.((item) => item?.type === 'output_text')?.text ||
       raw?.output?.[0]?.content?.[0]?.text ||
       '';
 
-    console.log('IMPROVE META RAW:', JSON.stringify(raw, null, 2));
-    console.log('IMPROVE META TEXT:', text);
-
     if (!text) {
+      console.error('OpenAI improve-meta empty structured output:', raw);
       throw new Error('OpenAI returned empty improve-meta structured output');
     }
 
-    const parsed = JSON.parse(text);
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (parseErr) {
+      console.error('Improve-meta JSON parse error:', parseErr);
+      console.error('Improve-meta raw text:', text);
+      throw new Error('Failed to parse improve-meta structured JSON');
+    }
 
     return {
       summary: parsed?.summary || getImproveMetaFallbackMessage(lang),
@@ -818,5 +1013,113 @@ Return:
     };
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+export default async function handler(req, res) {
+  applyCors(req, res);
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return sendJson(res, 405, { error: 'Method not allowed' });
+  }
+
+  try {
+    const { user, error: authError } = await getAuthenticatedUser(req);
+
+    if (authError || !user) {
+      return sendJson(res, 401, { error: authError || 'Unauthorized' });
+    }
+
+    const subscription = await getUserSubscription(user.id);
+
+    if (!userHasProAccess(subscription)) {
+      return sendJson(res, 403, { error: 'PRO_REQUIRED' });
+    }
+
+    const mode = String(req.body?.mode || 'scan').toLowerCase();
+    const uiLang = normalizeUiLanguage(req.body?.lang || 'en');
+
+    if (mode === 'improve_meta') {
+      const pageUrl = normalizeUrl(req.body?.url || '');
+      const title = String(req.body?.title || '').trim();
+      const metaDescription = String(req.body?.meta_description || '').trim();
+
+      if (!title && !metaDescription) {
+        return sendJson(res, 400, { error: 'Missing title and meta description' });
+      }
+
+      const aiMeta = await callOpenAIImproveMeta(
+        {
+          url: pageUrl,
+          title,
+          meta_description: metaDescription
+        },
+        uiLang
+      );
+
+      return sendJson(res, 200, {
+        ok: true,
+        mode: 'improve_meta',
+        improved_title: aiMeta.improved_title || '',
+        improved_meta_description: aiMeta.improved_meta_description || '',
+        summary: aiMeta.summary || getImproveMetaFallbackMessage(uiLang)
+      });
+    }
+
+    const pageUrl = normalizeUrl(req.body?.url || '');
+
+    if (!pageUrl) {
+      return sendJson(res, 400, { error: 'Missing or invalid URL' });
+    }
+
+    const page = await fetchSinglePage(pageUrl);
+
+    if (!page || !page.content) {
+      return sendJson(res, 500, { error: 'Failed to fetch page content' });
+    }
+
+    const ruleAudit = buildRuleAudit(page);
+
+    let aiAudit = {
+      summary: getAiFallbackMessage(uiLang),
+      issues: [],
+      suggestions: [],
+      quick_wins: [],
+      improved_title: '',
+      improved_meta_description: ''
+    };
+
+    try {
+      aiAudit = await callOpenAISeoAnalysis(page, ruleAudit, uiLang);
+    } catch (err) {
+      console.error('AI audit failed:', err);
+    }
+
+    return sendJson(res, 200, {
+      ok: true,
+      mode: 'scan',
+      url: page.url,
+      score: ruleAudit.score,
+      rule_audit: ruleAudit,
+      ai_audit: aiAudit,
+      page_speed: ruleAudit.page_speed,
+      image_seo: ruleAudit.image_seo,
+      technical_seo: ruleAudit.technical_seo,
+      page: {
+        title: page.page_title,
+        meta_description: page.meta_description,
+        h1: page.h1
+      }
+    });
+  } catch (err) {
+    console.error('seocheck.js error:', err);
+
+    return sendJson(res, 500, {
+      error: err?.message || 'SEO check failed'
+    });
   }
 }
