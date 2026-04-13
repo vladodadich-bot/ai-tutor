@@ -8,7 +8,6 @@
     * {
       box-sizing: border-box;
     }
-
     :root {
       --bg-1: #ffffff;
       --bg-2: #ffffff;
@@ -736,7 +735,7 @@ function formatMessageHtml(text) {
   var escaped = escapeHtml(text).replace(/\n/g, "<br>");
 
   return escaped.replace(
-    /(https?:\/\/[^\s<>()]+)/g
+    /(https?:\/\/[^\s<>()]+)/g,
     function (url) {
       var cleanUrl = url.replace(/&lt;br&gt;$/, "");
       return '<a href="' + cleanUrl + '" target="_blank" rel="noopener noreferrer">' + cleanUrl + "</a>";
