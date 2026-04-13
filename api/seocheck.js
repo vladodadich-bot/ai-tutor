@@ -824,12 +824,17 @@ Technical SEO signals: ${JSON.stringify(ruleAudit.technical_seo || {})}
       throw new Error(raw?.error?.message || 'OpenAI SEO analysis failed');
     }
 
-    const text =
-      raw?.output_text ||
-      raw?.output?.map((item) =>
-        safeArray(item?.content).map((c) => c?.text || '').join('\n')
-      ).join('\n') ||
-      '';
+    let text = raw?.output_text;
+
+if (!text) {
+  try {
+    text = raw?.output?.[0]?.content?.[0]?.text || '';
+  } catch (e) {
+    text = '';
+  }
+}
+
+console.log("AI RAW:", text);
 
     if (!text) {
       console.error('OpenAI empty structured output:', raw);
