@@ -96,6 +96,16 @@ function getAiFallbackMessage(lang = 'en') {
   return 'AI analysis is temporarily unavailable. Rule-based SEO results are shown.';
 }
 
+function getImproveMetaFallbackMessage(lang = 'en') {
+  const safeLang = normalizeUiLanguage(lang);
+
+  if (safeLang === 'de') return 'Die KI-Optimierung für Titel und Meta-Beschreibung ist momentan nicht verfügbar.';
+  if (safeLang === 'fr') return 'L’optimisation IA du titre et de la meta description est momentanément indisponible.';
+  if (safeLang === 'it') return 'L’ottimizzazione AI di title e meta description non è temporaneamente disponibile.';
+  if (safeLang === 'hr') return 'AI optimizacija naslova i meta opisa trenutno nije dostupna.';
+  return 'AI optimization for title and meta description is temporarily unavailable.';
+}
+
 function stripHtml(html = '') {
   return String(html)
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -817,25 +827,25 @@ Technical SEO signals: ${JSON.stringify(ruleAudit.technical_seo || {})}
       })
     });
 
-  const raw = await response.json();
+    const raw = await response.json();
 
-if (!response.ok) {
-  console.error('OpenAI HTTP error:', raw);
-  throw new Error(raw?.error?.message || 'OpenAI SEO analysis failed');
-}
+    if (!response.ok) {
+      console.error('OpenAI HTTP error:', raw);
+      throw new Error(raw?.error?.message || 'OpenAI SEO analysis failed');
+    }
 
-const text =
-  raw?.output_text ||
-  raw?.output?.[0]?.content?.[0]?.text ||
-  '';
+    const text =
+      raw?.output_text ||
+      raw?.output?.[0]?.content?.[0]?.text ||
+      '';
 
-console.log('OPENAI RAW:', JSON.stringify(raw, null, 2));
-console.log('OPENAI TEXT:', text);
+    console.log('OPENAI RAW:', JSON.stringify(raw, null, 2));
+    console.log('OPENAI TEXT:', text);
 
-if (!text) {
-  console.error('OpenAI empty structured output:', raw);
-  throw new Error('OpenAI returned empty structured output');
-}
+    if (!text) {
+      console.error('OpenAI empty structured output:', raw);
+      throw new Error('OpenAI returned empty structured output');
+    }
 
     let parsed;
     try {
@@ -871,6 +881,150 @@ if (!text) {
   }
 }
 
+/* =========================================================
+   NOVO 1: AI TITLE + META OPTIMIZER
+   Ovaj blok služi samo za zadnji optimizer dio u frontendu.
+   Pozivaj ga sa body: { mode: 'improve_meta', url, title, meta_description, lang }
+   ========================================================= */
+async function callOpenAIImproveMeta(inputData = {}, lang = 'en') {
+  if (!process.env.OPENAI_API_KEY) {
+    return {
+      summary: getImproveMetaFallbackMessage(lang),
+      improved_title: '',
+      improved_meta_description: ''
+    };
+  }
+
+  const safeLang = normalizeUiLanguage(lang);
+  const languageInstruction = getLanguageInstruction(safeLang);
+
+  const pageUrl = normalizeUrl(inputData.url || '');
+  const title = String(inputData.title || '').trim();
+  const metaDescription = String(inputData.meta_description || '').trim();
+
+  const systemPrompt = `
+You are a senior SEO copywriter.
+${languageInstruction}
+Your task is to improve an SEO title and meta description.
+
+Rules:
+- Keep the title clear, specific, clickable, and aligned with likely search intent.
+- Keep the title ideally around 50 to 60 characters.
+- Keep the meta description ideally around 140 to 160 characters.
+- Do not use quotation marks unless truly necessary.
+- Do not invent facts that are not present in the provided input.
+- If the existing title or meta description is already strong, still provide a slightly improved version.
+- Return only content matching the JSON schema.
+`.trim();
+
+  const userPrompt = `
+Improve the SEO title and meta description for this page.
+
+URL: ${pageUrl}
+Current title: ${title}
+Current meta description: ${metaDescription}
+
+Return:
+- one improved SEO title
+- one improved meta description
+- one short summary explaining what was improved and why
+`.trim();
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-mini',
+        input: [
+          {
+            role: 'system',
+            content: [{ type: 'input_text', text: systemPrompt }]
+          },
+          {
+            role: 'user',
+            content: [{ type: 'input_text', text: userPrompt }]
+          }
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'improve_meta_response',
+            strict: true,
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                summary: { type: 'string' },
+                improved_title: { type: 'string' },
+                improved_meta_description: { type: 'string' }
+              },
+              required: [
+                'summary',
+                'improved_title',
+                'improved_meta_description'
+              ]
+            }
+          }
+        }
+      })
+    });
+
+    const raw = await response.json();
+
+    if (!response.ok) {
+      console.error('OpenAI improve-meta HTTP error:', raw);
+      throw new Error(raw?.error?.message || 'OpenAI improve-meta request failed');
+    }
+
+    const text =
+      raw?.output_text ||
+      raw?.output?.[0]?.content?.[0]?.text ||
+      '';
+
+    console.log('IMPROVE META RAW:', JSON.stringify(raw, null, 2));
+    console.log('IMPROVE META TEXT:', text);
+
+    if (!text) {
+      console.error('OpenAI improve-meta empty structured output:', raw);
+      throw new Error('OpenAI returned empty improve-meta structured output');
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (parseErr) {
+      console.error('Improve-meta JSON parse error:', parseErr);
+      console.error('Improve-meta raw text:', text);
+      console.error('Improve-meta raw payload:', raw);
+      throw new Error('Failed to parse improve-meta structured JSON');
+    }
+
+    return {
+      summary: parsed?.summary || '',
+      improved_title: parsed?.improved_title || '',
+      improved_meta_description: parsed?.improved_meta_description || ''
+    };
+  } catch (err) {
+    console.error('OpenAI improve-meta timeout/error:', err);
+
+    return {
+      summary: getImproveMetaFallbackMessage(lang),
+      improved_title: '',
+      improved_meta_description: ''
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export default async function handler(req, res) {
   applyCors(req, res);
 
@@ -895,8 +1049,50 @@ export default async function handler(req, res) {
       return sendJson(res, 403, { error: 'PRO_REQUIRED' });
     }
 
-    const pageUrl = normalizeUrl(req.body?.url || '');
+    const mode = String(req.body?.mode || 'scan').toLowerCase();
     const uiLang = normalizeUiLanguage(req.body?.lang || 'en');
+
+    /* =========================================================
+       NOVO 2: HANDLER GRANA ZA AI TITLE + META OPTIMIZER
+       Frontend šalje:
+       {
+         mode: 'improve_meta',
+         url: 'https://example.com/page',
+         title: 'Current title',
+         meta_description: 'Current meta description',
+         lang: 'en'
+       }
+       ========================================================= */
+    if (mode === 'improve_meta') {
+      const pageUrl = normalizeUrl(req.body?.url || '');
+      const title = String(req.body?.title || '').trim();
+      const metaDescription = String(req.body?.meta_description || '').trim();
+
+      if (!title && !metaDescription) {
+        return sendJson(res, 400, {
+          error: 'Missing title and meta description'
+        });
+      }
+
+      const aiMeta = await callOpenAIImproveMeta(
+        {
+          url: pageUrl,
+          title,
+          meta_description: metaDescription
+        },
+        uiLang
+      );
+
+      return sendJson(res, 200, {
+        ok: true,
+        mode: 'improve_meta',
+        improved_title: aiMeta.improved_title || '',
+        improved_meta_description: aiMeta.improved_meta_description || '',
+        summary: aiMeta.summary || getImproveMetaFallbackMessage(uiLang)
+      });
+    }
+
+    const pageUrl = normalizeUrl(req.body?.url || '');
 
     if (!pageUrl) {
       return sendJson(res, 400, { error: 'Missing or invalid URL' });
@@ -930,6 +1126,7 @@ export default async function handler(req, res) {
 
     return sendJson(res, 200, {
       ok: true,
+      mode: 'scan',
       url: page.url,
       score: ruleAudit.score,
       rule_audit: ruleAudit,
