@@ -736,7 +736,7 @@ function formatMessageHtml(text) {
   var escaped = escapeHtml(text).replace(/\n/g, "<br>");
 
   return escaped.replace(
-    /(https?:\/\/[^\s<]+)/g,
+    /(https?:\/\/[^\s<>()]+)/g
     function (url) {
       var cleanUrl = url.replace(/&lt;br&gt;$/, "");
       return '<a href="' + cleanUrl + '" target="_blank" rel="noopener noreferrer">' + cleanUrl + "</a>";
@@ -744,11 +744,18 @@ function formatMessageHtml(text) {
   );
 }
   function cleanText(value) {
-    return String(value || "")
-      .replace(/\u00A0/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
+  return String(value || "")
+    .replace(/\u00A0/g, " ")
+    .replace(/\s+/g, " ")
+
+    // ukloni (link)
+    .replace(/\((https?:\/\/[^\s)]+)\)/g, "$1")
+
+    // ukloni link)
+    .replace(/(https?:\/\/[^\s)]+)\)/g, "$1")
+
+    .trim();
+}
 
   function truncateText(value, max) {
     var text = cleanText(value);
