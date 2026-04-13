@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -40,7 +40,6 @@
 
       --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
       --shadow-lg: 0 18px 42px rgba(15, 23, 42, 0.12);
-
       --glow:
         0 0 0 1px rgba(99, 175, 207, 0.12),
         0 0 22px rgba(99, 175, 207, 0.14);
@@ -992,6 +991,7 @@
   function renderWelcomeIfNeeded() {
     var history = getStoredHistory();
     if (history.length) return;
+    if (chatMessages.children.length) return;
     addMessage("assistant", getLocalizedWelcomeMessage());
   }
 
@@ -1018,25 +1018,10 @@
     return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
   }
 
-  function darkenHex(hex, percent) {
-    var rgb = hexToRgb(hex);
-    if (!rgb) return hex;
-
-    var factor = 1 - (percent / 100);
-    var r = Math.max(0, Math.min(255, Math.round(rgb.r * factor)));
-    var g = Math.max(0, Math.min(255, Math.round(rgb.g * factor)));
-    var b = Math.max(0, Math.min(255, Math.round(rgb.b * factor)));
-
-    return "#" + [r, g, b].map(function (v) {
-      var s = v.toString(16);
-      return s.length === 1 ? "0" + s : s;
-    }).join("");
-  }
-
   function applyAgentData() {
-    var color = agentData.themeColor || "#63AFCF";
-    var darker = darkenHex(color, 10);
-    var darker2 = darkenHex(color, 24);
+    var color = "#63AFCF";
+    var darker = "#4e9fbe";
+    var darker2 = "#3b88a8";
     var glowSoft = rgbaFromHex(color, 0.14);
 
     chatTitle.textContent = agentData.agentName || "SiteMind AI";
@@ -1044,25 +1029,34 @@
     document.documentElement.style.setProperty("--theme-main", color);
     document.documentElement.style.setProperty("--theme-dark", darker);
     document.documentElement.style.setProperty("--theme-deep", darker2);
+
     document.documentElement.style.setProperty("--header-grad-1", color);
     document.documentElement.style.setProperty("--header-grad-2", darker);
     document.documentElement.style.setProperty("--header-grad-3", darker2);
+
     document.documentElement.style.setProperty("--accent", color);
     document.documentElement.style.setProperty("--accent-2", darker);
+
     document.documentElement.style.setProperty("--user-grad-1", color);
     document.documentElement.style.setProperty("--user-grad-2", darker);
+
     document.documentElement.style.setProperty("--border", rgbaFromHex(color, 0.16));
     document.documentElement.style.setProperty("--border-strong", rgbaFromHex(color, 0.26));
-    document.documentElement.style.setProperty("--glow",
+    document.documentElement.style.setProperty(
+      "--glow",
       "0 0 0 1px " + rgbaFromHex(color, 0.12) + ", 0 0 22px " + rgbaFromHex(color, 0.14)
     );
 
     chatInput.style.borderColor = rgbaFromHex(color, 0.26);
+
     chatInput.onfocus = function () {
       chatInput.style.borderColor = rgbaFromHex(color, 0.45);
-      chatInput.style.boxShadow = "0 0 0 1px " + rgbaFromHex(color, 0.12) + ", 0 0 20px " + glowSoft;
+      chatInput.style.boxShadow =
+        "0 0 0 1px " + rgbaFromHex(color, 0.12) +
+        ", 0 0 20px " + glowSoft;
       chatInput.style.background = "#ffffff";
     };
+
     chatInput.onblur = function () {
       chatInput.style.borderColor = rgbaFromHex(color, 0.26);
       chatInput.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.6)";
@@ -1264,6 +1258,7 @@
       }
 
       updateUiLanguage();
+      renderWelcomeIfNeeded();
     }
 
     if (event.data.type === "sitemind-agent-config") {
@@ -1294,9 +1289,10 @@
   applyAgentData();
   autoResizeTextarea();
 
-  fetchAgentConfig().finally(function () {
+  fetchAgentConfig();
+  setTimeout(function () {
     renderWelcomeIfNeeded();
-  });
+  }, 700);
 
   requestPageContextRefresh();
 
