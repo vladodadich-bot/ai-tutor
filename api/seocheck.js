@@ -1,6 +1,3 @@
-// 🔥 SAMO OVA FUNKCIJA JE BITNO IZMIJENJENA
-// (ostatak tvog koda ostaje ISTI)
-
 async function callOpenAISeoAnalysis(page, ruleAudit, lang = 'en') {
   if (!process.env.OPENAI_API_KEY) {
     return {
@@ -18,6 +15,14 @@ async function callOpenAISeoAnalysis(page, ruleAudit, lang = 'en') {
 
   const title = String(page.page_title || '').trim();
   const meta = String(page.meta_description || '').trim();
+  const h1 = String(page.h1 || '').trim();
+  const headings = safeArray(page.headings).slice(0, 16).join(' | ');
+  const content =
+    String(page.content || '').trim() ||
+    String(page.text_preview || '').trim() ||
+    '';
+
+  const trimmedContent = content.slice(0, OPENAI_CONTENT_LIMIT);
 
   const systemPrompt = `
 You are a senior SEO strategist.
@@ -27,12 +32,13 @@ Never return empty fields.
 `.trim();
 
   const userPrompt = `
-Improve SEO for this page.
+Analyze this page and improve SEO.
 
 Title: ${title}
 Meta: ${meta}
-
-Return better title and meta description.
+H1: ${h1}
+Headings: ${headings}
+Content: ${trimmedContent}
 `.trim();
 
   const controller = new AbortController();
@@ -49,8 +55,14 @@ Return better title and meta description.
       body: JSON.stringify({
         model: 'gpt-5-mini',
         input: [
-          { role: 'system', content: [{ type: 'input_text', text: systemPrompt }] },
-          { role: 'user', content: [{ type: 'input_text', text: userPrompt }] }
+          {
+            role: 'system',
+            content: [{ type: 'input_text', text: systemPrompt }]
+          },
+          {
+            role: 'user',
+            content: [{ type: 'input_text', text: userPrompt }]
+          }
         ],
         text: {
           format: {
@@ -59,6 +71,7 @@ Return better title and meta description.
             strict: true,
             schema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 summary: { type: 'string' },
                 issues: { type: 'array', items: { type: 'string' } },
@@ -96,43 +109,70 @@ Return better title and meta description.
     console.log("🔍 RAW OPENAI:", raw);
 
     if (!response.ok) {
-      throw new Error(raw?.error?.message || 'OpenAI failed');
+      throw new Error(raw?.error?.message || 'OpenAI request failed');
     }
 
-    // 🔥 FIXED OUTPUT PARSING
-    let text = raw?.output_text;
+    // ✅ SIGURNO ČITANJE OUTPUTA
+    let text = '';
 
-    if (!text) {
-      try {
-        text = raw?.output?.[0]?.content?.[0]?.text || '';
-      } catch {
-        text = '';
+    try {
+      if (raw?.output_text) {
+        text = raw.output_text;
+      } else if (Array.isArray(raw?.output)) {
+        text = raw.output
+          .map(item =>
+            (item?.content || [])
+              .map(c => c?.text || '')
+              .join('')
+          )
+          .join('');
       }
+    } catch (e) {
+      console.error("TEXT EXTRACTION ERROR:", e);
+      text = '';
     }
 
     console.log("🧠 AI TEXT:", text);
 
+    // ✅ FALLBACK AKO PRAZNO
     if (!text) {
-      throw new Error('Empty AI response');
+      console.error("EMPTY AI RESPONSE:", raw);
+
+      return {
+        summary: getAiFallbackMessage(lang),
+        issues: [],
+        suggestions: [],
+        quick_wins: [],
+        improved_title: title,
+        improved_meta_description: meta
+      };
     }
 
-    let parsed;
+    // ✅ SIGURAN JSON PARSE
+    let parsed = {};
 
     try {
       parsed = JSON.parse(text);
     } catch (err) {
-      console.error("❌ JSON PARSE ERROR:", err);
-      console.error("TEXT WAS:", text);
-      throw err;
+      console.error("JSON PARSE ERROR:", err);
+      console.error("RAW TEXT:", text);
+
+      return {
+        summary: getAiFallbackMessage(lang),
+        issues: [],
+        suggestions: [],
+        quick_wins: [],
+        improved_title: title,
+        improved_meta_description: meta
+      };
     }
 
+    // ✅ FINAL RETURN (NIKAD PRAZNO)
     return {
       summary: parsed.summary || '',
       issues: safeArray(parsed.issues),
       suggestions: safeArray(parsed.suggestions),
       quick_wins: safeArray(parsed.quick_wins),
-
-      // 🔥 FALLBACK ako AI faila
       improved_title: parsed.improved_title || title,
       improved_meta_description: parsed.improved_meta_description || meta
     };
@@ -145,8 +185,8 @@ Return better title and meta description.
       issues: [],
       suggestions: [],
       quick_wins: [],
-      improved_title: title, // fallback
-      improved_meta_description: meta // fallback
+      improved_title: title,
+      improved_meta_description: meta
     };
   } finally {
     clearTimeout(timeout);
