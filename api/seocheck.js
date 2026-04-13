@@ -104,8 +104,34 @@ Content: ${trimmedContent}
       })
     });
 
-    const raw = await response.json();
+  let raw;
 
+try {
+  raw = await response.json();
+} catch (err) {
+  console.error("❌ OPENAI JSON ERROR:", err);
+
+  return {
+    summary: getAiFallbackMessage(lang),
+    issues: [],
+    suggestions: [],
+    quick_wins: [],
+    improved_title: title,
+    improved_meta_description: meta
+  };
+}
+if (!response.ok) {
+  console.error("❌ OPENAI HTTP ERROR:", raw);
+
+  return {
+    summary: getAiFallbackMessage(lang),
+    issues: [],
+    suggestions: [],
+    quick_wins: [],
+    improved_title: title,
+    improved_meta_description: meta
+  };
+}
     console.log("🔍 RAW OPENAI:", raw);
 
     if (!response.ok) {
@@ -113,24 +139,36 @@ Content: ${trimmedContent}
     }
 
     // ✅ SIGURNO ČITANJE OUTPUTA
-    let text = '';
+  let text = '';
 
-    try {
-      if (raw?.output_text) {
-        text = raw.output_text;
-      } else if (Array.isArray(raw?.output)) {
-        text = raw.output
-          .map(item =>
-            (item?.content || [])
-              .map(c => c?.text || '')
-              .join('')
-          )
-          .join('');
-      }
-    } catch (e) {
-      console.error("TEXT EXTRACTION ERROR:", e);
-      text = '';
-    }
+try {
+  if (raw?.output_text) {
+    text = raw.output_text;
+  } else if (Array.isArray(raw?.output)) {
+    text = raw.output
+      .map(item =>
+        (item?.content || [])
+          .map(c => c?.text || '')
+          .join('')
+      )
+      .join('');
+  }
+} catch (e) {
+  console.error("TEXT EXTRACTION ERROR:", e);
+}
+
+if (!text) {
+  console.error("EMPTY AI RESPONSE:", raw);
+
+  return {
+    summary: getAiFallbackMessage(lang),
+    issues: [],
+    suggestions: [],
+    quick_wins: [],
+    improved_title: title,
+    improved_meta_description: meta
+  };
+}
 
     console.log("🧠 AI TEXT:", text);
 
@@ -152,21 +190,23 @@ Content: ${trimmedContent}
     let parsed = {};
 
     try {
-      parsed = JSON.parse(text);
-    } catch (err) {
-      console.error("JSON PARSE ERROR:", err);
-      console.error("RAW TEXT:", text);
+     let parsed = {};
 
-      return {
-        summary: getAiFallbackMessage(lang),
-        issues: [],
-        suggestions: [],
-        quick_wins: [],
-        improved_title: title,
-        improved_meta_description: meta
-      };
-    }
+try {
+  parsed = JSON.parse(text);
+} catch (err) {
+  console.error("JSON PARSE ERROR:", err);
+  console.error("RAW TEXT:", text);
 
+  return {
+    summary: getAiFallbackMessage(lang),
+    issues: [],
+    suggestions: [],
+    quick_wins: [],
+    improved_title: title,
+    improved_meta_description: meta
+  };
+}
     // ✅ FINAL RETURN (NIKAD PRAZNO)
     return {
       summary: parsed.summary || '',
