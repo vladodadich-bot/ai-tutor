@@ -38,6 +38,23 @@
       --accent: #63AFCF;
       --accent-2: #4e9fbe;
 
+      --header-text: #ffffff;
+      --header-subtext: rgba(255,255,255,0.92);
+      --header-brand-text: rgba(255,255,255,0.88);
+      --header-close-border: rgba(255,255,255,0.22);
+      --header-close-bg-1: rgba(255,255,255,0.20);
+      --header-close-bg-2: rgba(255,255,255,0.10);
+      --header-close-hover-bg-1: rgba(255,255,255,0.28);
+      --header-close-hover-bg-2: rgba(255,255,255,0.14);
+      --header-close-hover-border: rgba(255,255,255,0.34);
+
+      --send-text: #ffffff;
+      --face-eye: #ffffff;
+      --face-eye-2: #eefbff;
+      --face-eye-3: #dff4fb;
+      --face-mouth: rgba(255,255,255,0.94);
+      --face-border: rgba(255,255,255,0.24);
+
       --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
       --shadow-lg: 0 18px 42px rgba(15, 23, 42, 0.12);
       --glow:
@@ -90,7 +107,7 @@
       position: relative;
       z-index: 1;
       padding: 14px 18px 16px;
-      color: #ffffff;
+      color: var(--header-text);
       background:
         radial-gradient(circle at 16% 8%, rgba(255,255,255,0.34), transparent 20%),
         radial-gradient(circle at 85% 12%, rgba(255,255,255,0.18), transparent 26%),
@@ -138,14 +155,14 @@
       line-height: 1;
       font-weight: 700;
       letter-spacing: 0.35px;
-      color: rgba(255, 255, 255, 0.88);
+      color: var(--header-brand-text);
       text-decoration: none;
       opacity: 0.96;
       text-shadow: 0 1px 1px rgba(0,0,0,0.08);
     }
 
     .brand-link:hover {
-      color: #ffffff;
+      color: var(--header-text);
       text-decoration: underline;
     }
 
@@ -156,15 +173,15 @@
       letter-spacing: -0.2px;
       padding-right: 6px;
       word-break: break-word;
-      color: #ffffff;
+      color: var(--header-text);
       text-shadow: 0 1px 1px rgba(0,0,0,0.08);
     }
 
     .chat-close {
-      border: 1px solid rgba(255,255,255,0.22);
+      border: 1px solid var(--header-close-border);
       background:
-        linear-gradient(180deg, rgba(255,255,255,0.20), rgba(255,255,255,0.10));
-      color: #ffffff;
+        linear-gradient(180deg, var(--header-close-bg-1), var(--header-close-bg-2));
+      color: var(--header-text);
       width: 34px;
       height: 34px;
       min-width: 34px;
@@ -188,14 +205,14 @@
 
     .chat-close:hover {
       background:
-        linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.14));
-      border-color: rgba(255,255,255,0.34);
+        linear-gradient(180deg, var(--header-close-hover-bg-1), var(--header-close-hover-bg-2));
+      border-color: var(--header-close-hover-border);
       transform: translateY(-1px);
     }
 
     .chat-subtitle {
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.92);
+      color: var(--header-subtext);
       line-height: 1.45;
       max-width: 96%;
       position: relative;
@@ -360,7 +377,7 @@
       background:
         radial-gradient(circle at 20% 18%, rgba(255,255,255,0.24), transparent 22%),
         linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #ffffff;
+      color: var(--send-text);
       padding: 0 18px;
       font-size: 14px;
       font-weight: 800;
@@ -477,7 +494,7 @@
         radial-gradient(circle at 24% 20%, rgba(255,255,255,0.30), transparent 24%),
         linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)),
         linear-gradient(135deg, #63AFCF, #4e9fbe 62%, #3b88a8);
-      border: 1px solid rgba(255,255,255,0.24);
+      border: 1px solid var(--face-border);
       box-shadow:
         inset 0 1px 0 rgba(255,255,255,0.12),
         0 8px 20px rgba(99, 175, 207, 0.24);
@@ -505,7 +522,7 @@
       width: 16px;
       height: 22px;
       border-radius: 4px;
-      background: linear-gradient(180deg, #ffffff 0%, #eefbff 45%, #dff4fb 100%);
+      background: linear-gradient(180deg, var(--face-eye) 0%, var(--face-eye-2) 45%, var(--face-eye-3) 100%);
       box-shadow:
         0 0 10px rgba(255,255,255,0.30),
         0 0 18px rgba(223,244,251,0.18),
@@ -527,7 +544,7 @@
       width: 10px;
       height: 4px;
       border-radius: 0 0 6px 6px;
-      border-bottom: 2px solid rgba(255, 255, 255, 0.94);
+      border-bottom: 2px solid var(--face-mouth);
       opacity: 0.9;
       z-index: 1;
       box-shadow: 0 0 6px rgba(255,255,255,0.18);
@@ -738,6 +755,10 @@
 
   function isDarkColor(color) {
     return getBrightness(color) < 145;
+  }
+
+  function getContrastTextColor(color, darkText, lightText) {
+    return isDarkColor(color) ? (lightText || "#ffffff") : (darkText || "#0f172a");
   }
 
   function isValidCssColor(value) {
@@ -1091,6 +1112,14 @@
     var accentDark = adjustColor(accent, -18);
     var accentDeep = adjustColor(accent, -34);
 
+    var headerIsDark = isDarkColor(headerBg);
+    var accentIsDark = isDarkColor(accent);
+
+    var headerText = getContrastTextColor(headerBg, "#0f172a", "#ffffff");
+    var headerSubtext = headerIsDark ? "rgba(255,255,255,0.92)" : "rgba(15,23,42,0.82)";
+    var headerBrandText = headerIsDark ? "rgba(255,255,255,0.88)" : "rgba(15,23,42,0.74)";
+    var sendText = getContrastTextColor(accent, "#0f172a", "#ffffff");
+
     document.documentElement.style.setProperty("--theme-main", accent);
     document.documentElement.style.setProperty("--theme-dark", accentDark);
     document.documentElement.style.setProperty("--theme-deep", accentDeep);
@@ -1104,6 +1133,57 @@
 
     document.documentElement.style.setProperty("--user-grad-1", accent);
     document.documentElement.style.setProperty("--user-grad-2", accentDark);
+
+    document.documentElement.style.setProperty("--header-text", headerText);
+    document.documentElement.style.setProperty("--header-subtext", headerSubtext);
+    document.documentElement.style.setProperty("--header-brand-text", headerBrandText);
+    document.documentElement.style.setProperty("--send-text", sendText);
+
+    document.documentElement.style.setProperty(
+      "--header-close-border",
+      headerIsDark ? "rgba(255,255,255,0.22)" : "rgba(15,23,42,0.16)"
+    );
+    document.documentElement.style.setProperty(
+      "--header-close-bg-1",
+      headerIsDark ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.58)"
+    );
+    document.documentElement.style.setProperty(
+      "--header-close-bg-2",
+      headerIsDark ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.34)"
+    );
+    document.documentElement.style.setProperty(
+      "--header-close-hover-bg-1",
+      headerIsDark ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.72)"
+    );
+    document.documentElement.style.setProperty(
+      "--header-close-hover-bg-2",
+      headerIsDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.46)"
+    );
+    document.documentElement.style.setProperty(
+      "--header-close-hover-border",
+      headerIsDark ? "rgba(255,255,255,0.34)" : "rgba(15,23,42,0.24)"
+    );
+
+    document.documentElement.style.setProperty(
+      "--face-eye",
+      accentIsDark ? "#ffffff" : "#0f172a"
+    );
+    document.documentElement.style.setProperty(
+      "--face-eye-2",
+      accentIsDark ? "#eefbff" : "#334155"
+    );
+    document.documentElement.style.setProperty(
+      "--face-eye-3",
+      accentIsDark ? "#dff4fb" : "#64748b"
+    );
+    document.documentElement.style.setProperty(
+      "--face-mouth",
+      accentIsDark ? "rgba(255,255,255,0.94)" : "rgba(15,23,42,0.88)"
+    );
+    document.documentElement.style.setProperty(
+      "--face-border",
+      accentIsDark ? "rgba(255,255,255,0.24)" : "rgba(15,23,42,0.14)"
+    );
 
     if (mode === "dark") {
       document.documentElement.style.setProperty("--bg-1", pageBg);
