@@ -286,14 +286,14 @@
     }
 
     .bubble a {
-      color: #63AFCF;
+      color: var(--accent);
       text-decoration: underline;
       font-weight: 600;
       word-break: break-word;
     }
 
     .bubble a:hover {
-      color: #206f90;
+      color: var(--accent-2);
     }
 
     .message-row.user .bubble a {
@@ -646,13 +646,121 @@
     var lang = String(value || "").toLowerCase().trim();
 
     if (!lang) return "en";
-    if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
     if (lang.indexOf("de") === 0) return "de";
     if (lang.indexOf("it") === 0) return "it";
     if (lang.indexOf("fr") === 0) return "fr";
     if (lang.indexOf("en") === 0) return "en";
 
     return "en";
+  }
+
+  function hexToRgb(hex) {
+    var cleaned = String(hex || "").replace("#", "").trim();
+    if (cleaned.length === 3) {
+      cleaned = cleaned.split("").map(function (c) { return c + c; }).join("");
+    }
+    if (cleaned.length !== 6) return null;
+
+    var num = parseInt(cleaned, 16);
+    if (isNaN(num)) return null;
+
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255
+    };
+  }
+
+  function parseRgb(value) {
+    var color = String(value || "").trim();
+    if (!color) return null;
+
+    if (color.charAt(0) === "#") {
+      return hexToRgb(color);
+    }
+
+    var match = color.match(/rgba?\(([^)]+)\)/i);
+    if (!match) return null;
+
+    var parts = match[1].split(",");
+    if (parts.length < 3) return null;
+
+    return {
+      r: parseInt(parts[0], 10),
+      g: parseInt(parts[1], 10),
+      b: parseInt(parts[2], 10)
+    };
+  }
+
+  function rgbaFromHex(hex, alpha) {
+    var rgb = hexToRgb(hex);
+    if (!rgb) return "rgba(99, 175, 207, " + alpha + ")";
+    return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
+  }
+
+  function rgbaFromColor(color, alpha, fallbackHex) {
+    var rgb = parseRgb(color) || hexToRgb(fallbackHex || "#63AFCF");
+    if (!rgb) return "rgba(99, 175, 207, " + alpha + ")";
+    return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function rgbToHex(rgb) {
+    if (!rgb) return "#63AFCF";
+
+    function toHex(v) {
+      var hex = clamp(Math.round(v), 0, 255).toString(16);
+      return hex.length === 1 ? "0" + hex : hex;
+    }
+
+    return "#" + toHex(rgb.r) + toHex(rgb.g) + toHex(rgb.b);
+  }
+
+  function adjustColor(color, amount) {
+    var rgb = parseRgb(color);
+    if (!rgb) return color || "#63AFCF";
+
+    return rgbToHex({
+      r: clamp(rgb.r + amount, 0, 255),
+      g: clamp(rgb.g + amount, 0, 255),
+      b: clamp(rgb.b + amount, 0, 255)
+    });
+  }
+
+  function getBrightness(color) {
+    var rgb = parseRgb(color);
+    if (!rgb) return 255;
+    return (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+  }
+
+  function isDarkColor(color) {
+    return getBrightness(color) < 145;
+  }
+
+  function isValidCssColor(value) {
+    if (!value || typeof value !== "string") return false;
+    var test = document.createElement("div");
+    test.style.color = "";
+    test.style.color = value;
+    return !!test.style.color;
+  }
+
+  function cleanText(value) {
+    return String(value || "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/\((https?:\/\/[^\s)]+)\)/g, "$1")
+      .replace(/(https?:\/\/[^\s)]+)\)/g, "$1")
+      .trim();
+  }
+
+  function truncateText(value, max) {
+    var text = cleanText(value);
+    if (text.length <= max) return text;
+    return text.slice(0, max);
   }
 
   var initialLang = normalizeLang(
@@ -680,24 +788,18 @@
     themeColor: "#63AFCF"
   };
 
+  var themeState = {
+    mode: "light",
+    pageBackground: "",
+    headerBackground: "",
+    accentColor: "#63AFCF",
+    fallbackColor: "#63AFCF"
+  };
+
   var isSending = false;
   var activeController = null;
 
   var UI_TEXT = {
-    hr: {
-      subtitleDefault: "Pitaj AI asistenta",
-      inputPlaceholder: "Napiši pitanje...",
-      send: "Pošalji",
-      sending: "...",
-      loading: "Samo trenutak...",
-      streaming: "AI odgovara...",
-      errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
-      errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
-      welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
-      askPage: "Pitaj AI o: ",
-      closeAria: "Zatvori chat",
-      openStatus: ""
-    },
     de: {
       subtitleDefault: "Frag den KI-Assistenten",
       inputPlaceholder: "Schreibe eine Frage...",
@@ -811,21 +913,6 @@
         return '<a href="' + cleanUrl + '" target="_blank" rel="noopener noreferrer">' + cleanUrl + "</a>";
       }
     );
-  }
-
-  function cleanText(value) {
-    return String(value || "")
-      .replace(/\u00A0/g, " ")
-      .replace(/\s+/g, " ")
-      .replace(/\((https?:\/\/[^\s)]+)\)/g, "$1")
-      .replace(/(https?:\/\/[^\s)]+)\)/g, "$1")
-      .trim();
-  }
-
-  function truncateText(value, max) {
-    var text = cleanText(value);
-    if (text.length <= max) return text;
-    return text.slice(0, max);
   }
 
   function notifyParentClose() {
@@ -995,75 +1082,188 @@
     addMessage("assistant", getLocalizedWelcomeMessage());
   }
 
-  function hexToRgb(hex) {
-    var cleaned = String(hex || "").replace("#", "").trim();
-    if (cleaned.length === 3) {
-      cleaned = cleaned.split("").map(function (c) { return c + c; }).join("");
+  function applyResolvedTheme() {
+    var accent = isValidCssColor(themeState.accentColor) ? themeState.accentColor : "#63AFCF";
+    var headerBg = isValidCssColor(themeState.headerBackground) ? themeState.headerBackground : accent;
+    var pageBg = isValidCssColor(themeState.pageBackground) ? themeState.pageBackground : "#ffffff";
+    var mode = themeState.mode === "dark" ? "dark" : "light";
+
+    var accentDark = adjustColor(accent, -18);
+    var accentDeep = adjustColor(accent, -34);
+
+    document.documentElement.style.setProperty("--theme-main", accent);
+    document.documentElement.style.setProperty("--theme-dark", accentDark);
+    document.documentElement.style.setProperty("--theme-deep", accentDeep);
+
+    document.documentElement.style.setProperty("--header-grad-1", headerBg);
+    document.documentElement.style.setProperty("--header-grad-2", adjustColor(headerBg, -10));
+    document.documentElement.style.setProperty("--header-grad-3", adjustColor(headerBg, -24));
+
+    document.documentElement.style.setProperty("--accent", accent);
+    document.documentElement.style.setProperty("--accent-2", accentDark);
+
+    document.documentElement.style.setProperty("--user-grad-1", accent);
+    document.documentElement.style.setProperty("--user-grad-2", accentDark);
+
+    if (mode === "dark") {
+      document.documentElement.style.setProperty("--bg-1", pageBg);
+      document.documentElement.style.setProperty("--bg-2", adjustColor(pageBg, 8));
+      document.documentElement.style.setProperty("--bg-3", adjustColor(pageBg, 14));
+      document.documentElement.style.setProperty("--panel", "rgba(15, 23, 42, 0.96)");
+      document.documentElement.style.setProperty("--panel-strong", "rgba(15, 23, 42, 1)");
+      document.documentElement.style.setProperty("--text", "#e5eef8");
+      document.documentElement.style.setProperty("--muted", "#94a3b8");
+      document.documentElement.style.setProperty("--muted-2", "#8ea0b5");
+      document.documentElement.style.setProperty("--assistant-bg", "rgba(255,255,255,0.05)");
+      document.documentElement.style.setProperty("--theme-soft", rgbaFromColor(accent, 0.14, "#63AFCF"));
+      document.documentElement.style.setProperty("--border", rgbaFromColor(accent, 0.20, "#63AFCF"));
+      document.documentElement.style.setProperty("--border-strong", rgbaFromColor(accent, 0.34, "#63AFCF"));
+      document.documentElement.style.setProperty(
+        "--glow",
+        "0 0 0 1px " + rgbaFromColor(accent, 0.18, "#63AFCF") + ", 0 0 22px " + rgbaFromColor(accent, 0.16, "#63AFCF")
+      );
+
+      document.body.style.background =
+        "radial-gradient(circle at top left, " + rgbaFromColor(accent, 0.10, "#63AFCF") + ", transparent 26%), " +
+        "radial-gradient(circle at bottom right, " + rgbaFromColor(accent, 0.08, "#63AFCF") + ", transparent 22%), " +
+        "linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 52%, var(--bg-3) 100%)";
+
+      var shell = document.querySelector(".chat-shell");
+      if (shell) {
+        shell.style.background =
+          "linear-gradient(180deg, " + rgbaFromColor(pageBg, 0.96, "#0f172a") + ", " + rgbaFromColor(adjustColor(pageBg, 12), 0.98, "#1e293b") + ")";
+      }
+
+      var form = document.querySelector(".chat-form");
+      if (form) {
+        form.style.background = "rgba(15, 23, 42, 0.92)";
+        form.style.borderTop = "1px solid " + rgbaFromColor(accent, 0.18, "#63AFCF");
+        form.style.boxShadow = "0 -8px 24px rgba(0, 0, 0, 0.18)";
+      }
+
+      chatInput.style.background = "rgba(255,255,255,0.06)";
+      chatInput.style.color = "#e5eef8";
+      chatInput.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.03)";
+    } else {
+      document.documentElement.style.setProperty("--bg-1", "#ffffff");
+      document.documentElement.style.setProperty("--bg-2", "#ffffff");
+      document.documentElement.style.setProperty("--bg-3", adjustColor(pageBg, 6));
+      document.documentElement.style.setProperty("--panel", "rgba(255, 255, 255, 0.98)");
+      document.documentElement.style.setProperty("--panel-strong", "rgba(255, 255, 255, 1)");
+      document.documentElement.style.setProperty("--text", "#0f172a");
+      document.documentElement.style.setProperty("--muted", "#64748b");
+      document.documentElement.style.setProperty("--muted-2", "#94a3b8");
+      document.documentElement.style.setProperty("--assistant-bg", adjustColor(pageBg, 4));
+      document.documentElement.style.setProperty("--theme-soft", rgbaFromColor(accent, 0.12, "#63AFCF"));
+      document.documentElement.style.setProperty("--border", rgbaFromColor(accent, 0.16, "#63AFCF"));
+      document.documentElement.style.setProperty("--border-strong", rgbaFromColor(accent, 0.26, "#63AFCF"));
+      document.documentElement.style.setProperty(
+        "--glow",
+        "0 0 0 1px " + rgbaFromColor(accent, 0.12, "#63AFCF") + ", 0 0 22px " + rgbaFromColor(accent, 0.14, "#63AFCF")
+      );
+
+      document.body.style.background =
+        "radial-gradient(circle at top left, " + rgbaFromColor(accent, 0.08, "#63AFCF") + ", transparent 26%), " +
+        "radial-gradient(circle at bottom right, " + rgbaFromColor(accent, 0.06, "#63AFCF") + ", transparent 22%), " +
+        "linear-gradient(180deg, #ffffff 0%, #ffffff 52%, " + adjustColor(pageBg, 6) + " 100%)";
+
+      var shellLight = document.querySelector(".chat-shell");
+      if (shellLight) {
+        shellLight.style.background =
+          "linear-gradient(180deg, rgba(255,255,255,1), " + adjustColor(pageBg, 5) + ")";
+      }
+
+      var formLight = document.querySelector(".chat-form");
+      if (formLight) {
+        formLight.style.background = "rgba(255, 255, 255, 0.98)";
+        formLight.style.borderTop = "1px solid " + rgbaFromColor(accent, 0.16, "#63AFCF");
+        formLight.style.boxShadow = "0 -8px 24px rgba(15, 23, 42, 0.06)";
+      }
+
+      chatInput.style.background = "#ffffff";
+      chatInput.style.color = "#0f172a";
+      chatInput.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.6)";
     }
-    if (cleaned.length !== 6) return null;
 
-    var num = parseInt(cleaned, 16);
-    if (isNaN(num)) return null;
+    chatHeader.style.boxShadow =
+      "0 14px 30px " + rgbaFromColor(headerBg, 0.22, "#63AFCF") + ", inset 0 1px 0 rgba(255,255,255,0.18)";
 
-    return {
-      r: (num >> 16) & 255,
-      g: (num >> 8) & 255,
-      b: num & 255
-    };
-  }
-
-  function rgbaFromHex(hex, alpha) {
-    var rgb = hexToRgb(hex);
-    if (!rgb) return "rgba(99, 175, 207, " + alpha + ")";
-    return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
+    var face = document.getElementById("smFace");
+    if (face) {
+      face.style.background =
+        "radial-gradient(circle at 24% 20%, rgba(255,255,255,0.30), transparent 24%), " +
+        "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)), " +
+        "linear-gradient(135deg, " + accent + ", " + accentDark + " 62%, " + accentDeep + ")";
+      face.style.boxShadow =
+        "inset 0 1px 0 rgba(255,255,255,0.12), 0 8px 20px " + rgbaFromColor(accent, 0.24, "#63AFCF");
+    }
   }
 
   function applyAgentData() {
-    var color = "#63AFCF";
-    var darker = "#4e9fbe";
-    var darker2 = "#3b88a8";
-    var glowSoft = rgbaFromHex(color, 0.14);
-
     chatTitle.textContent = agentData.agentName || "SiteMind AI";
+    applyResolvedTheme();
 
-    document.documentElement.style.setProperty("--theme-main", color);
-    document.documentElement.style.setProperty("--theme-dark", darker);
-    document.documentElement.style.setProperty("--theme-deep", darker2);
+    var color = isValidCssColor(themeState.accentColor) ? themeState.accentColor : "#63AFCF";
 
-    document.documentElement.style.setProperty("--header-grad-1", color);
-    document.documentElement.style.setProperty("--header-grad-2", darker);
-    document.documentElement.style.setProperty("--header-grad-3", darker2);
-
-    document.documentElement.style.setProperty("--accent", color);
-    document.documentElement.style.setProperty("--accent-2", darker);
-
-    document.documentElement.style.setProperty("--user-grad-1", color);
-    document.documentElement.style.setProperty("--user-grad-2", darker);
-
-    document.documentElement.style.setProperty("--border", rgbaFromHex(color, 0.16));
-    document.documentElement.style.setProperty("--border-strong", rgbaFromHex(color, 0.26));
-    document.documentElement.style.setProperty(
-      "--glow",
-      "0 0 0 1px " + rgbaFromHex(color, 0.12) + ", 0 0 22px " + rgbaFromHex(color, 0.14)
-    );
-
-    chatInput.style.borderColor = rgbaFromHex(color, 0.26);
+    chatInput.style.borderColor = rgbaFromColor(color, 0.26, "#63AFCF");
 
     chatInput.onfocus = function () {
-      chatInput.style.borderColor = rgbaFromHex(color, 0.45);
+      chatInput.style.borderColor = rgbaFromColor(color, 0.45, "#63AFCF");
       chatInput.style.boxShadow =
-        "0 0 0 1px " + rgbaFromHex(color, 0.12) +
-        ", 0 0 20px " + glowSoft;
-      chatInput.style.background = "#ffffff";
+        "0 0 0 1px " + rgbaFromColor(color, 0.12, "#63AFCF") +
+        ", 0 0 20px " + rgbaFromColor(color, 0.14, "#63AFCF");
     };
 
     chatInput.onblur = function () {
-      chatInput.style.borderColor = rgbaFromHex(color, 0.26);
-      chatInput.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.6)";
-      chatInput.style.background = "#ffffff";
+      chatInput.style.borderColor = rgbaFromColor(color, 0.26, "#63AFCF");
+      chatInput.style.boxShadow = themeState.mode === "dark"
+        ? "inset 0 1px 0 rgba(255,255,255,0.03)"
+        : "inset 0 1px 0 rgba(255,255,255,0.6)";
     };
 
     updateUiLanguage();
+  }
+
+  function applyIncomingTheme(data) {
+    if (!data || typeof data !== "object") return;
+
+    if (data.mode === "dark" || data.mode === "light") {
+      themeState.mode = data.mode;
+    }
+
+    if (isValidCssColor(data.pageBackground)) {
+      themeState.pageBackground = data.pageBackground;
+    }
+
+    if (isValidCssColor(data.headerBackground)) {
+      themeState.headerBackground = data.headerBackground;
+    }
+
+    if (isValidCssColor(data.accentColor)) {
+      themeState.accentColor = data.accentColor;
+    }
+
+    if (isValidCssColor(data.fallbackColor)) {
+      themeState.fallbackColor = data.fallbackColor;
+    }
+
+    if (!themeState.pageBackground) {
+      themeState.pageBackground = themeState.mode === "dark" ? "#0f172a" : "#ffffff";
+    }
+
+    if (!themeState.headerBackground) {
+      themeState.headerBackground = themeState.accentColor || themeState.fallbackColor || "#63AFCF";
+    }
+
+    if (!themeState.accentColor) {
+      themeState.accentColor = themeState.fallbackColor || agentData.themeColor || "#63AFCF";
+    }
+
+    if (!data.mode) {
+      themeState.mode = isDarkColor(themeState.pageBackground) ? "dark" : "light";
+    }
+
+    applyResolvedTheme();
   }
 
   async function fetchAgentConfig() {
@@ -1081,6 +1281,13 @@
       agentData.agentName = data.agentName || "SiteMind AI";
       agentData.welcomeMessage = data.welcomeMessage || "";
       agentData.themeColor = data.themeColor || "#63AFCF";
+
+      if (!themeState.accentColor || themeState.accentColor === "#63AFCF") {
+        themeState.accentColor = agentData.themeColor || "#63AFCF";
+      }
+      if (!themeState.fallbackColor) {
+        themeState.fallbackColor = agentData.themeColor || "#63AFCF";
+      }
 
       applyAgentData();
     } catch (e) {}
@@ -1266,6 +1473,19 @@
       agentData.agentName = event.data.agentName || "SiteMind AI";
       agentData.welcomeMessage = event.data.welcomeMessage || "";
       agentData.themeColor = event.data.themeColor || "#63AFCF";
+
+      if (!themeState.accentColor || themeState.accentColor === "#63AFCF") {
+        themeState.accentColor = agentData.themeColor || "#63AFCF";
+      }
+      if (!themeState.fallbackColor) {
+        themeState.fallbackColor = agentData.themeColor || "#63AFCF";
+      }
+
+      applyAgentData();
+    }
+
+    if (event.data.type === "sitemind-theme") {
+      applyIncomingTheme(event.data);
       applyAgentData();
     }
   });
