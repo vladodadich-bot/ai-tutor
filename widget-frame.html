@@ -29,6 +29,7 @@
 
       --user-grad-1: #63AFCF;
       --user-grad-2: #4e9fbe;
+      --user-text-color: #ffffff;
       --assistant-bg: #f7fcfe;
 
       --header-grad-1: #63AFCF;
@@ -275,7 +276,7 @@
       background:
         radial-gradient(circle at 18% 18%, rgba(255,255,255,0.26), transparent 24%),
         linear-gradient(135deg, var(--user-grad-1) 0%, var(--user-grad-2) 100%);
-      color: #ffffff;
+      color: var(--user-text-color);
       font-weight: 600;
       border-bottom-right-radius: 6px;
       border: 1px solid rgba(255,255,255,0.14);
@@ -283,6 +284,15 @@
         0 10px 24px rgba(99, 175, 207, 0.24),
         inset 0 1px 0 rgba(255,255,255,0.14);
     }
+    /* DARK MODE → plavi bubble */
+.widget.dark .message-row.user .bubble {
+  --user-text-color: #f9fafb;
+}
+
+/* LIGHT MODE → bijeli/svijetli bubble */
+.widget.light .message-row.user .bubble {
+  --user-text-color: #0f172a;
+}
 
     .message-row.user .bubble::after {
       content: "";
