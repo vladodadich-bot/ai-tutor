@@ -49,11 +49,6 @@
       --header-close-hover-border: rgba(255,255,255,0.34);
 
       --send-text: #ffffff;
-      --face-eye: #ffffff;
-      --face-eye-2: #eefbff;
-      --face-eye-3: #dff4fb;
-      --face-mouth: rgba(255,255,255,0.94);
-      --face-border: rgba(255,255,255,0.24);
 
       --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
       --shadow-lg: 0 18px 42px rgba(15, 23, 42, 0.12);
@@ -149,21 +144,53 @@
     }
 
     .brand-link {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
       margin: 0 0 7px;
+      padding: 6px 10px;
       font-size: 10px;
       line-height: 1;
       font-weight: 700;
       letter-spacing: 0.35px;
-      color: var(--header-brand-text);
+      color: var(--header-text);
       text-decoration: none;
-      opacity: 0.96;
+      opacity: 0.98;
       text-shadow: 0 1px 1px rgba(0,0,0,0.08);
+      background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08));
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 999px;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.16),
+        0 6px 16px rgba(0,0,0,0.08);
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+    }
+
+    .brand-link::after {
+      content: "";
+      position: absolute;
+      top: -30%;
+      left: -55%;
+      width: 42%;
+      height: 160%;
+      background: linear-gradient(
+        115deg,
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,0.10) 30%,
+        rgba(255,255,255,0.45) 50%,
+        rgba(255,255,255,0.10) 70%,
+        rgba(255,255,255,0) 100%
+      );
+      transform: skewX(-24deg);
+      animation: shineSweep 5.8s ease-in-out infinite;
+      pointer-events: none;
     }
 
     .brand-link:hover {
       color: var(--header-text);
-      text-decoration: underline;
+      text-decoration: none;
+      filter: brightness(1.04);
     }
 
     .chat-title {
@@ -480,27 +507,29 @@
       min-width: 0;
     }
 
-    .sm-face {
+    .sm-logo-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       width: 52px;
       height: 52px;
       min-width: 52px;
       border-radius: 14px;
       position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       overflow: hidden;
+      text-decoration: none;
       background:
         radial-gradient(circle at 24% 20%, rgba(255,255,255,0.30), transparent 24%),
         linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)),
         linear-gradient(135deg, #63AFCF, #4e9fbe 62%, #3b88a8);
-      border: 1px solid var(--face-border);
+      border: 1px solid rgba(255,255,255,0.22);
       box-shadow:
         inset 0 1px 0 rgba(255,255,255,0.12),
         0 8px 20px rgba(99, 175, 207, 0.24);
+      flex-shrink: 0;
     }
 
-    .sm-face::before {
+    .sm-logo-link::before {
       content: "";
       position: absolute;
       inset: 0;
@@ -508,87 +537,71 @@
         radial-gradient(circle at 30% 25%, rgba(255,255,255,0.16), transparent 35%),
         radial-gradient(circle at 75% 75%, rgba(223,244,251,0.22), transparent 30%);
       pointer-events: none;
-    }
-
-    .sm-eyes {
-      position: relative;
       z-index: 1;
-      display: flex;
-      align-items: center;
-      gap: 5px;
     }
 
-    .sm-eye {
-      width: 16px;
-      height: 22px;
-      border-radius: 4px;
-      background: linear-gradient(180deg, var(--face-eye) 0%, var(--face-eye-2) 45%, var(--face-eye-3) 100%);
-      box-shadow:
-        0 0 10px rgba(255,255,255,0.30),
-        0 0 18px rgba(223,244,251,0.18),
-        inset 0 1px 0 rgba(255,255,255,0.68);
-      transition:
-        height 0.14s ease,
-        transform 0.22s ease,
-        opacity 0.22s ease,
-        border-radius 0.22s ease;
-      transform-origin: center center;
-    }
-
-    .sm-face::after {
+    .sm-logo-link::after {
       content: "";
       position: absolute;
-      left: 50%;
-      bottom: 5px;
-      transform: translateX(-50%);
-      width: 10px;
-      height: 4px;
-      border-radius: 0 0 6px 6px;
-      border-bottom: 2px solid var(--face-mouth);
-      opacity: 0.9;
-      z-index: 1;
-      box-shadow: 0 0 6px rgba(255,255,255,0.18);
+      top: -35%;
+      left: -60%;
+      width: 44%;
+      height: 180%;
+      background: linear-gradient(
+        115deg,
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,0.10) 28%,
+        rgba(255,255,255,0.62) 50%,
+        rgba(255,255,255,0.14) 72%,
+        rgba(255,255,255,0) 100%
+      );
+      transform: skewX(-24deg);
+      animation: shineSweep 5.2s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 2;
     }
 
-    .sm-face.sm-blink .sm-eye {
-      height: 4px;
-      border-radius: 6px;
+    .sm-logo {
+      width: 38px;
+      height: 38px;
+      object-fit: contain;
+      display: block;
+      position: relative;
+      z-index: 0;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.10));
     }
 
-    .sm-face.sm-think-1 .sm-eye-left {
-      transform: rotate(-10deg) translateY(1px);
-    }
-
-    .sm-face.sm-think-1 .sm-eye-right {
-      transform: rotate(10deg) translateY(1px);
-    }
-
-    .sm-face.sm-think-2 .sm-eye-left {
-      transform: rotate(-16deg) translateY(2px) scaleY(0.92);
-    }
-
-    .sm-face.sm-think-2 .sm-eye-right {
-      transform: rotate(16deg) translateY(2px) scaleY(0.92);
-    }
-
-    .sm-face.sm-think-3 .sm-eye-left {
-      transform: skewY(-8deg) translateY(1px);
-    }
-
-    .sm-face.sm-think-3 .sm-eye-right {
-      transform: skewY(8deg) translateY(1px);
+    @keyframes shineSweep {
+      0% {
+        left: -65%;
+        opacity: 0;
+      }
+      8% {
+        opacity: 0;
+      }
+      18% {
+        opacity: 1;
+      }
+      30% {
+        left: 130%;
+        opacity: 0;
+      }
+      100% {
+        left: 130%;
+        opacity: 0;
+      }
     }
 
     @media (max-width: 480px) {
-      .sm-face {
+      .sm-logo-link {
         width: 48px;
         height: 48px;
         min-width: 48px;
       }
 
-      .sm-eye {
-        width: 14px;
-        height: 21px;
+      .sm-logo {
+        width: 34px;
+        height: 34px;
       }
 
       .sm-header-brand {
@@ -603,15 +616,24 @@
     <div class="chat-header-top">
       <div class="chat-header-left">
         <div class="sm-header-brand">
-          <div class="sm-face" id="smFace" aria-hidden="true">
-            <div class="sm-eyes">
-              <div class="sm-eye sm-eye-left"></div>
-              <div class="sm-eye sm-eye-right"></div>
-            </div>
-          </div>
+          <a
+            class="sm-logo-link"
+            id="smLogoLink"
+            href="https://sitemindai.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open SiteMind Ai Labs"
+          >
+            <img
+              class="sm-logo"
+              id="smLogo"
+              src="https://sitemindai.app/images/logo2.png"
+              alt="SiteMind Ai Labs logo"
+            />
+          </a>
 
           <div class="sm-title-wrap">
-            <a class="brand-link" href="https://sitemindai.app" target="_blank" rel="noopener noreferrer"> Powered by SiteMind Ai Labs</a>
+            <a class="brand-link" href="https://sitemindai.app" target="_blank" rel="noopener noreferrer">Powered by SiteMind Ai Labs</a>
             <div class="chat-title" id="chatTitle">SiteMind AI</div>
           </div>
         </div>
@@ -659,18 +681,18 @@
   var params = new URLSearchParams(window.location.search);
   var agentId = params.get("agentId") || "demo-agent";
 
- function normalizeLang(value) {
-  var lang = String(value || "").toLowerCase().trim();
+  function normalizeLang(value) {
+    var lang = String(value || "").toLowerCase().trim();
 
-  if (!lang) return "en";
-  if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
-  if (lang.indexOf("de") === 0) return "de";
-  if (lang.indexOf("it") === 0) return "it";
-  if (lang.indexOf("fr") === 0) return "fr";
-  if (lang.indexOf("en") === 0) return "en";
+    if (!lang) return "en";
+    if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
+    if (lang.indexOf("de") === 0) return "de";
+    if (lang.indexOf("it") === 0) return "it";
+    if (lang.indexOf("fr") === 0) return "fr";
+    if (lang.indexOf("en") === 0) return "en";
 
-  return "en";
-}
+    return "en";
+  }
 
   function hexToRgb(hex) {
     var cleaned = String(hex || "").replace("#", "").trim();
@@ -823,19 +845,19 @@
 
   var UI_TEXT = {
     hr: {
-  subtitleDefault: "Pitaj AI asistenta",
-  inputPlaceholder: "Napiši pitanje...",
-  send: "Pošalji",
-  sending: "...",
-  loading: "Samo trenutak...",
-  streaming: "AI odgovara...",
-  errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
-  errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
-  welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
-  askPage: "Pitaj AI o: ",
-  closeAria: "Zatvori chat",
-  openStatus: ""
-},
+      subtitleDefault: "Pitaj AI asistenta",
+      inputPlaceholder: "Napiši pitanje...",
+      send: "Pošalji",
+      sending: "...",
+      loading: "Samo trenutak...",
+      streaming: "AI odgovara...",
+      errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
+      errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
+      welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
+      askPage: "Pitaj AI o: ",
+      closeAria: "Zatvori chat",
+      openStatus: ""
+    },
     de: {
       subtitleDefault: "Frag den KI-Assistenten",
       inputPlaceholder: "Schreibe eine Frage...",
@@ -1128,7 +1150,6 @@
     var accentDeep = adjustColor(accent, -34);
 
     var headerIsDark = isDarkColor(headerBg);
-    var accentIsDark = isDarkColor(accent);
 
     var headerText = getContrastTextColor(headerBg, "#0f172a", "#ffffff");
     var headerSubtext = headerIsDark ? "rgba(255,255,255,0.92)" : "rgba(15,23,42,0.82)";
@@ -1177,27 +1198,6 @@
     document.documentElement.style.setProperty(
       "--header-close-hover-border",
       headerIsDark ? "rgba(255,255,255,0.34)" : "rgba(15,23,42,0.24)"
-    );
-
-    document.documentElement.style.setProperty(
-      "--face-eye",
-      accentIsDark ? "#ffffff" : "#0f172a"
-    );
-    document.documentElement.style.setProperty(
-      "--face-eye-2",
-      accentIsDark ? "#eefbff" : "#334155"
-    );
-    document.documentElement.style.setProperty(
-      "--face-eye-3",
-      accentIsDark ? "#dff4fb" : "#64748b"
-    );
-    document.documentElement.style.setProperty(
-      "--face-mouth",
-      accentIsDark ? "rgba(255,255,255,0.94)" : "rgba(15,23,42,0.88)"
-    );
-    document.documentElement.style.setProperty(
-      "--face-border",
-      accentIsDark ? "rgba(255,255,255,0.24)" : "rgba(15,23,42,0.14)"
     );
 
     if (mode === "dark") {
@@ -1283,13 +1283,13 @@
     chatHeader.style.boxShadow =
       "0 14px 30px " + rgbaFromColor(headerBg, 0.22, "#63AFCF") + ", inset 0 1px 0 rgba(255,255,255,0.18)";
 
-    var face = document.getElementById("smFace");
-    if (face) {
-      face.style.background =
+    var logoLink = document.getElementById("smLogoLink");
+    if (logoLink) {
+      logoLink.style.background =
         "radial-gradient(circle at 24% 20%, rgba(255,255,255,0.30), transparent 24%), " +
         "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)), " +
         "linear-gradient(135deg, " + accent + ", " + accentDark + " 62%, " + accentDeep + ")";
-      face.style.boxShadow =
+      logoLink.style.boxShadow =
         "inset 0 1px 0 rgba(255,255,255,0.12), 0 8px 20px " + rgbaFromColor(accent, 0.24, "#63AFCF");
     }
   }
@@ -1622,74 +1622,6 @@
       );
     } catch (e) {}
   }
-})();
-</script>
-
-<script>
-(function () {
-  const face = document.getElementById('smFace');
-  if (!face) return;
-
-  const thinkClasses = ['sm-think-1', 'sm-think-2', 'sm-think-3'];
-  let isBlinking = false;
-
-  function clearThinking() {
-    thinkClasses.forEach(cls => face.classList.remove(cls));
-  }
-
-  function blink() {
-    if (isBlinking) return;
-    isBlinking = true;
-
-    clearThinking();
-    face.classList.add('sm-blink');
-
-    setTimeout(() => {
-      face.classList.remove('sm-blink');
-      isBlinking = false;
-    }, 150);
-  }
-
-  function randomThinkingPose() {
-    if (isBlinking) return;
-
-    clearThinking();
-
-    const shouldThink = Math.random() < 0.55;
-    if (!shouldThink) return;
-
-    const cls = thinkClasses[Math.floor(Math.random() * thinkClasses.length)];
-    face.classList.add(cls);
-
-    setTimeout(() => {
-      face.classList.remove(cls);
-    }, 900 + Math.floor(Math.random() * 700));
-  }
-
-  function idleMotion() {
-    const roll = Math.random();
-
-    if (roll < 0.45) {
-      blink();
-      return;
-    }
-
-    if (roll < 0.85) {
-      randomThinkingPose();
-      return;
-    }
-
-    blink();
-    setTimeout(() => {
-      randomThinkingPose();
-    }, 220);
-  }
-
-  setInterval(idleMotion, 2800 + Math.floor(Math.random() * 1200));
-
-  setTimeout(() => {
-    blink();
-  }, 1200);
 })();
 </script>
 </body>
