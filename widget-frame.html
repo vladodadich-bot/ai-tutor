@@ -1,6 +1,3 @@
-
-
-
 <!DOCTYPE html>
 <html lang="">
 <head>
@@ -52,6 +49,12 @@
       --header-close-hover-border: rgba(255,255,255,0.34);
 
       --send-text: #ffffff;
+      --face-eye: #ffffff;
+      --face-eye-2: #eefbff;
+      --face-eye-3: #dff4fb;
+      --face-mouth: rgba(255,255,255,0.94);
+      --face-border: rgba(255,255,255,0.24);
+
       --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
       --shadow-lg: 0 18px 42px rgba(15, 23, 42, 0.12);
       --glow:
@@ -103,7 +106,7 @@
     .chat-header {
       position: relative;
       z-index: 1;
-      padding: 14px 18px 14px;
+      padding: 14px 18px 16px;
       color: var(--header-text);
       background:
         radial-gradient(circle at 16% 8%, rgba(255,255,255,0.34), transparent 20%),
@@ -147,7 +150,7 @@
 
     .brand-link {
       display: inline-block;
-      margin: 0 0 6px;
+      margin: 0 0 7px;
       font-size: 10px;
       line-height: 1;
       font-weight: 700;
@@ -217,17 +220,6 @@
       text-shadow: 0 1px 1px rgba(0,0,0,0.06);
     }
 
-    .chat-note {
-      position: relative;
-      z-index: 1;
-      font-size: 10px;
-      line-height: 1.35;
-      color: rgba(255,255,255,0.74);
-      letter-spacing: 0.1px;
-      text-shadow: 0 1px 1px rgba(0,0,0,0.06);
-      margin-top: 1px;
-    }
-
     .chat-messages {
       position: relative;
       z-index: 1;
@@ -283,7 +275,7 @@
       background:
         radial-gradient(circle at 18% 18%, rgba(255,255,255,0.26), transparent 24%),
         linear-gradient(135deg, var(--user-grad-1) 0%, var(--user-grad-2) 100%);
-      color: #EAA83C;
+      color: #ffffff;
       font-weight: 600;
       border-bottom-right-radius: 6px;
       border: 1px solid rgba(255,255,255,0.14);
@@ -420,7 +412,7 @@
       }
 
       .chat-header {
-        padding: 16px 20px 15px;
+        padding: 16px 20px 18px;
       }
 
       .chat-title {
@@ -442,7 +434,7 @@
 
     @media (max-width: 460px) {
       .chat-header {
-        padding: 14px 14px 13px;
+        padding: 14px 14px 14px;
       }
 
       .chat-messages {
@@ -473,26 +465,6 @@
       .chat-input {
         font-size: 15px;
       }
-
-      .sm-header-brand {
-        gap: 10px;
-      }
-
-      .sm-logo-wrap {
-        width: 46px;
-        height: 46px;
-        min-width: 46px;
-        border-radius: 12px;
-      }
-
-      .sm-logo-img {
-        max-width: 30px;
-        max-height: 30px;
-      }
-
-      .chat-note {
-        font-size: 9px;
-      }
     }
 
     .sm-header-brand {
@@ -508,7 +480,7 @@
       min-width: 0;
     }
 
-    .sm-logo-wrap {
+    .sm-face {
       width: 52px;
       height: 52px;
       min-width: 52px;
@@ -519,73 +491,108 @@
       justify-content: center;
       overflow: hidden;
       background:
-        radial-gradient(circle at 24% 20%, rgba(255,255,255,0.24), transparent 24%),
-        linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06)),
-        linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08));
-      border: 1px solid rgba(255,255,255,0.18);
+        radial-gradient(circle at 24% 20%, rgba(255,255,255,0.30), transparent 24%),
+        linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)),
+        linear-gradient(135deg, #63AFCF, #4e9fbe 62%, #3b88a8);
+      border: 1px solid var(--face-border);
       box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.16),
+        inset 0 1px 0 rgba(255,255,255,0.12),
         0 8px 20px rgba(99, 175, 207, 0.24);
-      backdrop-filter: blur(10px);
     }
 
-    .sm-logo-wrap::before {
-      content: "";
-      position: absolute;
-      inset: -35%;
-      background: linear-gradient(
-        115deg,
-        transparent 24%,
-        rgba(255,255,255,0.00) 34%,
-        rgba(255,255,255,0.22) 46%,
-        rgba(255,255,255,0.62) 50%,
-        rgba(255,255,255,0.18) 54%,
-        transparent 66%
-      );
-      transform: translateX(-155%) rotate(14deg);
-      opacity: 0;
-      pointer-events: none;
-      animation: logoShine 7.5s ease-in-out infinite;
-    }
-
-    .sm-logo-wrap::after {
+    .sm-face::before {
       content: "";
       position: absolute;
       inset: 0;
-      pointer-events: none;
       background:
-        radial-gradient(circle at 26% 22%, rgba(255,255,255,0.20), transparent 34%),
-        radial-gradient(circle at 74% 76%, rgba(255,255,255,0.08), transparent 28%);
+        radial-gradient(circle at 30% 25%, rgba(255,255,255,0.16), transparent 35%),
+        radial-gradient(circle at 75% 75%, rgba(223,244,251,0.22), transparent 30%);
+      pointer-events: none;
     }
 
-    .sm-logo-img {
+    .sm-eyes {
       position: relative;
       z-index: 1;
-      display: block;
-      max-width: 34px;
-      max-height: 34px;
-      width: auto;
-      height: auto;
-      object-fit: contain;
-      filter:
-        drop-shadow(0 1px 0 rgba(255,255,255,0.18))
-        drop-shadow(0 6px 14px rgba(0,0,0,0.10));
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
 
-    @keyframes logoShine {
-      0%, 72%, 100% {
-        transform: translateX(-155%) rotate(14deg);
-        opacity: 0;
+    .sm-eye {
+      width: 16px;
+      height: 22px;
+      border-radius: 4px;
+      background: linear-gradient(180deg, var(--face-eye) 0%, var(--face-eye-2) 45%, var(--face-eye-3) 100%);
+      box-shadow:
+        0 0 10px rgba(255,255,255,0.30),
+        0 0 18px rgba(223,244,251,0.18),
+        inset 0 1px 0 rgba(255,255,255,0.68);
+      transition:
+        height 0.14s ease,
+        transform 0.22s ease,
+        opacity 0.22s ease,
+        border-radius 0.22s ease;
+      transform-origin: center center;
+    }
+
+    .sm-face::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: 5px;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 4px;
+      border-radius: 0 0 6px 6px;
+      border-bottom: 2px solid var(--face-mouth);
+      opacity: 0.9;
+      z-index: 1;
+      box-shadow: 0 0 6px rgba(255,255,255,0.18);
+    }
+
+    .sm-face.sm-blink .sm-eye {
+      height: 4px;
+      border-radius: 6px;
+    }
+
+    .sm-face.sm-think-1 .sm-eye-left {
+      transform: rotate(-10deg) translateY(1px);
+    }
+
+    .sm-face.sm-think-1 .sm-eye-right {
+      transform: rotate(10deg) translateY(1px);
+    }
+
+    .sm-face.sm-think-2 .sm-eye-left {
+      transform: rotate(-16deg) translateY(2px) scaleY(0.92);
+    }
+
+    .sm-face.sm-think-2 .sm-eye-right {
+      transform: rotate(16deg) translateY(2px) scaleY(0.92);
+    }
+
+    .sm-face.sm-think-3 .sm-eye-left {
+      transform: skewY(-8deg) translateY(1px);
+    }
+
+    .sm-face.sm-think-3 .sm-eye-right {
+      transform: skewY(8deg) translateY(1px);
+    }
+
+    @media (max-width: 480px) {
+      .sm-face {
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
       }
-      76% {
-        opacity: 0.34;
+
+      .sm-eye {
+        width: 14px;
+        height: 21px;
       }
-      82% {
-        transform: translateX(155%) rotate(14deg);
-        opacity: 0.88;
-      }
-      86% {
-        opacity: 0;
+
+      .sm-header-brand {
+        gap: 10px;
       }
     }
   </style>
@@ -596,17 +603,15 @@
     <div class="chat-header-top">
       <div class="chat-header-left">
         <div class="sm-header-brand">
-          <div class="sm-logo-wrap" id="smLogoWrap" aria-hidden="true">
-            <img
-              class="sm-logo-img"
-              id="smLogo"
-              src="https://sitemindai.app/images/logo2.png"
-              alt="SiteMind AI logo"
-            />
+          <div class="sm-face" id="smFace" aria-hidden="true">
+            <div class="sm-eyes">
+              <div class="sm-eye sm-eye-left"></div>
+              <div class="sm-eye sm-eye-right"></div>
+            </div>
           </div>
 
           <div class="sm-title-wrap">
-            <a class="brand-link" href="https://sitemindai.app" target="_blank" rel="noopener noreferrer">Powered by SiteMind Ai Labs</a>
+            <a class="brand-link" href="https://sitemindai.app" target="_blank" rel="noopener noreferrer"> Powered by SiteMind Ai Labs</a>
             <div class="chat-title" id="chatTitle">SiteMind AI</div>
           </div>
         </div>
@@ -616,7 +621,6 @@
     </div>
 
     <div class="chat-subtitle" id="chatSubtitle">Ask AI Agent</div>
-    <div class="chat-note" id="chatNote">For important or sensitive information, please verify details when needed.</div>
   </div>
 
   <div class="chat-messages" id="chatMessages"></div>
@@ -651,23 +655,22 @@
   var chatSubtitle = document.getElementById("chatSubtitle");
   var chatHeader = document.getElementById("chatHeader");
   var chatClose = document.getElementById("chatClose");
-  var chatNote = document.getElementById("chatNote");
 
   var params = new URLSearchParams(window.location.search);
   var agentId = params.get("agentId") || "demo-agent";
 
-  function normalizeLang(value) {
-    var lang = String(value || "").toLowerCase().trim();
+ function normalizeLang(value) {
+  var lang = String(value || "").toLowerCase().trim();
 
-    if (!lang) return "en";
-    if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
-    if (lang.indexOf("de") === 0) return "de";
-    if (lang.indexOf("it") === 0) return "it";
-    if (lang.indexOf("fr") === 0) return "fr";
-    if (lang.indexOf("en") === 0) return "en";
+  if (!lang) return "en";
+  if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
+  if (lang.indexOf("de") === 0) return "de";
+  if (lang.indexOf("it") === 0) return "it";
+  if (lang.indexOf("fr") === 0) return "fr";
+  if (lang.indexOf("en") === 0) return "en";
 
-    return "en";
-  }
+  return "en";
+}
 
   function hexToRgb(hex) {
     var cleaned = String(hex || "").replace("#", "").trim();
@@ -705,6 +708,12 @@
       g: parseInt(parts[1], 10),
       b: parseInt(parts[2], 10)
     };
+  }
+
+  function rgbaFromHex(hex, alpha) {
+    var rgb = hexToRgb(hex);
+    if (!rgb) return "rgba(99, 175, 207, " + alpha + ")";
+    return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
   }
 
   function rgbaFromColor(color, alpha, fallbackHex) {
@@ -776,21 +785,11 @@
     return text.slice(0, max);
   }
 
-  function detectLanguage() {
-    var pageLang = document.documentElement.lang || "";
-    if (pageLang && pageLang.length >= 2) {
-      return pageLang.slice(0, 2).toLowerCase();
-    }
-
-    var browserLang = navigator.language || navigator.userLanguage || "en";
-    if (browserLang && browserLang.length >= 2) {
-      return browserLang.slice(0, 2).toLowerCase();
-    }
-
-    return "en";
-  }
-
-  var initialLang = normalizeLang(params.get("lang") || detectLanguage());
+  var initialLang = normalizeLang(
+    params.get("lang") ||
+    document.documentElement.getAttribute("lang") ||
+    (navigator.language || navigator.userLanguage || "en")
+  );
 
   var pageData = {
     pageTitle: "",
@@ -824,20 +823,19 @@
 
   var UI_TEXT = {
     hr: {
-      subtitleDefault: "Pitaj AI asistenta",
-      inputPlaceholder: "Napiši pitanje...",
-      send: "Pošalji",
-      sending: "...",
-      loading: "Samo trenutak...",
-      streaming: "AI odgovara...",
-      errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
-      errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
-      welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
-      askPage: "Pitaj AI o: ",
-      closeAria: "Zatvori chat",
-      openStatus: "",
-      note: "Za važne ili osjetljive informacije po potrebi dodatno provjerite detalje."
-    },
+  subtitleDefault: "Pitaj AI asistenta",
+  inputPlaceholder: "Napiši pitanje...",
+  send: "Pošalji",
+  sending: "...",
+  loading: "Samo trenutak...",
+  streaming: "AI odgovara...",
+  errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
+  errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
+  welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
+  askPage: "Pitaj AI o: ",
+  closeAria: "Zatvori chat",
+  openStatus: ""
+},
     de: {
       subtitleDefault: "Frag den KI-Assistenten",
       inputPlaceholder: "Schreibe eine Frage...",
@@ -850,8 +848,7 @@
       welcome: "Hallo! Ich kann dir mit dem Inhalt dieser Seite, Services, Produkten oder allgemeinen Fragen helfen.",
       askPage: "Frage die KI zu: ",
       closeAria: "Chat schließen",
-      openStatus: "",
-      note: "Bei wichtigen oder sensiblen Informationen empfiehlt sich bei Bedarf eine kurze Prüfung."
+      openStatus: ""
     },
     it: {
       subtitleDefault: "Chiedi all'assistente AI",
@@ -865,8 +862,7 @@
       welcome: "Ciao! Posso aiutarti con il contenuto di questa pagina, servizi, prodotti o domande generali.",
       askPage: "Chiedi all'AI di: ",
       closeAria: "Chiudi chat",
-      openStatus: "",
-      note: "Per informazioni importanti o sensibili, se necessario verifica i dettagli."
+      openStatus: ""
     },
     fr: {
       subtitleDefault: "Demandez à l’assistant IA",
@@ -880,8 +876,7 @@
       welcome: "Bonjour ! Je peux vous aider avec le contenu de cette page, les services, les produits ou des questions générales.",
       askPage: "Demandez à l’IA à propos de : ",
       closeAria: "Fermer le chat",
-      openStatus: "",
-      note: "Pour les informations importantes ou sensibles, il peut être utile de vérifier les détails."
+      openStatus: ""
     },
     en: {
       subtitleDefault: "Ask AI Agent",
@@ -895,8 +890,7 @@
       welcome: "Hello! I can help with this page, services, products, or general questions.",
       askPage: "Ask AI about: ",
       closeAria: "Close chat",
-      openStatus: "",
-      note: "For important or sensitive information, please verify details when needed."
+      openStatus: ""
     }
   };
 
@@ -1005,7 +999,6 @@
     chatInput.placeholder = t("inputPlaceholder");
     chatSend.textContent = isSending ? t("sending") : t("send");
     chatClose.setAttribute("aria-label", t("closeAria"));
-    chatNote.textContent = t("note");
 
     if (pageData.pageTitle) {
       chatSubtitle.textContent = t("askPage") + pageData.pageTitle;
@@ -1129,20 +1122,18 @@
     var accent = isValidCssColor(themeState.accentColor) ? themeState.accentColor : "#63AFCF";
     var headerBg = isValidCssColor(themeState.headerBackground) ? themeState.headerBackground : accent;
     var pageBg = isValidCssColor(themeState.pageBackground) ? themeState.pageBackground : "#ffffff";
-    var mode = isDarkColor(pageBg) ? "dark" : "light";
+    var mode = themeState.mode === "dark" ? "dark" : "light";
 
     var accentDark = adjustColor(accent, -18);
     var accentDeep = adjustColor(accent, -34);
+
     var headerIsDark = isDarkColor(headerBg);
+    var accentIsDark = isDarkColor(accent);
 
     var headerText = getContrastTextColor(headerBg, "#0f172a", "#ffffff");
     var headerSubtext = headerIsDark ? "rgba(255,255,255,0.92)" : "rgba(15,23,42,0.82)";
     var headerBrandText = headerIsDark ? "rgba(255,255,255,0.88)" : "rgba(15,23,42,0.74)";
-    var sendBase = headerIsDark ? adjustColor(headerBg, 28) : adjustColor(headerBg, -28);
-    var sendMid = headerIsDark ? adjustColor(headerBg, 16) : adjustColor(headerBg, -16);
-    var sendText = isDarkColor(sendBase)
-      ? "rgba(255,255,255,0.92)"
-      : "rgba(15,23,42,0.82)";
+    var sendText = getContrastTextColor(accent, "#0f172a", "#ffffff");
 
     document.documentElement.style.setProperty("--theme-main", accent);
     document.documentElement.style.setProperty("--theme-dark", accentDark);
@@ -1152,8 +1143,8 @@
     document.documentElement.style.setProperty("--header-grad-2", adjustColor(headerBg, -10));
     document.documentElement.style.setProperty("--header-grad-3", adjustColor(headerBg, -24));
 
-    document.documentElement.style.setProperty("--accent", sendBase);
-    document.documentElement.style.setProperty("--accent-2", sendMid);
+    document.documentElement.style.setProperty("--accent", accent);
+    document.documentElement.style.setProperty("--accent-2", accentDark);
 
     document.documentElement.style.setProperty("--user-grad-1", accent);
     document.documentElement.style.setProperty("--user-grad-2", accentDark);
@@ -1161,6 +1152,7 @@
     document.documentElement.style.setProperty("--header-text", headerText);
     document.documentElement.style.setProperty("--header-subtext", headerSubtext);
     document.documentElement.style.setProperty("--header-brand-text", headerBrandText);
+    document.documentElement.style.setProperty("--send-text", sendText);
 
     document.documentElement.style.setProperty(
       "--header-close-border",
@@ -1187,6 +1179,27 @@
       headerIsDark ? "rgba(255,255,255,0.34)" : "rgba(15,23,42,0.24)"
     );
 
+    document.documentElement.style.setProperty(
+      "--face-eye",
+      accentIsDark ? "#ffffff" : "#0f172a"
+    );
+    document.documentElement.style.setProperty(
+      "--face-eye-2",
+      accentIsDark ? "#eefbff" : "#334155"
+    );
+    document.documentElement.style.setProperty(
+      "--face-eye-3",
+      accentIsDark ? "#dff4fb" : "#64748b"
+    );
+    document.documentElement.style.setProperty(
+      "--face-mouth",
+      accentIsDark ? "rgba(255,255,255,0.94)" : "rgba(15,23,42,0.88)"
+    );
+    document.documentElement.style.setProperty(
+      "--face-border",
+      accentIsDark ? "rgba(255,255,255,0.24)" : "rgba(15,23,42,0.14)"
+    );
+
     if (mode === "dark") {
       document.documentElement.style.setProperty("--bg-1", pageBg);
       document.documentElement.style.setProperty("--bg-2", adjustColor(pageBg, 8));
@@ -1204,7 +1217,6 @@
         "--glow",
         "0 0 0 1px " + rgbaFromColor(accent, 0.18, "#63AFCF") + ", 0 0 22px " + rgbaFromColor(accent, 0.16, "#63AFCF")
       );
-      document.documentElement.style.setProperty("--send-text", sendText);
 
       document.body.style.background =
         "radial-gradient(circle at top left, " + rgbaFromColor(accent, 0.10, "#63AFCF") + ", transparent 26%), " +
@@ -1227,7 +1239,6 @@
       chatInput.style.background = "rgba(255,255,255,0.06)";
       chatInput.style.color = "#e5eef8";
       chatInput.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.03)";
-      chatNote.style.color = "rgba(255,255,255,0.72)";
     } else {
       document.documentElement.style.setProperty("--bg-1", "#ffffff");
       document.documentElement.style.setProperty("--bg-2", "#ffffff");
@@ -1245,7 +1256,6 @@
         "--glow",
         "0 0 0 1px " + rgbaFromColor(accent, 0.12, "#63AFCF") + ", 0 0 22px " + rgbaFromColor(accent, 0.14, "#63AFCF")
       );
-      document.documentElement.style.setProperty("--send-text", sendText);
 
       document.body.style.background =
         "radial-gradient(circle at top left, " + rgbaFromColor(accent, 0.08, "#63AFCF") + ", transparent 26%), " +
@@ -1268,17 +1278,19 @@
       chatInput.style.background = "#ffffff";
       chatInput.style.color = "#0f172a";
       chatInput.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.6)";
-      chatNote.style.color = "rgba(255,255,255,0.74)";
     }
 
     chatHeader.style.boxShadow =
       "0 14px 30px " + rgbaFromColor(headerBg, 0.22, "#63AFCF") + ", inset 0 1px 0 rgba(255,255,255,0.18)";
 
-    var logoWrap = document.getElementById("smLogoWrap");
-    if (logoWrap) {
-      logoWrap.style.boxShadow =
-        "inset 0 1px 0 rgba(255,255,255,0.14), 0 8px 20px " + rgbaFromColor(accent, 0.24, "#63AFCF");
-      logoWrap.style.borderColor = headerIsDark ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.28)";
+    var face = document.getElementById("smFace");
+    if (face) {
+      face.style.background =
+        "radial-gradient(circle at 24% 20%, rgba(255,255,255,0.30), transparent 24%), " +
+        "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)), " +
+        "linear-gradient(135deg, " + accent + ", " + accentDark + " 62%, " + accentDeep + ")";
+      face.style.boxShadow =
+        "inset 0 1px 0 rgba(255,255,255,0.12), 0 8px 20px " + rgbaFromColor(accent, 0.24, "#63AFCF");
     }
   }
 
@@ -1340,6 +1352,10 @@
 
     if (!themeState.accentColor) {
       themeState.accentColor = themeState.fallbackColor || agentData.themeColor || "#63AFCF";
+    }
+
+    if (!data.mode) {
+      themeState.mode = isDarkColor(themeState.pageBackground) ? "dark" : "light";
     }
 
     applyResolvedTheme();
@@ -1606,6 +1622,74 @@
       );
     } catch (e) {}
   }
+})();
+</script>
+
+<script>
+(function () {
+  const face = document.getElementById('smFace');
+  if (!face) return;
+
+  const thinkClasses = ['sm-think-1', 'sm-think-2', 'sm-think-3'];
+  let isBlinking = false;
+
+  function clearThinking() {
+    thinkClasses.forEach(cls => face.classList.remove(cls));
+  }
+
+  function blink() {
+    if (isBlinking) return;
+    isBlinking = true;
+
+    clearThinking();
+    face.classList.add('sm-blink');
+
+    setTimeout(() => {
+      face.classList.remove('sm-blink');
+      isBlinking = false;
+    }, 150);
+  }
+
+  function randomThinkingPose() {
+    if (isBlinking) return;
+
+    clearThinking();
+
+    const shouldThink = Math.random() < 0.55;
+    if (!shouldThink) return;
+
+    const cls = thinkClasses[Math.floor(Math.random() * thinkClasses.length)];
+    face.classList.add(cls);
+
+    setTimeout(() => {
+      face.classList.remove(cls);
+    }, 900 + Math.floor(Math.random() * 700));
+  }
+
+  function idleMotion() {
+    const roll = Math.random();
+
+    if (roll < 0.45) {
+      blink();
+      return;
+    }
+
+    if (roll < 0.85) {
+      randomThinkingPose();
+      return;
+    }
+
+    blink();
+    setTimeout(() => {
+      randomThinkingPose();
+    }, 220);
+  }
+
+  setInterval(idleMotion, 2800 + Math.floor(Math.random() * 1200));
+
+  setTimeout(() => {
+    blink();
+  }, 1200);
 })();
 </script>
 </body>
