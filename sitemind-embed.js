@@ -50,14 +50,14 @@
 
   var lang = (htmlLang || ogLocale || browserLang || "en").toLowerCase();
 
-  if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
+  if (lang.indexOf("hr") === 0) return "hr";
   if (lang.indexOf("de") === 0) return "de";
   if (lang.indexOf("it") === 0) return "it";
   if (lang.indexOf("fr") === 0) return "fr";
   return "en";
 }
 
-function getDefaultBubbleText(lang) {
+  function getDefaultBubbleText(lang) {
   if (lang === "hr") {
     return "💬 Trebaš pomoć?<br>Pitaj AI asistenta";
   }
@@ -313,7 +313,7 @@ function getDefaultBubbleText(lang) {
       return false;
     }
 
-    if (hasAny(["course", "lesson", "school", "lernen", "guide for students", "student", "unterricht"])) {
+    if (hasAny(["course", "lesson", "lektira", "schule", "school", "lernen", "guide for students", "učen", "student", "unterricht"])) {
       return "education";
     }
 
@@ -344,187 +344,13 @@ function getDefaultBubbleText(lang) {
     return "general";
   }
 
-  function isTransparentColor(color) {
-    var value = String(color || "").toLowerCase().trim();
-    return (
-      !value ||
-      value === "transparent" ||
-      value === "rgba(0, 0, 0, 0)" ||
-      value === "rgba(0,0,0,0)" ||
-      value === "inherit" ||
-      value === "initial"
-    );
-  }
-
-  function parseRgb(color) {
-    if (!color) return null;
-
-    var value = String(color).trim();
-
-    if (value.charAt(0) === "#") {
-      return hexToRgb(value);
-    }
-
-    var match = value.match(/rgba?\(([^)]+)\)/i);
-    if (!match) return null;
-
-    var parts = match[1].split(",");
-    if (parts.length < 3) return null;
-
-    return {
-      r: parseInt(parts[0], 10),
-      g: parseInt(parts[1], 10),
-      b: parseInt(parts[2], 10)
-    };
-  }
-
-  function getBrightness(color) {
-    var rgb = parseRgb(color);
-    if (!rgb) return 255;
-    return (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
-  }
-
-  function findFirstVisibleElement(selectors) {
-    for (var i = 0; i < selectors.length; i++) {
-      var el = document.querySelector(selectors[i]);
-      if (!el) continue;
-
-      var rect = el.getBoundingClientRect();
-      if ((rect.width > 0 || rect.height > 0) && el.offsetParent !== null) {
-        return el;
-      }
-
-      if (rect.width > 0 || rect.height > 0) {
-        return el;
-      }
-    }
-    return null;
-  }
-
-  function getComputedStyleSafe(el) {
-    if (!el) return null;
-    try {
-      return window.getComputedStyle(el);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function pickSolidBackground(el) {
-    if (!el) return "";
-
-    var current = el;
-    var depth = 0;
-
-    while (current && depth < 5) {
-      var style = getComputedStyleSafe(current);
-      if (style) {
-        var bg = style.backgroundColor;
-        if (!isTransparentColor(bg)) {
-          return bg;
-        }
-      }
-      current = current.parentElement;
-      depth += 1;
-    }
-
-    return "";
-  }
-
-  function detectHeaderElement() {
-    return findFirstVisibleElement([
-      "header",
-      ".site-header",
-      ".navbar",
-      ".nav-bar",
-      ".main-header",
-      ".top-header",
-      "#header",
-      ".app-header"
-    ]);
-  }
-
-  function detectAccentElement() {
-    return findFirstVisibleElement([
-      "button",
-      ".btn",
-      ".button",
-      "[class*='btn']",
-      "[class*='button']",
-      "a.button",
-      "a.btn",
-      ".cta",
-      "[class*='cta']"
-    ]);
-  }
-
-  function detectPageBackgroundColor() {
-    var mainRoot = getBestContentRoot();
-    var bg =
-      pickSolidBackground(mainRoot) ||
-      pickSolidBackground(document.body) ||
-      pickSolidBackground(document.documentElement);
-
-    return bg || "#0b1220";
-  }
-
-  function detectHeaderBackgroundColor() {
-    var headerEl = detectHeaderElement();
-    var bg = pickSolidBackground(headerEl);
-
-    return bg || "";
-  }
-
-  function detectAccentColor() {
-    var accentEl = detectAccentElement();
-    var style = getComputedStyleSafe(accentEl);
-
-    if (style) {
-      if (!isTransparentColor(style.backgroundColor)) {
-        return style.backgroundColor;
-      }
-      if (!isTransparentColor(style.color)) {
-        return style.color;
-      }
-      if (!isTransparentColor(style.borderColor)) {
-        return style.borderColor;
-      }
-    }
-
-    var link = document.querySelector("a");
-    var linkStyle = getComputedStyleSafe(link);
-    if (linkStyle && !isTransparentColor(linkStyle.color)) {
-      return linkStyle.color;
-    }
-
-    return themeColor;
-  }
-
-  function detectSiteThemePayload() {
-    var pageBg = detectPageBackgroundColor();
-    var headerBg = detectHeaderBackgroundColor() || pageBg;
-    var accent = detectAccentColor() || themeColor;
-
-    var mode = getBrightness(pageBg) < 145 ? "dark" : "light";
-
-    return {
-      type: "sitemind-theme",
-      agentId: agentId,
-      mode: mode,
-      pageBackground: pageBg,
-      headerBackground: headerBg,
-      accentColor: accent,
-      fallbackColor: themeColor
-    };
-  }
-
   function getPageContextPayload() {
     var pageText = getMainContentText();
 
     return {
       type: "sitemind-page-context",
       agentId: agentId,
-      language: detectBrowserLanguage(),
+      language: detectPageLanguage(),
       pageTypeHint: getPageTypeHint(),
       pageTitle: getPageTitle(),
       pageDescription: getPageDescription(),
@@ -536,8 +362,10 @@ function getDefaultBubbleText(lang) {
     };
   }
 
-  function postToIframe(payload) {
-    if (!iframe || !iframe.contentWindow || !payload) return;
+  function sendPageContext() {
+    if (!iframe || !iframe.contentWindow) return;
+
+    var payload = getPageContextPayload();
 
     try {
       iframe.contentWindow.postMessage(payload, BASE_URL);
@@ -546,19 +374,6 @@ function getDefaultBubbleText(lang) {
         iframe.contentWindow.postMessage(payload, "*");
       } catch (err) {}
     }
-  }
-
-  function sendPageContext() {
-    postToIframe(getPageContextPayload());
-  }
-
-  function sendThemeContext() {
-    postToIframe(detectSiteThemePayload());
-  }
-
-  function sendAllContext() {
-    sendThemeContext();
-    sendPageContext();
   }
 
   function applyBubblePosition() {
@@ -575,84 +390,57 @@ function getDefaultBubbleText(lang) {
     }
   }
 
-function styleBubble() {
-  if (!bubble) return;
+  function styleBubble() {
+    if (!bubble) return;
 
-  var bubbleDark = "#115C79";
-  var bubbleMid = "#1588A7";
-  var bubbleLight = "#2AA7C8";
+    var glowSoft = rgbaFromHex(themeColor, 0.14);
+    var glowStrong = rgbaFromHex(themeColor, 0.22);
+    var borderGlow = rgbaFromHex(themeColor, 0.18);
 
-  var borderColor = "rgba(255,255,255,0.22)";
-  var borderHover = "rgba(255,255,255,0.30)";
-  var outerGlow = "rgba(17, 92, 121, 0.24)";
-  var outerGlowHover = "rgba(17, 92, 121, 0.34)";
+    bubble.style.position = "fixed";
+    bubble.style.zIndex = "999999";
+    bubble.style.border = "1px solid " + borderGlow;
+    bubble.style.borderRadius = "999px";
+    bubble.style.padding = "14px 22px";
+    bubble.style.background =
+      "radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 34%), linear-gradient(135deg, " + themeColor + ", #1d4ed8)";
+    bubble.style.color = "#ffffff";
+    bubble.style.fontSize = "14px";
+    bubble.style.fontWeight = "700";
+    bubble.style.lineHeight = "1.35";
+    bubble.style.textAlign = "center";
+    bubble.style.maxWidth = "255px";
+    bubble.style.boxShadow =
+      "0 16px 34px rgba(37,99,235,0.18), 0 0 0 1px rgba(255,255,255,0.08), 0 0 20px " + glowSoft;
+    bubble.style.cursor = "pointer";
+    bubble.style.whiteSpace = "normal";
+    bubble.style.backdropFilter = "blur(10px)";
+    bubble.style.webkitBackdropFilter = "blur(10px)";
+    bubble.style.transition =
+      "transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease, border-color 0.18s ease, filter 0.18s ease";
 
-  bubble.style.position = "fixed";
-  bubble.style.zIndex = "999999";
-  bubble.style.border = "1px solid " + borderColor;
-  bubble.style.borderRadius = "999px";
-  bubble.style.padding = "14px 22px";
-  bubble.style.color = "#ffffff";
-  bubble.style.fontSize = "14px";
-  bubble.style.fontWeight = "700";
-  bubble.style.lineHeight = "1.35";
-  bubble.style.textAlign = "center";
-  bubble.style.maxWidth = "255px";
-  bubble.style.cursor = "pointer";
-  bubble.style.whiteSpace = "normal";
-  bubble.style.backdropFilter = "blur(10px)";
-  bubble.style.webkitBackdropFilter = "blur(10px)";
-  bubble.style.transition =
-    "transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, filter 0.22s ease";
+    if (window.innerWidth < 520) {
+      bubble.style.maxWidth = "220px";
+      bubble.style.fontSize = "13px";
+      bubble.style.padding = "12px 18px";
+    }
 
-  bubble.style.background =
-    "linear-gradient(145deg, " + bubbleDark + " 0%, " + bubbleMid + " 34%, " + bubbleLight + " 50%, " + bubbleMid + " 66%, " + bubbleDark + " 100%), " +
-    "linear-gradient(180deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.14) 18%, rgba(255,255,255,0.05) 42%, rgba(0,0,0,0.08) 100%), " +
-    "repeating-linear-gradient(115deg, rgba(255,255,255,0.00) 0px, rgba(255,255,255,0.00) 4px, rgba(255,255,255,0.085) 5px, rgba(255,255,255,0.00) 9px), " +
-    "repeating-linear-gradient(115deg, rgba(0,0,0,0.00) 0px, rgba(0,0,0,0.00) 8px, rgba(0,0,0,0.050) 9px, rgba(0,0,0,0.00) 14px), " +
-    "radial-gradient(circle at 20% 18%, rgba(255,255,255,0.30), transparent 26%), " +
-    "radial-gradient(circle at 82% 78%, rgba(0,0,0,0.10), transparent 24%)";
+    bubble.onmouseenter = function () {
+      bubble.style.transform = "translateY(-1px)";
+      bubble.style.borderColor = rgbaFromHex(themeColor, 0.28);
+      bubble.style.boxShadow =
+        "0 18px 38px rgba(37,99,235,0.22), 0 0 0 1px rgba(255,255,255,0.10), 0 0 26px " + glowStrong;
+      bubble.style.filter = "brightness(1.03)";
+    };
 
-  bubble.style.boxShadow =
-    "0 16px 36px " + outerGlow + ", " +
-    "0 0 0 1px rgba(255,255,255,0.08), " +
-    "inset 0 1px 0 rgba(255,255,255,0.24), " +
-    "inset 0 10px 14px rgba(255,255,255,0.08), " +
-    "inset 0 -12px 22px rgba(0,0,0,0.16)";
-
-  bubble.style.textShadow = "0 1px 2px rgba(0,0,0,0.24)";
-  bubble.style.letterSpacing = "0.1px";
-
-  if (window.innerWidth < 520) {
-    bubble.style.maxWidth = "220px";
-    bubble.style.fontSize = "13px";
-    bubble.style.padding = "12px 18px";
+    bubble.onmouseleave = function () {
+      bubble.style.transform = "translateY(0)";
+      bubble.style.borderColor = borderGlow;
+      bubble.style.boxShadow =
+        "0 16px 34px rgba(37,99,235,0.18), 0 0 0 1px rgba(255,255,255,0.08), 0 0 20px " + glowSoft;
+      bubble.style.filter = "brightness(1)";
+    };
   }
-
-  bubble.onmouseenter = function () {
-    bubble.style.transform = "translateY(-2px)";
-    bubble.style.borderColor = borderHover;
-    bubble.style.boxShadow =
-      "0 20px 42px " + outerGlowHover + ", " +
-      "0 0 0 1px rgba(255,255,255,0.10), " +
-      "inset 0 1px 0 rgba(255,255,255,0.28), " +
-      "inset 0 12px 16px rgba(255,255,255,0.10), " +
-      "inset 0 -14px 24px rgba(0,0,0,0.18)";
-    bubble.style.filter = "brightness(1.05)";
-  };
-
-  bubble.onmouseleave = function () {
-    bubble.style.transform = "translateY(0)";
-    bubble.style.borderColor = borderColor;
-    bubble.style.boxShadow =
-      "0 16px 36px " + outerGlow + ", " +
-      "0 0 0 1px rgba(255,255,255,0.08), " +
-      "inset 0 1px 0 rgba(255,255,255,0.24), " +
-      "inset 0 10px 14px rgba(255,255,255,0.08), " +
-      "inset 0 -12px 22px rgba(0,0,0,0.16)";
-    bubble.style.filter = "brightness(1)";
-  };
-}
 
   function applyPanelLayout() {
     if (!panel || !bubble || !iframe) return;
@@ -668,7 +456,6 @@ function styleBubble() {
     panel.style.borderRadius = "";
     panel.style.borderLeft = "";
     panel.style.borderRight = "";
-    panel.style.border = "";
     panel.style.background = "#ffffff";
     panel.style.overflow = "hidden";
     panel.style.boxShadow = "0 18px 50px rgba(15,23,42,0.16)";
@@ -757,7 +544,7 @@ function styleBubble() {
     isOpen = true;
     applyPanelLayout();
     applyPageShrink();
-    sendAllContext();
+    sendPageContext();
   }
 
   function closePanel() {
@@ -815,8 +602,8 @@ function styleBubble() {
     bubble.addEventListener("click", togglePanel);
 
     iframe.addEventListener("load", function () {
-      setTimeout(sendAllContext, 300);
-      setTimeout(sendAllContext, 1200);
+      setTimeout(sendPageContext, 300);
+      setTimeout(sendPageContext, 1200);
     });
   }
 
@@ -825,11 +612,11 @@ function styleBubble() {
     if (!event.data || typeof event.data !== "object") return;
 
     if (event.data.type === "sitemind-widget-ready") {
-      sendAllContext();
+      sendPageContext();
     }
 
     if (event.data.type === "sitemind-refresh-page-context") {
-      sendAllContext();
+      sendPageContext();
     }
 
     if (event.data.type === "sitemind-close-widget") {
@@ -848,7 +635,6 @@ function styleBubble() {
       } else {
         resetPageShrink();
       }
-      sendThemeContext();
     } else {
       resetPageShrink();
     }
