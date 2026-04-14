@@ -43,30 +43,35 @@
   var originalBodyOverflowX = "";
 
   function detectBrowserLanguage() {
-    var browserLang = navigator.language || navigator.userLanguage || "en";
-    var lang = String(browserLang || "en").toLowerCase();
+  var browserLang = navigator.language || navigator.userLanguage || "en";
+  var lang = String(browserLang || "en").toLowerCase();
 
-    if (lang.indexOf("de") === 0) return "de";
-    if (lang.indexOf("it") === 0) return "it";
-    if (lang.indexOf("fr") === 0) return "fr";
-    return "en";
+  if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
+  if (lang.indexOf("de") === 0) return "de";
+  if (lang.indexOf("it") === 0) return "it";
+  if (lang.indexOf("fr") === 0) return "fr";
+  return "en";
+}
+
+function getDefaultBubbleText(lang) {
+  if (lang === "hr") {
+    return "💬 Trebaš pomoć?<br>Pitaj AI asistenta";
   }
 
-  function getDefaultBubbleText(lang) {
-    if (lang === "de") {
-      return "💬 Brauchst du Hilfe?<br>Frag den KI-Assistenten";
-    }
-
-    if (lang === "it") {
-      return "💬 Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
-    }
-
-    if (lang === "fr") {
-      return "💬 Besoin d’aide ?<br>Demandez à l’assistant IA";
-    }
-
-    return "💬 Need help?<br>Ask the AI assistant";
+  if (lang === "de") {
+    return "💬 Brauchst du Hilfe?<br>Frag den KI-Assistenten";
   }
+
+  if (lang === "it") {
+    return "💬 Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
+  }
+
+  if (lang === "fr") {
+    return "💬 Besoin d’aide ?<br>Demandez à l’assistant IA";
+  }
+
+  return "💬 Need help?<br>Ask the AI assistant";
+}
 
   var detectedLang = detectBrowserLanguage();
 
