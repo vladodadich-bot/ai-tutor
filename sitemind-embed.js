@@ -42,9 +42,13 @@
   var originalHtmlOverflowX = "";
   var originalBodyOverflowX = "";
 
-  function detectBrowserLanguage() {
-  var browserLang = navigator.language || navigator.userLanguage || "en";
-  var lang = String(browserLang || "en").toLowerCase();
+  function detectPageLanguage() {
+  var htmlLang = document.documentElement.getAttribute("lang") || "";
+  var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
+  var ogLocale = ogLocaleMeta && ogLocaleMeta.content ? ogLocaleMeta.content : "";
+  var browserLang = navigator.language || navigator.userLanguage || "";
+
+  var lang = (htmlLang || ogLocale || browserLang || "en").toLowerCase();
 
   if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
   if (lang.indexOf("de") === 0) return "de";
@@ -73,7 +77,7 @@ function getDefaultBubbleText(lang) {
   return "💬 Need help?<br>Ask the AI assistant";
 }
 
-  var detectedLang = detectBrowserLanguage();
+  var detectedLang = detectPageLanguage();
 
   var bubbleText =
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-bubble-text")) ||
