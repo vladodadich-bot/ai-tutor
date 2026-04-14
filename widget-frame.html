@@ -1122,33 +1122,31 @@
     var accent = isValidCssColor(themeState.accentColor) ? themeState.accentColor : "#63AFCF";
     var headerBg = isValidCssColor(themeState.headerBackground) ? themeState.headerBackground : accent;
     var pageBg = isValidCssColor(themeState.pageBackground) ? themeState.pageBackground : "#ffffff";
-    var mode = themeState.mode === "dark" ? "dark" : "light";
+    var mode = isDarkColor(pageBg) ? "dark" : "light";
 
     var accentDark = adjustColor(accent, -18);
     var accentDeep = adjustColor(accent, -34);
 
     var headerIsDark = isDarkColor(headerBg);
-    var accentIsDark = isDarkColor(accent);
-  
-var avatarBase = getSoftContrastColor(headerBg, -22, 22);
-var avatarMid = getSoftContrastColor(headerBg, -34, 34);
-var avatarDeep = getSoftContrastColor(headerBg, -46, 46);
+    
+    var avatarBase = headerIsDark ? adjustColor(headerBg, 22) : adjustColor(headerBg, -22);
+var avatarMid = headerIsDark ? adjustColor(headerBg, 34) : adjustColor(headerBg, -34);
+var avatarDeep = headerIsDark ? adjustColor(headerBg, 46) : adjustColor(headerBg, -46);
 
-var avatarEye = headerIsDark ? "rgba(255,255,255,0.88)" : "rgba(15,23,42,0.72)";
-var avatarEye2 = headerIsDark ? "rgba(255,255,255,0.72)" : "rgba(15,23,42,0.56)";
-var avatarEye3 = headerIsDark ? "rgba(255,255,255,0.56)" : "rgba(15,23,42,0.42)";
-var avatarMouth = headerIsDark ? "rgba(255,255,255,0.80)" : "rgba(15,23,42,0.68)";
-var avatarBorder = headerIsDark ? "rgba(255,255,255,0.18)" : "rgba(15,23,42,0.10)";
+var avatarEye = headerIsDark ? "rgba(255,255,255,0.86)" : "rgba(15,23,42,0.70)";
+var avatarEye2 = headerIsDark ? "rgba(255,255,255,0.72)" : "rgba(15,23,42,0.54)";
+var avatarEye3 = headerIsDark ? "rgba(255,255,255,0.58)" : "rgba(15,23,42,0.40)";
+var avatarMouth = headerIsDark ? "rgba(255,255,255,0.78)" : "rgba(15,23,42,0.64)";
+var avatarBorder = headerIsDark ? "rgba(255,255,255,0.16)" : "rgba(15,23,42,0.10)";
 
     var headerText = getContrastTextColor(headerBg, "#0f172a", "#ffffff");
     var headerSubtext = headerIsDark ? "rgba(255,255,255,0.92)" : "rgba(15,23,42,0.82)";
     var headerBrandText = headerIsDark ? "rgba(255,255,255,0.88)" : "rgba(15,23,42,0.74)";
-    var sendText = isDarkColor(accent)
+    var sendBase = headerIsDark ? adjustColor(headerBg, 28) : adjustColor(headerBg, -28);
+var sendMid = headerIsDark ? adjustColor(headerBg, 16) : adjustColor(headerBg, -16);
+var sendText = isDarkColor(sendBase)
   ? "rgba(255,255,255,0.92)"
-  : "rgba(15,23,42,0.78)";
-
-var sendBase = getSoftContrastColor(pageBg, -32, 32);
-var sendMid = getSoftContrastColor(pageBg, -44, 44);
+  : "rgba(15,23,42,0.82)";
 
     document.documentElement.style.setProperty("--theme-main", accent);
     document.documentElement.style.setProperty("--theme-dark", accentDark);
@@ -1324,9 +1322,9 @@ document.documentElement.style.setProperty("--face-border", avatarBorder);
   function applyIncomingTheme(data) {
     if (!data || typeof data !== "object") return;
 
-    if (data.mode === "dark" || data.mode === "light") {
-      themeState.mode = data.mode;
-    }
+   if (data.mode === "dark" || data.mode === "light") {
+  themeState.mode = data.mode;
+}
 
     if (isValidCssColor(data.pageBackground)) {
       themeState.pageBackground = data.pageBackground;
@@ -1354,10 +1352,6 @@ document.documentElement.style.setProperty("--face-border", avatarBorder);
 
     if (!themeState.accentColor) {
       themeState.accentColor = themeState.fallbackColor || agentData.themeColor || "#63AFCF";
-    }
-
-    if (!data.mode) {
-      themeState.mode = isDarkColor(themeState.pageBackground) ? "dark" : "light";
     }
 
     applyResolvedTheme();
