@@ -659,17 +659,18 @@
   var params = new URLSearchParams(window.location.search);
   var agentId = params.get("agentId") || "demo-agent";
 
-  function normalizeLang(value) {
-    var lang = String(value || "").toLowerCase().trim();
+ function normalizeLang(value) {
+  var lang = String(value || "").toLowerCase().trim();
 
-    if (!lang) return "en";
-    if (lang.indexOf("de") === 0) return "de";
-    if (lang.indexOf("it") === 0) return "it";
-    if (lang.indexOf("fr") === 0) return "fr";
-    if (lang.indexOf("en") === 0) return "en";
+  if (!lang) return "en";
+  if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
+  if (lang.indexOf("de") === 0) return "de";
+  if (lang.indexOf("it") === 0) return "it";
+  if (lang.indexOf("fr") === 0) return "fr";
+  if (lang.indexOf("en") === 0) return "en";
 
-    return "en";
-  }
+  return "en";
+}
 
   function hexToRgb(hex) {
     var cleaned = String(hex || "").replace("#", "").trim();
@@ -821,6 +822,20 @@
   var activeController = null;
 
   var UI_TEXT = {
+    hr: {
+  subtitleDefault: "Pitaj AI asistenta",
+  inputPlaceholder: "Napiši pitanje...",
+  send: "Pošalji",
+  sending: "...",
+  loading: "Samo trenutak...",
+  streaming: "AI odgovara...",
+  errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
+  errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
+  welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
+  askPage: "Pitaj AI o: ",
+  closeAria: "Zatvori chat",
+  openStatus: ""
+},
     de: {
       subtitleDefault: "Frag den KI-Assistenten",
       inputPlaceholder: "Schreibe eine Frage...",
