@@ -570,8 +570,7 @@ function getDefaultBubbleText(lang) {
       bubble.style.right = "16px";
     }
   }
-/ / funkcija za oblak chat / / 
-  
+
 function styleBubble() {
   if (!bubble) return;
 
