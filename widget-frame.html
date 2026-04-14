@@ -1128,17 +1128,18 @@
     var accentDeep = adjustColor(accent, -34);
 
     var headerIsDark = isDarkColor(headerBg);
+    var accentIsDark = isDarkColor(accent);
   
 var avatarBase = getSoftContrastColor(headerBg, -22, 22);
 var avatarMid = getSoftContrastColor(headerBg, -34, 34);
 var avatarDeep = getSoftContrastColor(headerBg, -46, 46);
-//start avatar//
+
 var avatarEye = headerIsDark ? "rgba(255,255,255,0.88)" : "rgba(15,23,42,0.72)";
 var avatarEye2 = headerIsDark ? "rgba(255,255,255,0.72)" : "rgba(15,23,42,0.56)";
 var avatarEye3 = headerIsDark ? "rgba(255,255,255,0.56)" : "rgba(15,23,42,0.42)";
 var avatarMouth = headerIsDark ? "rgba(255,255,255,0.80)" : "rgba(15,23,42,0.68)";
 var avatarBorder = headerIsDark ? "rgba(255,255,255,0.18)" : "rgba(15,23,42,0.10)";
-    //end Avatar//
+
     var headerText = getContrastTextColor(headerBg, "#0f172a", "#ffffff");
     var headerSubtext = headerIsDark ? "rgba(255,255,255,0.92)" : "rgba(15,23,42,0.82)";
     var headerBrandText = headerIsDark ? "rgba(255,255,255,0.88)" : "rgba(15,23,42,0.74)";
@@ -1193,13 +1194,13 @@ var sendMid = getSoftContrastColor(pageBg, -44, 44);
       headerIsDark ? "rgba(255,255,255,0.34)" : "rgba(15,23,42,0.24)"
     );
     
-    // avatar face //
+    
 document.documentElement.style.setProperty("--face-eye", avatarEye);
 document.documentElement.style.setProperty("--face-eye-2", avatarEye2);
 document.documentElement.style.setProperty("--face-eye-3", avatarEye3);
 document.documentElement.style.setProperty("--face-mouth", avatarMouth);
 document.documentElement.style.setProperty("--face-border", avatarBorder);
-// end avatar face //
+
     
     if (mode === "dark") {
       document.documentElement.style.setProperty("--bg-1", pageBg);
