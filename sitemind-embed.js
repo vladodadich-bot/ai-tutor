@@ -42,42 +42,33 @@
   var originalHtmlOverflowX = "";
   var originalBodyOverflowX = "";
 
-  function detectPageLanguage() {
-  var htmlLang = document.documentElement.getAttribute("lang") || "";
-  var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
-  var ogLocale = ogLocaleMeta && ogLocaleMeta.content ? ogLocaleMeta.content : "";
-  var browserLang = navigator.language || navigator.userLanguage || "";
+  function detectBrowserLanguage() {
+    var browserLang = navigator.language || navigator.userLanguage || "en";
+    var lang = String(browserLang || "en").toLowerCase();
 
-  var lang = (htmlLang || ogLocale || browserLang || "en").toLowerCase();
-
-  if (lang.indexOf("hr") === 0) return "hr";
-  if (lang.indexOf("de") === 0) return "de";
-  if (lang.indexOf("it") === 0) return "it";
-  if (lang.indexOf("fr") === 0) return "fr";
-  return "en";
-}
+    if (lang.indexOf("de") === 0) return "de";
+    if (lang.indexOf("it") === 0) return "it";
+    if (lang.indexOf("fr") === 0) return "fr";
+    return "en";
+  }
 
   function getDefaultBubbleText(lang) {
-  if (lang === "hr") {
-    return "💬 Trebaš pomoć?<br>Pitaj AI asistenta";
+    if (lang === "de") {
+      return "💬 Brauchst du Hilfe?<br>Frag den KI-Assistenten";
+    }
+
+    if (lang === "it") {
+      return "💬 Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
+    }
+
+    if (lang === "fr") {
+      return "💬 Besoin d’aide ?<br>Demandez à l’assistant IA";
+    }
+
+    return "💬 Need help?<br>Ask the AI assistant";
   }
 
-  if (lang === "de") {
-    return "💬 Brauchst du Hilfe?<br>Frag den KI-Assistenten";
-  }
-
-  if (lang === "it") {
-    return "💬 Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
-  }
-
-  if (lang === "fr") {
-    return "💬 Besoin d’aide ?<br>Demandez à l’assistant IA";
-  }
-
-  return "💬 Need help?<br>Ask the AI assistant";
-}
-
-  var detectedLang = detectPageLanguage();
+  var detectedLang = detectBrowserLanguage();
 
   var bubbleText =
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-bubble-text")) ||
@@ -313,7 +304,7 @@
       return false;
     }
 
-    if (hasAny(["course", "lesson", "lektira", "schule", "school", "lernen", "guide for students", "učen", "student", "unterricht"])) {
+    if (hasAny(["course", "lesson", "school", "lernen", "guide for students", "student", "unterricht"])) {
       return "education";
     }
 
@@ -344,13 +335,187 @@
     return "general";
   }
 
+  function isTransparentColor(color) {
+    var value = String(color || "").toLowerCase().trim();
+    return (
+      !value ||
+      value === "transparent" ||
+      value === "rgba(0, 0, 0, 0)" ||
+      value === "rgba(0,0,0,0)" ||
+      value === "inherit" ||
+      value === "initial"
+    );
+  }
+
+  function parseRgb(color) {
+    if (!color) return null;
+
+    var value = String(color).trim();
+
+    if (value.charAt(0) === "#") {
+      return hexToRgb(value);
+    }
+
+    var match = value.match(/rgba?\(([^)]+)\)/i);
+    if (!match) return null;
+
+    var parts = match[1].split(",");
+    if (parts.length < 3) return null;
+
+    return {
+      r: parseInt(parts[0], 10),
+      g: parseInt(parts[1], 10),
+      b: parseInt(parts[2], 10)
+    };
+  }
+
+  function getBrightness(color) {
+    var rgb = parseRgb(color);
+    if (!rgb) return 255;
+    return (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+  }
+
+  function findFirstVisibleElement(selectors) {
+    for (var i = 0; i < selectors.length; i++) {
+      var el = document.querySelector(selectors[i]);
+      if (!el) continue;
+
+      var rect = el.getBoundingClientRect();
+      if ((rect.width > 0 || rect.height > 0) && el.offsetParent !== null) {
+        return el;
+      }
+
+      if (rect.width > 0 || rect.height > 0) {
+        return el;
+      }
+    }
+    return null;
+  }
+
+  function getComputedStyleSafe(el) {
+    if (!el) return null;
+    try {
+      return window.getComputedStyle(el);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function pickSolidBackground(el) {
+    if (!el) return "";
+
+    var current = el;
+    var depth = 0;
+
+    while (current && depth < 5) {
+      var style = getComputedStyleSafe(current);
+      if (style) {
+        var bg = style.backgroundColor;
+        if (!isTransparentColor(bg)) {
+          return bg;
+        }
+      }
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return "";
+  }
+
+  function detectHeaderElement() {
+    return findFirstVisibleElement([
+      "header",
+      ".site-header",
+      ".navbar",
+      ".nav-bar",
+      ".main-header",
+      ".top-header",
+      "#header",
+      ".app-header"
+    ]);
+  }
+
+  function detectAccentElement() {
+    return findFirstVisibleElement([
+      "button",
+      ".btn",
+      ".button",
+      "[class*='btn']",
+      "[class*='button']",
+      "a.button",
+      "a.btn",
+      ".cta",
+      "[class*='cta']"
+    ]);
+  }
+
+  function detectPageBackgroundColor() {
+    var mainRoot = getBestContentRoot();
+    var bg =
+      pickSolidBackground(mainRoot) ||
+      pickSolidBackground(document.body) ||
+      pickSolidBackground(document.documentElement);
+
+    return bg || "#0b1220";
+  }
+
+  function detectHeaderBackgroundColor() {
+    var headerEl = detectHeaderElement();
+    var bg = pickSolidBackground(headerEl);
+
+    return bg || "";
+  }
+
+  function detectAccentColor() {
+    var accentEl = detectAccentElement();
+    var style = getComputedStyleSafe(accentEl);
+
+    if (style) {
+      if (!isTransparentColor(style.backgroundColor)) {
+        return style.backgroundColor;
+      }
+      if (!isTransparentColor(style.color)) {
+        return style.color;
+      }
+      if (!isTransparentColor(style.borderColor)) {
+        return style.borderColor;
+      }
+    }
+
+    var link = document.querySelector("a");
+    var linkStyle = getComputedStyleSafe(link);
+    if (linkStyle && !isTransparentColor(linkStyle.color)) {
+      return linkStyle.color;
+    }
+
+    return themeColor;
+  }
+
+  function detectSiteThemePayload() {
+    var pageBg = detectPageBackgroundColor();
+    var headerBg = detectHeaderBackgroundColor() || pageBg;
+    var accent = detectAccentColor() || themeColor;
+
+    var mode = getBrightness(pageBg) < 145 ? "dark" : "light";
+
+    return {
+      type: "sitemind-theme",
+      agentId: agentId,
+      mode: mode,
+      pageBackground: pageBg,
+      headerBackground: headerBg,
+      accentColor: accent,
+      fallbackColor: themeColor
+    };
+  }
+
   function getPageContextPayload() {
     var pageText = getMainContentText();
 
     return {
       type: "sitemind-page-context",
       agentId: agentId,
-      language: detectPageLanguage(),
+      language: detectBrowserLanguage(),
       pageTypeHint: getPageTypeHint(),
       pageTitle: getPageTitle(),
       pageDescription: getPageDescription(),
@@ -362,10 +527,8 @@
     };
   }
 
-  function sendPageContext() {
-    if (!iframe || !iframe.contentWindow) return;
-
-    var payload = getPageContextPayload();
+  function postToIframe(payload) {
+    if (!iframe || !iframe.contentWindow || !payload) return;
 
     try {
       iframe.contentWindow.postMessage(payload, BASE_URL);
@@ -374,6 +537,19 @@
         iframe.contentWindow.postMessage(payload, "*");
       } catch (err) {}
     }
+  }
+
+  function sendPageContext() {
+    postToIframe(getPageContextPayload());
+  }
+
+  function sendThemeContext() {
+    postToIframe(detectSiteThemePayload());
+  }
+
+  function sendAllContext() {
+    sendThemeContext();
+    sendPageContext();
   }
 
   function applyBubblePosition() {
@@ -456,6 +632,7 @@
     panel.style.borderRadius = "";
     panel.style.borderLeft = "";
     panel.style.borderRight = "";
+    panel.style.border = "";
     panel.style.background = "#ffffff";
     panel.style.overflow = "hidden";
     panel.style.boxShadow = "0 18px 50px rgba(15,23,42,0.16)";
@@ -544,7 +721,7 @@
     isOpen = true;
     applyPanelLayout();
     applyPageShrink();
-    sendPageContext();
+    sendAllContext();
   }
 
   function closePanel() {
@@ -602,8 +779,8 @@
     bubble.addEventListener("click", togglePanel);
 
     iframe.addEventListener("load", function () {
-      setTimeout(sendPageContext, 300);
-      setTimeout(sendPageContext, 1200);
+      setTimeout(sendAllContext, 300);
+      setTimeout(sendAllContext, 1200);
     });
   }
 
@@ -612,11 +789,11 @@
     if (!event.data || typeof event.data !== "object") return;
 
     if (event.data.type === "sitemind-widget-ready") {
-      sendPageContext();
+      sendAllContext();
     }
 
     if (event.data.type === "sitemind-refresh-page-context") {
-      sendPageContext();
+      sendAllContext();
     }
 
     if (event.data.type === "sitemind-close-widget") {
@@ -635,6 +812,7 @@
       } else {
         resetPageShrink();
       }
+      sendThemeContext();
     } else {
       resetPageShrink();
     }
