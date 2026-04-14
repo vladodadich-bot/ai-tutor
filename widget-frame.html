@@ -55,15 +55,6 @@
       --face-mouth: rgba(255,255,255,0.94);
       --face-border: rgba(255,255,255,0.24);
 
-      --hydra-ring: rgba(255,255,255,0.20);
-      --hydra-glow: rgba(99,175,207,0.26);
-      --hydra-lid: rgba(208, 225, 238, 0.96);
-      --hydra-lid-shadow: rgba(15,23,42,0.08);
-      --hydra-flow-1: rgba(255,255,255,0.00);
-      --hydra-flow-2: rgba(114, 228, 255, 0.34);
-      --hydra-flow-3: rgba(255,255,255,0.00);
-      --hydra-core: rgba(114, 228, 255, 0.28);
-
       --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
       --shadow-lg: 0 18px 42px rgba(15, 23, 42, 0.12);
       --glow:
@@ -489,190 +480,115 @@
       min-width: 0;
     }
 
-    .hydra-avatar {
+    .sm-face {
       width: 52px;
       height: 52px;
       min-width: 52px;
       border-radius: 14px;
       position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       overflow: hidden;
-      isolation: isolate;
-      border: 1px solid var(--hydra-ring);
+      background:
+        radial-gradient(circle at 24% 20%, rgba(255,255,255,0.30), transparent 24%),
+        linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)),
+        linear-gradient(135deg, #63AFCF, #4e9fbe 62%, #3b88a8);
+      border: 1px solid var(--face-border);
       box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.14),
-        0 8px 20px var(--hydra-glow);
-      background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
-      transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, filter 0.22s ease;
+        inset 0 1px 0 rgba(255,255,255,0.12),
+        0 8px 20px rgba(99, 175, 207, 0.24);
     }
 
-    .hydra-avatar::before {
+    .sm-face::before {
       content: "";
       position: absolute;
       inset: 0;
-      z-index: 4;
-      pointer-events: none;
       background:
-        radial-gradient(circle at 24% 18%, rgba(255,255,255,0.20), transparent 24%),
-        linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.00) 34%, rgba(0,0,0,0.08) 100%);
-      mix-blend-mode: screen;
-      opacity: 0.95;
-    }
-
-    .hydra-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center 30%;
-      display: block;
-      filter: saturate(1.06) contrast(1.03) brightness(0.98);
-      transform: scale(1.02);
-    }
-
-    .hydra-core-glow {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
+        radial-gradient(circle at 30% 25%, rgba(255,255,255,0.16), transparent 35%),
+        radial-gradient(circle at 75% 75%, rgba(223,244,251,0.22), transparent 30%);
       pointer-events: none;
-      background:
-        radial-gradient(circle at 50% 48%, var(--hydra-core) 0%, rgba(114,228,255,0.12) 18%, transparent 44%),
-        radial-gradient(circle at 50% 72%, rgba(114,228,255,0.12) 0%, transparent 26%);
-      opacity: 0.78;
-      transition: opacity 0.18s ease, filter 0.18s ease;
     }
 
-    .hydra-flow {
-      position: absolute;
-      inset: -8% -28%;
-      z-index: 3;
-      pointer-events: none;
-      background: linear-gradient(112deg, var(--hydra-flow-1) 32%, var(--hydra-flow-2) 50%, var(--hydra-flow-3) 66%);
-      mix-blend-mode: screen;
-      opacity: 0.52;
-      transform: translateX(-88%);
+    .sm-eyes {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
 
-    .hydra-flow-1 {
-      animation: hydraFlow 6.4s linear infinite;
-    }
-
-    .hydra-flow-2 {
-      inset: -10% -34%;
-      opacity: 0.34;
-      filter: blur(1.5px);
-      animation: hydraFlow 8.2s linear infinite reverse;
-    }
-
-    .hydra-avatar.is-thinking .hydra-flow-1 {
-      animation-duration: 1.35s;
-      opacity: 0.90;
-    }
-
-    .hydra-avatar.is-thinking .hydra-flow-2 {
-      animation-duration: 1.8s;
-      opacity: 0.62;
-    }
-
-    .hydra-avatar.is-thinking .hydra-core-glow {
-      opacity: 1;
-      filter: brightness(1.28);
-    }
-
-    .hydra-avatar.is-thinking {
+    .sm-eye {
+      width: 16px;
+      height: 22px;
+      border-radius: 4px;
+      background: linear-gradient(180deg, var(--face-eye) 0%, var(--face-eye-2) 45%, var(--face-eye-3) 100%);
       box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.16),
-        0 10px 24px rgba(90, 214, 255, 0.34),
-        0 0 18px rgba(90, 214, 255, 0.24);
-      filter: brightness(1.02);
-      transform: translateY(-0.5px);
-    }
-
-    .hydra-lid {
-      position: absolute;
-      z-index: 5;
-      width: 12px;
-      height: 10px;
-      top: 18px;
-      border-radius: 999px;
-      background:
-        linear-gradient(180deg, var(--hydra-lid), rgba(198, 214, 228, 0.96));
-      box-shadow:
-        0 1px 2px var(--hydra-lid-shadow),
-        inset 0 1px 0 rgba(255,255,255,0.14);
-      transform: scaleY(0);
+        0 0 10px rgba(255,255,255,0.30),
+        0 0 18px rgba(223,244,251,0.18),
+        inset 0 1px 0 rgba(255,255,255,0.68);
+      transition:
+        height 0.14s ease,
+        transform 0.22s ease,
+        opacity 0.22s ease,
+        border-radius 0.22s ease;
       transform-origin: center center;
-      opacity: 0;
     }
 
-    .hydra-lid-left {
-      left: 14px;
+    .sm-face::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: 5px;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 4px;
+      border-radius: 0 0 6px 6px;
+      border-bottom: 2px solid var(--face-mouth);
+      opacity: 0.9;
+      z-index: 1;
+      box-shadow: 0 0 6px rgba(255,255,255,0.18);
     }
 
-    .hydra-lid-right {
-      right: 14px;
+    .sm-face.sm-blink .sm-eye {
+      height: 4px;
+      border-radius: 6px;
     }
 
-    .hydra-avatar.is-blinking .hydra-lid {
-      animation: hydraBlink 160ms ease forwards;
+    .sm-face.sm-think-1 .sm-eye-left {
+      transform: rotate(-10deg) translateY(1px);
     }
 
-    .hydra-avatar.idle-pulse .hydra-core-glow {
-      animation: hydraPulse 2.8s ease-in-out 1;
+    .sm-face.sm-think-1 .sm-eye-right {
+      transform: rotate(10deg) translateY(1px);
     }
 
-    @keyframes hydraFlow {
-      0% {
-        transform: translateX(-88%);
-      }
-      100% {
-        transform: translateX(88%);
-      }
+    .sm-face.sm-think-2 .sm-eye-left {
+      transform: rotate(-16deg) translateY(2px) scaleY(0.92);
     }
 
-    @keyframes hydraBlink {
-      0% {
-        transform: scaleY(0);
-        opacity: 0;
-      }
-      45% {
-        transform: scaleY(1);
-        opacity: 0.96;
-      }
-      100% {
-        transform: scaleY(0);
-        opacity: 0;
-      }
+    .sm-face.sm-think-2 .sm-eye-right {
+      transform: rotate(16deg) translateY(2px) scaleY(0.92);
     }
 
-    @keyframes hydraPulse {
-      0%, 100% {
-        opacity: 0.78;
-        filter: brightness(1);
-      }
-      50% {
-        opacity: 1;
-        filter: brightness(1.22);
-      }
+    .sm-face.sm-think-3 .sm-eye-left {
+      transform: skewY(-8deg) translateY(1px);
+    }
+
+    .sm-face.sm-think-3 .sm-eye-right {
+      transform: skewY(8deg) translateY(1px);
     }
 
     @media (max-width: 480px) {
-      .hydra-avatar {
+      .sm-face {
         width: 48px;
         height: 48px;
         min-width: 48px;
       }
 
-      .hydra-lid {
-        width: 11px;
-        height: 9px;
-        top: 17px;
-      }
-
-      .hydra-lid-left {
-        left: 13px;
-      }
-
-      .hydra-lid-right {
-        right: 13px;
+      .sm-eye {
+        width: 14px;
+        height: 21px;
       }
 
       .sm-header-brand {
@@ -687,20 +603,11 @@
     <div class="chat-header-top">
       <div class="chat-header-left">
         <div class="sm-header-brand">
-          <div class="hydra-avatar" id="hydraAvatar" aria-hidden="true">
-            <img
-              src="https://sitemindai.app/images/hydra.webp"
-              alt=""
-              class="hydra-img"
-              id="hydraImg"
-              loading="eager"
-              decoding="async"
-            />
-            <div class="hydra-core-glow"></div>
-            <div class="hydra-flow hydra-flow-1"></div>
-            <div class="hydra-flow hydra-flow-2"></div>
-            <div class="hydra-lid hydra-lid-left"></div>
-            <div class="hydra-lid hydra-lid-right"></div>
+          <div class="sm-face" id="smFace" aria-hidden="true">
+            <div class="sm-eyes">
+              <div class="sm-eye sm-eye-left"></div>
+              <div class="sm-eye sm-eye-right"></div>
+            </div>
           </div>
 
           <div class="sm-title-wrap">
@@ -752,18 +659,18 @@
   var params = new URLSearchParams(window.location.search);
   var agentId = params.get("agentId") || "demo-agent";
 
-  function normalizeLang(value) {
-    var lang = String(value || "").toLowerCase().trim();
+ function normalizeLang(value) {
+  var lang = String(value || "").toLowerCase().trim();
 
-    if (!lang) return "en";
-    if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
-    if (lang.indexOf("de") === 0) return "de";
-    if (lang.indexOf("it") === 0) return "it";
-    if (lang.indexOf("fr") === 0) return "fr";
-    if (lang.indexOf("en") === 0) return "en";
+  if (!lang) return "en";
+  if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
+  if (lang.indexOf("de") === 0) return "de";
+  if (lang.indexOf("it") === 0) return "it";
+  if (lang.indexOf("fr") === 0) return "fr";
+  if (lang.indexOf("en") === 0) return "en";
 
-    return "en";
-  }
+  return "en";
+}
 
   function hexToRgb(hex) {
     var cleaned = String(hex || "").replace("#", "").trim();
@@ -916,19 +823,19 @@
 
   var UI_TEXT = {
     hr: {
-      subtitleDefault: "Pitaj AI asistenta",
-      inputPlaceholder: "Napiši pitanje...",
-      send: "Pošalji",
-      sending: "...",
-      loading: "Samo trenutak...",
-      streaming: "AI odgovara...",
-      errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
-      errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
-      welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
-      askPage: "Pitaj AI o: ",
-      closeAria: "Zatvori chat",
-      openStatus: ""
-    },
+  subtitleDefault: "Pitaj AI asistenta",
+  inputPlaceholder: "Napiši pitanje...",
+  send: "Pošalji",
+  sending: "...",
+  loading: "Samo trenutak...",
+  streaming: "AI odgovara...",
+  errorGeneric: "Došlo je do greške. Pokušaj ponovo.",
+  errorTimeout: "Zahtjev je trajao predugo. Pokušaj kraće pitanje.",
+  welcome: "Pozdrav! Mogu pomoći sa sadržajem ove stranice, uslugama, proizvodima ili općim pitanjima.",
+  askPage: "Pitaj AI o: ",
+  closeAria: "Zatvori chat",
+  openStatus: ""
+},
     de: {
       subtitleDefault: "Frag den KI-Assistenten",
       inputPlaceholder: "Schreibe eine Frage...",
@@ -1028,7 +935,7 @@
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/\"/g, "&quot;")
+      .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
   }
 
@@ -1085,12 +992,6 @@
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  function syncHydraThinking(active) {
-    if (window.__sitemindHydraController && typeof window.__sitemindHydraController.setThinking === "function") {
-      window.__sitemindHydraController.setThinking(!!active);
-    }
-  }
-
   function updateUiLanguage() {
     var lang = getLang();
 
@@ -1112,7 +1013,6 @@
     chatInput.disabled = loading;
     chatSend.textContent = loading ? t("sending") : t("send");
     setStatus(loading ? t("loading") : "");
-    syncHydraThinking(loading);
   }
 
   function normalizeHistory(history) {
@@ -1228,21 +1128,25 @@
     var accentDeep = adjustColor(accent, -34);
 
     var headerIsDark = isDarkColor(headerBg);
+    
+    var avatarBase = headerIsDark ? adjustColor(headerBg, 22) : adjustColor(headerBg, -22);
+var avatarMid = headerIsDark ? adjustColor(headerBg, 34) : adjustColor(headerBg, -34);
+var avatarDeep = headerIsDark ? adjustColor(headerBg, 46) : adjustColor(headerBg, -46);
 
-    var avatarEye = headerIsDark ? "rgba(255,255,255,0.86)" : "rgba(15,23,42,0.70)";
-    var avatarEye2 = headerIsDark ? "rgba(255,255,255,0.72)" : "rgba(15,23,42,0.54)";
-    var avatarEye3 = headerIsDark ? "rgba(255,255,255,0.58)" : "rgba(15,23,42,0.40)";
-    var avatarMouth = headerIsDark ? "rgba(255,255,255,0.78)" : "rgba(15,23,42,0.64)";
-    var avatarBorder = headerIsDark ? "rgba(255,255,255,0.16)" : "rgba(15,23,42,0.10)";
+var avatarEye = headerIsDark ? "rgba(255,255,255,0.86)" : "rgba(15,23,42,0.70)";
+var avatarEye2 = headerIsDark ? "rgba(255,255,255,0.72)" : "rgba(15,23,42,0.54)";
+var avatarEye3 = headerIsDark ? "rgba(255,255,255,0.58)" : "rgba(15,23,42,0.40)";
+var avatarMouth = headerIsDark ? "rgba(255,255,255,0.78)" : "rgba(15,23,42,0.64)";
+var avatarBorder = headerIsDark ? "rgba(255,255,255,0.16)" : "rgba(15,23,42,0.10)";
 
     var headerText = getContrastTextColor(headerBg, "#0f172a", "#ffffff");
     var headerSubtext = headerIsDark ? "rgba(255,255,255,0.92)" : "rgba(15,23,42,0.82)";
     var headerBrandText = headerIsDark ? "rgba(255,255,255,0.88)" : "rgba(15,23,42,0.74)";
     var sendBase = headerIsDark ? adjustColor(headerBg, 28) : adjustColor(headerBg, -28);
-    var sendMid = headerIsDark ? adjustColor(headerBg, 16) : adjustColor(headerBg, -16);
-    var sendText = isDarkColor(sendBase)
-      ? "rgba(255,255,255,0.92)"
-      : "rgba(15,23,42,0.82)";
+var sendMid = headerIsDark ? adjustColor(headerBg, 16) : adjustColor(headerBg, -16);
+var sendText = isDarkColor(sendBase)
+  ? "rgba(255,255,255,0.92)"
+  : "rgba(15,23,42,0.82)";
 
     document.documentElement.style.setProperty("--theme-main", accent);
     document.documentElement.style.setProperty("--theme-dark", accentDark);
@@ -1287,40 +1191,15 @@
       "--header-close-hover-border",
       headerIsDark ? "rgba(255,255,255,0.34)" : "rgba(15,23,42,0.24)"
     );
+    
+    
+document.documentElement.style.setProperty("--face-eye", avatarEye);
+document.documentElement.style.setProperty("--face-eye-2", avatarEye2);
+document.documentElement.style.setProperty("--face-eye-3", avatarEye3);
+document.documentElement.style.setProperty("--face-mouth", avatarMouth);
+document.documentElement.style.setProperty("--face-border", avatarBorder);
 
-    document.documentElement.style.setProperty("--face-eye", avatarEye);
-    document.documentElement.style.setProperty("--face-eye-2", avatarEye2);
-    document.documentElement.style.setProperty("--face-eye-3", avatarEye3);
-    document.documentElement.style.setProperty("--face-mouth", avatarMouth);
-    document.documentElement.style.setProperty("--face-border", avatarBorder);
-
-    document.documentElement.style.setProperty(
-      "--hydra-ring",
-      headerIsDark ? "rgba(255,255,255,0.18)" : "rgba(15,23,42,0.12)"
-    );
-    document.documentElement.style.setProperty(
-      "--hydra-glow",
-      rgbaFromColor(accent, headerIsDark ? 0.34 : 0.22, "#63AFCF")
-    );
-    document.documentElement.style.setProperty(
-      "--hydra-lid",
-      headerIsDark ? "rgba(202, 219, 232, 0.96)" : "rgba(220, 232, 241, 0.96)"
-    );
-    document.documentElement.style.setProperty(
-      "--hydra-lid-shadow",
-      headerIsDark ? "rgba(0,0,0,0.16)" : "rgba(15,23,42,0.08)"
-    );
-    document.documentElement.style.setProperty("--hydra-flow-1", "rgba(255,255,255,0.00)");
-    document.documentElement.style.setProperty(
-      "--hydra-flow-2",
-      rgbaFromColor(accent, headerIsDark ? 0.42 : 0.28, "#63AFCF")
-    );
-    document.documentElement.style.setProperty("--hydra-flow-3", "rgba(255,255,255,0.00)");
-    document.documentElement.style.setProperty(
-      "--hydra-core",
-      rgbaFromColor(accent, headerIsDark ? 0.36 : 0.22, "#63AFCF")
-    );
-
+    
     if (mode === "dark") {
       document.documentElement.style.setProperty("--bg-1", pageBg);
       document.documentElement.style.setProperty("--bg-2", adjustColor(pageBg, 8));
@@ -1403,6 +1282,16 @@
 
     chatHeader.style.boxShadow =
       "0 14px 30px " + rgbaFromColor(headerBg, 0.22, "#63AFCF") + ", inset 0 1px 0 rgba(255,255,255,0.18)";
+
+    var face = document.getElementById("smFace");
+    if (face) {
+    face.style.background =
+  "radial-gradient(circle at 24% 20%, rgba(255,255,255,0.18), transparent 24%), " +
+  "linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03)), " +
+  "linear-gradient(135deg, " + avatarBase + ", " + avatarMid + " 62%, " + avatarDeep + ")";
+      face.style.boxShadow =
+        "inset 0 1px 0 rgba(255,255,255,0.12), 0 8px 20px " + rgbaFromColor(accent, 0.24, "#63AFCF");
+    }
   }
 
   function applyAgentData() {
@@ -1433,9 +1322,9 @@
   function applyIncomingTheme(data) {
     if (!data || typeof data !== "object") return;
 
-    if (data.mode === "dark" || data.mode === "light") {
-      themeState.mode = data.mode;
-    }
+   if (data.mode === "dark" || data.mode === "light") {
+  themeState.mode = data.mode;
+}
 
     if (isValidCssColor(data.pageBackground)) {
       themeState.pageBackground = data.pageBackground;
@@ -1734,107 +1623,69 @@
 
 <script>
 (function () {
-  var avatar = document.getElementById('hydraAvatar');
-  if (!avatar) return;
+  const face = document.getElementById('smFace');
+  if (!face) return;
 
-  var blinkTimeout = null;
-  var pulseTimeout = null;
-  var thinking = false;
-  var destroyed = false;
+  const thinkClasses = ['sm-think-1', 'sm-think-2', 'sm-think-3'];
+  let isBlinking = false;
 
-  function clearTimers() {
-    if (blinkTimeout) {
-      clearTimeout(blinkTimeout);
-      blinkTimeout = null;
-    }
-    if (pulseTimeout) {
-      clearTimeout(pulseTimeout);
-      pulseTimeout = null;
-    }
+  function clearThinking() {
+    thinkClasses.forEach(cls => face.classList.remove(cls));
   }
 
   function blink() {
-    if (!avatar || destroyed) return;
+    if (isBlinking) return;
+    isBlinking = true;
 
-    avatar.classList.remove('is-blinking');
-    void avatar.offsetWidth;
-    avatar.classList.add('is-blinking');
+    clearThinking();
+    face.classList.add('sm-blink');
 
-    setTimeout(function () {
-      if (avatar) avatar.classList.remove('is-blinking');
-    }, 180);
+    setTimeout(() => {
+      face.classList.remove('sm-blink');
+      isBlinking = false;
+    }, 150);
   }
 
-  function pulse() {
-    if (!avatar || destroyed) return;
+  function randomThinkingPose() {
+    if (isBlinking) return;
 
-    avatar.classList.remove('idle-pulse');
-    void avatar.offsetWidth;
-    avatar.classList.add('idle-pulse');
+    clearThinking();
 
-    setTimeout(function () {
-      if (avatar) avatar.classList.remove('idle-pulse');
-    }, 2900);
+    const shouldThink = Math.random() < 0.55;
+    if (!shouldThink) return;
+
+    const cls = thinkClasses[Math.floor(Math.random() * thinkClasses.length)];
+    face.classList.add(cls);
+
+    setTimeout(() => {
+      face.classList.remove(cls);
+    }, 900 + Math.floor(Math.random() * 700));
   }
 
-  function scheduleBlink() {
-    clearTimeout(blinkTimeout);
+  function idleMotion() {
+    const roll = Math.random();
 
-    var next = thinking
-      ? 900 + Math.floor(Math.random() * 900)
-      : 3200 + Math.floor(Math.random() * 2600);
-
-    blinkTimeout = setTimeout(function () {
+    if (roll < 0.45) {
       blink();
-      if (thinking && Math.random() < 0.35) {
-        setTimeout(blink, 180 + Math.floor(Math.random() * 180));
-      }
-      scheduleBlink();
-    }, next);
-  }
-
-  function schedulePulse() {
-    clearTimeout(pulseTimeout);
-
-    var next = thinking
-      ? 700 + Math.floor(Math.random() * 700)
-      : 2600 + Math.floor(Math.random() * 2600);
-
-    pulseTimeout = setTimeout(function () {
-      pulse();
-      schedulePulse();
-    }, next);
-  }
-
-  function setThinking(active) {
-    thinking = !!active;
-    if (!avatar) return;
-
-    avatar.classList.toggle('is-thinking', thinking);
-    scheduleBlink();
-    schedulePulse();
-  }
-
-  window.__sitemindHydraController = {
-    setThinking: setThinking,
-    blink: blink,
-    destroy: function () {
-      destroyed = true;
-      clearTimers();
-      if (avatar) {
-        avatar.classList.remove('is-thinking');
-        avatar.classList.remove('is-blinking');
-        avatar.classList.remove('idle-pulse');
-      }
+      return;
     }
-  };
 
-  scheduleBlink();
-  schedulePulse();
+    if (roll < 0.85) {
+      randomThinkingPose();
+      return;
+    }
 
-  setTimeout(function () {
     blink();
-  }, 900);
+    setTimeout(() => {
+      randomThinkingPose();
+    }, 220);
+  }
+
+  setInterval(idleMotion, 2800 + Math.floor(Math.random() * 1200));
+
+  setTimeout(() => {
+    blink();
+  }, 1200);
 })();
 </script>
 </body>
