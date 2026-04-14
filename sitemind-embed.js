@@ -575,14 +575,13 @@ function styleBubble() {
   if (!bubble) return;
 
   var bubbleDark = "#115C79";
-  var bubbleLight = "#1588A7";
+  var bubbleMid = "#1588A7";
+  var bubbleLight = "#2AA7C8";
 
-  var borderColor = "rgba(255,255,255,0.18)";
-  var outerGlow = "rgba(17, 92, 121, 0.20)";
-  var outerGlowHover = "rgba(17, 92, 121, 0.28)";
-  var innerHighlight = "rgba(255,255,255,0.22)";
-  var brushedLine = "rgba(255,255,255,0.045)";
-  var brushedLineDark = "rgba(0,0,0,0.035)";
+  var borderColor = "rgba(255,255,255,0.22)";
+  var borderHover = "rgba(255,255,255,0.30)";
+  var outerGlow = "rgba(17, 92, 121, 0.24)";
+  var outerGlowHover = "rgba(17, 92, 121, 0.34)";
 
   bubble.style.position = "fixed";
   bubble.style.zIndex = "999999";
@@ -600,22 +599,24 @@ function styleBubble() {
   bubble.style.backdropFilter = "blur(10px)";
   bubble.style.webkitBackdropFilter = "blur(10px)";
   bubble.style.transition =
-    "transform 0.22s ease, box-shadow 0.22s ease, opacity 0.18s ease, border-color 0.22s ease, filter 0.22s ease";
+    "transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, filter 0.22s ease";
 
   bubble.style.background =
-    "linear-gradient(145deg, " + bubbleDark + " 0%, " + bubbleLight + " 52%, " + bubbleDark + " 100%), " +
-    "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.05) 38%, rgba(0,0,0,0.05) 100%), " +
-    "repeating-linear-gradient(115deg, transparent 0px, transparent 6px, " + brushedLine + " 7px, transparent 12px), " +
-    "repeating-linear-gradient(115deg, transparent 0px, transparent 11px, " + brushedLineDark + " 12px, transparent 17px), " +
-    "radial-gradient(circle at 18% 18%, " + innerHighlight + ", transparent 28%)";
+    "linear-gradient(145deg, " + bubbleDark + " 0%, " + bubbleMid + " 34%, " + bubbleLight + " 50%, " + bubbleMid + " 66%, " + bubbleDark + " 100%), " +
+    "linear-gradient(180deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.14) 18%, rgba(255,255,255,0.05) 42%, rgba(0,0,0,0.08) 100%), " +
+    "repeating-linear-gradient(115deg, rgba(255,255,255,0.00) 0px, rgba(255,255,255,0.00) 4px, rgba(255,255,255,0.085) 5px, rgba(255,255,255,0.00) 9px), " +
+    "repeating-linear-gradient(115deg, rgba(0,0,0,0.00) 0px, rgba(0,0,0,0.00) 8px, rgba(0,0,0,0.050) 9px, rgba(0,0,0,0.00) 14px), " +
+    "radial-gradient(circle at 20% 18%, rgba(255,255,255,0.30), transparent 26%), " +
+    "radial-gradient(circle at 82% 78%, rgba(0,0,0,0.10), transparent 24%)";
 
   bubble.style.boxShadow =
-    "0 14px 34px " + outerGlow + ", " +
-    "0 0 0 1px rgba(255,255,255,0.06), " +
-    "inset 0 1px 0 rgba(255,255,255,0.18), " +
-    "inset 0 -8px 18px rgba(0,0,0,0.10)";
+    "0 16px 36px " + outerGlow + ", " +
+    "0 0 0 1px rgba(255,255,255,0.08), " +
+    "inset 0 1px 0 rgba(255,255,255,0.24), " +
+    "inset 0 10px 14px rgba(255,255,255,0.08), " +
+    "inset 0 -12px 22px rgba(0,0,0,0.16)";
 
-  bubble.style.textShadow = "0 1px 1px rgba(0,0,0,0.18)";
+  bubble.style.textShadow = "0 1px 2px rgba(0,0,0,0.24)";
   bubble.style.letterSpacing = "0.1px";
 
   if (window.innerWidth < 520) {
@@ -626,23 +627,25 @@ function styleBubble() {
 
   bubble.onmouseenter = function () {
     bubble.style.transform = "translateY(-2px)";
-    bubble.style.borderColor = "rgba(255,255,255,0.24)";
+    bubble.style.borderColor = borderHover;
     bubble.style.boxShadow =
-      "0 18px 40px " + outerGlowHover + ", " +
-      "0 0 0 1px rgba(255,255,255,0.08), " +
-      "inset 0 1px 0 rgba(255,255,255,0.22), " +
-      "inset 0 -10px 20px rgba(0,0,0,0.12)";
-    bubble.style.filter = "brightness(1.03)";
+      "0 20px 42px " + outerGlowHover + ", " +
+      "0 0 0 1px rgba(255,255,255,0.10), " +
+      "inset 0 1px 0 rgba(255,255,255,0.28), " +
+      "inset 0 12px 16px rgba(255,255,255,0.10), " +
+      "inset 0 -14px 24px rgba(0,0,0,0.18)";
+    bubble.style.filter = "brightness(1.05)";
   };
 
   bubble.onmouseleave = function () {
     bubble.style.transform = "translateY(0)";
     bubble.style.borderColor = borderColor;
     bubble.style.boxShadow =
-      "0 14px 34px " + outerGlow + ", " +
-      "0 0 0 1px rgba(255,255,255,0.06), " +
-      "inset 0 1px 0 rgba(255,255,255,0.18), " +
-      "inset 0 -8px 18px rgba(0,0,0,0.10)";
+      "0 16px 36px " + outerGlow + ", " +
+      "0 0 0 1px rgba(255,255,255,0.08), " +
+      "inset 0 1px 0 rgba(255,255,255,0.24), " +
+      "inset 0 10px 14px rgba(255,255,255,0.08), " +
+      "inset 0 -12px 22px rgba(0,0,0,0.16)";
     bubble.style.filter = "brightness(1)";
   };
 }
