@@ -570,58 +570,83 @@ function getDefaultBubbleText(lang) {
       bubble.style.right = "16px";
     }
   }
+/ / funkcija za oblak chat / / 
+  
+function styleBubble() {
+  if (!bubble) return;
 
-  function styleBubble() {
-    if (!bubble) return;
+  var bubbleDark = "#115C79";
+  var bubbleLight = "#1588A7";
 
-    var glowSoft = rgbaFromHex(themeColor, 0.14);
-    var glowStrong = rgbaFromHex(themeColor, 0.22);
-    var borderGlow = rgbaFromHex(themeColor, 0.18);
+  var borderColor = "rgba(255,255,255,0.18)";
+  var outerGlow = "rgba(17, 92, 121, 0.20)";
+  var outerGlowHover = "rgba(17, 92, 121, 0.28)";
+  var innerHighlight = "rgba(255,255,255,0.22)";
+  var brushedLine = "rgba(255,255,255,0.045)";
+  var brushedLineDark = "rgba(0,0,0,0.035)";
 
-    bubble.style.position = "fixed";
-    bubble.style.zIndex = "999999";
-    bubble.style.border = "1px solid " + borderGlow;
-    bubble.style.borderRadius = "999px";
-    bubble.style.padding = "14px 22px";
-    bubble.style.background =
-      "radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 34%), linear-gradient(135deg, " + themeColor + ", #1d4ed8)";
-    bubble.style.color = "#ffffff";
-    bubble.style.fontSize = "14px";
-    bubble.style.fontWeight = "700";
-    bubble.style.lineHeight = "1.35";
-    bubble.style.textAlign = "center";
-    bubble.style.maxWidth = "255px";
-    bubble.style.boxShadow =
-      "0 16px 34px rgba(37,99,235,0.18), 0 0 0 1px rgba(255,255,255,0.08), 0 0 20px " + glowSoft;
-    bubble.style.cursor = "pointer";
-    bubble.style.whiteSpace = "normal";
-    bubble.style.backdropFilter = "blur(10px)";
-    bubble.style.webkitBackdropFilter = "blur(10px)";
-    bubble.style.transition =
-      "transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease, border-color 0.18s ease, filter 0.18s ease";
+  bubble.style.position = "fixed";
+  bubble.style.zIndex = "999999";
+  bubble.style.border = "1px solid " + borderColor;
+  bubble.style.borderRadius = "999px";
+  bubble.style.padding = "14px 22px";
+  bubble.style.color = "#ffffff";
+  bubble.style.fontSize = "14px";
+  bubble.style.fontWeight = "700";
+  bubble.style.lineHeight = "1.35";
+  bubble.style.textAlign = "center";
+  bubble.style.maxWidth = "255px";
+  bubble.style.cursor = "pointer";
+  bubble.style.whiteSpace = "normal";
+  bubble.style.backdropFilter = "blur(10px)";
+  bubble.style.webkitBackdropFilter = "blur(10px)";
+  bubble.style.transition =
+    "transform 0.22s ease, box-shadow 0.22s ease, opacity 0.18s ease, border-color 0.22s ease, filter 0.22s ease";
 
-    if (window.innerWidth < 520) {
-      bubble.style.maxWidth = "220px";
-      bubble.style.fontSize = "13px";
-      bubble.style.padding = "12px 18px";
-    }
+  bubble.style.background =
+    "linear-gradient(145deg, " + bubbleDark + " 0%, " + bubbleLight + " 52%, " + bubbleDark + " 100%), " +
+    "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.05) 38%, rgba(0,0,0,0.05) 100%), " +
+    "repeating-linear-gradient(115deg, transparent 0px, transparent 6px, " + brushedLine + " 7px, transparent 12px), " +
+    "repeating-linear-gradient(115deg, transparent 0px, transparent 11px, " + brushedLineDark + " 12px, transparent 17px), " +
+    "radial-gradient(circle at 18% 18%, " + innerHighlight + ", transparent 28%)";
 
-    bubble.onmouseenter = function () {
-      bubble.style.transform = "translateY(-1px)";
-      bubble.style.borderColor = rgbaFromHex(themeColor, 0.28);
-      bubble.style.boxShadow =
-        "0 18px 38px rgba(37,99,235,0.22), 0 0 0 1px rgba(255,255,255,0.10), 0 0 26px " + glowStrong;
-      bubble.style.filter = "brightness(1.03)";
-    };
+  bubble.style.boxShadow =
+    "0 14px 34px " + outerGlow + ", " +
+    "0 0 0 1px rgba(255,255,255,0.06), " +
+    "inset 0 1px 0 rgba(255,255,255,0.18), " +
+    "inset 0 -8px 18px rgba(0,0,0,0.10)";
 
-    bubble.onmouseleave = function () {
-      bubble.style.transform = "translateY(0)";
-      bubble.style.borderColor = borderGlow;
-      bubble.style.boxShadow =
-        "0 16px 34px rgba(37,99,235,0.18), 0 0 0 1px rgba(255,255,255,0.08), 0 0 20px " + glowSoft;
-      bubble.style.filter = "brightness(1)";
-    };
+  bubble.style.textShadow = "0 1px 1px rgba(0,0,0,0.18)";
+  bubble.style.letterSpacing = "0.1px";
+
+  if (window.innerWidth < 520) {
+    bubble.style.maxWidth = "220px";
+    bubble.style.fontSize = "13px";
+    bubble.style.padding = "12px 18px";
   }
+
+  bubble.onmouseenter = function () {
+    bubble.style.transform = "translateY(-2px)";
+    bubble.style.borderColor = "rgba(255,255,255,0.24)";
+    bubble.style.boxShadow =
+      "0 18px 40px " + outerGlowHover + ", " +
+      "0 0 0 1px rgba(255,255,255,0.08), " +
+      "inset 0 1px 0 rgba(255,255,255,0.22), " +
+      "inset 0 -10px 20px rgba(0,0,0,0.12)";
+    bubble.style.filter = "brightness(1.03)";
+  };
+
+  bubble.onmouseleave = function () {
+    bubble.style.transform = "translateY(0)";
+    bubble.style.borderColor = borderColor;
+    bubble.style.boxShadow =
+      "0 14px 34px " + outerGlow + ", " +
+      "0 0 0 1px rgba(255,255,255,0.06), " +
+      "inset 0 1px 0 rgba(255,255,255,0.18), " +
+      "inset 0 -8px 18px rgba(0,0,0,0.10)";
+    bubble.style.filter = "brightness(1)";
+  };
+}
 
   function applyPanelLayout() {
     if (!panel || !bubble || !iframe) return;
