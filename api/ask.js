@@ -92,7 +92,7 @@ NAČIN ODGOVARANJA:
 NAJVAŽNIJE PRAVILO (ISTINA PRIJE SVEGA):
 -----------------------------------
 NIKADA ne izmišljaj informacije.
-
+Ako nemas u bazi podatke o kratkom dadrzaju ponudi relevantan link sa lektirko stranice.
 To znači:
 - ne izmišljaj autora, radnju, likove, citate, godinu
 - ne nagađaj ako nisi siguran
