@@ -298,84 +298,105 @@
     return text;
   }
 
-  function getPageTypeHint() {
-    var url = (window.location.href || "").toLowerCase();
-    var title = getPageTitle().toLowerCase();
-    var desc = getPageDescription().toLowerCase();
-    var h1 = getPageH1().toLowerCase();
-    var text = getMainContentText().slice(0, 2500).toLowerCase();
-    var blob = [url, title, desc, h1, text].join(" ");
+ function getPageTypeHint() {
+  var url = String(window.location.href || "").toLowerCase();
+  var title = String(getPageTitle() || "").toLowerCase();
+  var desc = String(getPageDescription() || "").toLowerCase();
+  var h1 = String(getPageH1() || "").toLowerCase();
+  var headings = String((getHeadingsText() || []).join(" ") || "").toLowerCase();
+  var text = String(getMainContentText() || "").slice(0, 2500).toLowerCase();
 
-    function hasAny(words) {
-      for (var i = 0; i < words.length; i++) {
-        if (blob.indexOf(words[i]) !== -1) return true;
-      }
-      return false;
+  var blob = [url, title, desc, h1, headings, text].join(" ");
+
+  function hasAny(words) {
+    for (var i = 0; i < words.length; i++) {
+      if (blob.indexOf(words[i]) !== -1) return true;
     }
-
-    if (hasAny(["course", "lesson", "lektira", "schule", "school", "lernen", "guide for students", "učen", "student", "unterricht"])) {
-      return "education";
-    }
-
-    if (hasAny(["api", "developer", "sdk", "documentation", "docs", "integration", "javascript", "code", "vercel", "supabase"])) {
-      return "technical";
-    }
-
-    if (hasAny(["pricing", "plan", "saas", "subscription", "business", "service", "agency", "software"])) {
-      return "business";
-    }
-
-    if (hasAny(["shop", "product", "cart", "buy", "checkout", "store", "price"])) {
-      return "ecommerce";
-    }
-
-    if (hasAny(["news", "article", "blog", "post"])) {
-      return "blog";
-    }
-
-    if (hasAny(["travel", "hotel", "apartment", "booking", "guest"])) {
-      return "travel";
-    }
-
-    if (hasAny(["movie", "fun", "entertainment", "music", "game", "show"])) {
-      return "entertainment";
-    }
-
-    return "general";
+    return false;
   }
 
-  function getPageContextPayload() {
-    var pageText = getMainContentText();
-
-    return {
-      type: "sitemind-page-context",
-      agentId: agentId,
-      language: detectPageLanguage(),
-      pageTypeHint: getPageTypeHint(),
-      pageTitle: getPageTitle(),
-      pageDescription: getPageDescription(),
-      pageUrl: window.location.href,
-      h1: getPageH1(),
-      headings: getHeadingsText(),
-      pageContext: pageText,
-      pageText: pageText
-    };
+  if (hasAny([
+    "api", "developer", "sdk", "documentation", "docs", "integration",
+    "javascript", "typescript", "react", "code", "vercel", "supabase",
+    "endpoint", "reference"
+  ])) {
+    return "technical";
   }
 
-  function sendPageContext() {
-    if (!iframe || !iframe.contentWindow) return;
+  if (hasAny([
+    "shop", "product", "cart", "buy", "checkout", "store",
+    "price", "add to cart", "sku"
+  ])) {
+    return "ecommerce";
+  }
 
-    var payload = getPageContextPayload();
+  if (hasAny([
+    "travel", "hotel", "apartment", "booking", "guest",
+    "reservation", "stay", "accommodation"
+  ])) {
+    return "travel";
+  }
 
+  if (hasAny([
+    "pricing", "plan", "saas", "subscription", "service", "agency",
+    "software", "company", "business"
+  ])) {
+    return "business";
+  }
+
+  if (hasAny([
+    "news", "article", "blog", "post", "author", "published", "read more"
+  ])) {
+    return "blog";
+  }
+
+  if (hasAny([
+    "course", "lesson", "school", "lernen", "guide for students",
+    "student", "unterricht", "education", "learning", "study"
+  ])) {
+    return "education";
+  }
+
+  if (hasAny([
+    "movie", "music", "game", "show", "entertainment"
+  ])) {
+    return "entertainment";
+  }
+
+  return "general";
+}
+
+function getPageContextPayload() {
+  var pageText = getMainContentText();
+
+  return {
+    type: "sitemind-page-context",
+    agentId: agentId,
+    language: detectPageLanguage(),
+    pageTypeHint: getPageTypeHint(),
+    pageTitle: getPageTitle(),
+    pageDescription: getPageDescription(),
+    pageUrl: window.location.href,
+    h1: getPageH1(),
+    headings: getHeadingsText(),
+    pageContext: pageText,
+    pageText: pageText
+  };
+}
+
+function sendPageContext() {
+  if (!iframe || !iframe.contentWindow) return;
+
+  var payload = getPageContextPayload();
+
+  try {
+    iframe.contentWindow.postMessage(payload, BASE_URL);
+  } catch (e) {
     try {
-      iframe.contentWindow.postMessage(payload, BASE_URL);
-    } catch (e) {
-      try {
-        iframe.contentWindow.postMessage(payload, "*");
-      } catch (err) {}
-    }
+      iframe.contentWindow.postMessage(payload, "*");
+    } catch (err) {}
   }
-
+}
   function applyBubblePosition() {
     if (!bubble) return;
 
