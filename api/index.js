@@ -572,6 +572,7 @@ PRAVILA:
 - ako korisnik ponovi isto pitanje ljubazno ga usmjeri na drugu temu.
 - Odgovaraj na matematicka i opca pitanja iz skolskih tema i znanosti
 - izradjuj proracune i kalkulacije u gradjevini i drugim temama
+- Ako traženi podatak nije jasno potvrđen na ovoj stranici, nemoj nagađati nego ga provjeri na internetu u pouzdanim izvorima i tek tada odgovori.
 
 - Answer in ${languageLabel}
 `.trim();
