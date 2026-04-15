@@ -702,7 +702,6 @@ function scorePageForMessage(page, message) {
     if (meta.includes(word)) score += 2;
   }
 
-  // bonus za skoro exact match cijelog upita
   if (title.includes(text)) score += 20;
   if (h1.includes(text)) score += 18;
   if (headings.includes(text)) score += 8;
