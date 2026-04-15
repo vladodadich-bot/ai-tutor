@@ -1096,7 +1096,51 @@ function saveStoredHistory(history) {
       );
     } catch (e) {}
   }
+function clearStoredHistory() {
+  try {
+    sessionStorage.removeItem(getHistoryPayloadKey());
+  } catch (e) {}
+}
 
+function getStoredHistory() {
+  try {
+    var raw = sessionStorage.getItem(getHistoryPayloadKey());
+    if (!raw) return [];
+
+    var parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      clearStoredHistory();
+      return [];
+    }
+
+    var savedAt = Number(parsed.savedAt || 0);
+    var history = Array.isArray(parsed.history) ? parsed.history : [];
+
+    if (!savedAt || (Date.now() - savedAt > HISTORY_EXPIRY_MS)) {
+      clearStoredHistory();
+      return [];
+    }
+
+    return normalizeHistory(history);
+  } catch (e) {
+    clearStoredHistory();
+    return [];
+  }
+}
+
+function saveStoredHistory(history) {
+  try {
+    var normalized = normalizeHistory(history).slice(-MAX_HISTORY_ITEMS);
+
+    sessionStorage.setItem(
+      getHistoryPayloadKey(),
+      JSON.stringify({
+        savedAt: Date.now(),
+        history: normalized
+      })
+    );
+  } catch (e) {}
+}
   function addMessage(role, text) {
     var row = document.createElement("div");
     row.className = "message-row " + role;
