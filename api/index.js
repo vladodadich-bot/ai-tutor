@@ -591,7 +591,7 @@ function buildUserPrompt(payload) {
   const headingsText = Array.isArray(payload.headings) ? payload.headings.join(' | ') : '';
   const historyText = Array.isArray(payload.history) && payload.history.length
     ? payload.history
-        .slice(-2)
+        .slice(-4)
         .map((item) => `${item.role}: ${item.content}`)
         .join('\n')
     : 'N/A';
@@ -634,7 +634,7 @@ ${historyText}
 
 function buildLinkSuggestionReply(language, candidates) {
   const lang = String(language || 'en').toLowerCase();
-  const items = (candidates || []).slice(0, 2);
+  const items = (candidates || []).slice(0, 4);
 
   if (!items.length) return '';
 
