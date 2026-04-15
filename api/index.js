@@ -680,50 +680,33 @@ function safeJsonArray(value) {
 }
 
 function scorePageForMessage(page, message) {
-  const text = String(message || '').toLowerCase();
+  const text = String(message || '').toLowerCase().trim();
   if (!text) return 0;
 
-const title = String(page.page_title || '').toLowerCase();
-const meta = String(page.meta_description || '').toLowerCase();
-const h1 = String(page.h1 || '').toLowerCase();
-const headings = safeJsonArray(page.headings).join(' ').toLowerCase();
-const links = safeJsonArray(page.internal_links)
-  .map((link) => ((link && link.text) || '') + ' ' + ((link && link.href) || ''))
-  .join(' ')
-  .toLowerCase();
-const content = '';
+  const title = String(page.page_title || '').toLowerCase();
+  const meta = String(page.meta_description || '').toLowerCase();
+  const h1 = String(page.h1 || '').toLowerCase();
+  const headings = safeJsonArray(page.headings).join(' ').toLowerCase();
+  const preview = String(page.text_preview || '').toLowerCase();
 
   let score = 0;
   const words = text.split(/\s+/).filter(Boolean);
 
   for (const word of words) {
     if (word.length < 2) continue;
-    if (title.includes(word)) score += 5;
-    if (h1.includes(word)) score += 4;
-    if (headings.includes(word)) score += 3;
+
+    if (title.includes(word)) score += 8;
+    if (h1.includes(word)) score += 7;
+    if (headings.includes(word)) score += 4;
+    if (preview.includes(word)) score += 5;
     if (meta.includes(word)) score += 2;
-    if (links.includes(word)) score += 1;
-    if (content.includes(word)) score += 6;
   }
 
-  return score;
-}
-
-function scoreLinkMatch(link, message) {
-  const text = String(message || '').toLowerCase();
-  if (!text) return 0;
-
-  const linkText = String(link && link.text ? link.text : '').toLowerCase();
-  const linkHref = String(link && link.href ? link.href : '').toLowerCase();
-
-  let score = 0;
-  const words = text.split(/\s+/).filter(Boolean);
-
-  for (const word of words) {
-    if (word.length < 2) continue;
-    if (linkText.includes(word)) score += 5;
-    if (linkHref.includes(word)) score += 3;
-  }
+  // bonus za skoro exact match cijelog upita
+  if (title.includes(text)) score += 20;
+  if (h1.includes(text)) score += 18;
+  if (headings.includes(text)) score += 8;
+  if (preview.includes(text)) score += 10;
 
   return score;
 }
@@ -741,25 +724,6 @@ function pickRelevantCrawledPages(rows, message, limit = 3) {
 
   return scored.slice(0, limit);
 }
-
-function findRelevantLinkCandidates(rows, message, limit = 3) {
-  const matches = [];
-
-  for (const row of rows || []) {
-    const pageTitle = String(row.page_title || '').trim();
-    const pageUrl = String(row.url || '').trim();
-    const pageH1 = String(row.h1 || '').trim();
-    const links = safeJsonArray(row.internal_links);
-
-    const pageScore = scorePageForMessage(row, message);
-    if (pageScore > 0 && pageUrl) {
-      matches.push({
-        title: pageTitle || pageH1 || pageUrl,
-        url: pageUrl,
-        score: pageScore + 4
-      });
-    }
-
     for (const link of links) {
       const score = scoreLinkMatch(link, message);
       const href = String(link && link.href ? link.href : '').trim();
