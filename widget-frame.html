@@ -784,11 +784,15 @@
       .replace(/'/g, "&#039;");
   }
 
- function formatMessageHtml(text) {
-  var safeText = String(text || "").replace(/\r\n/g, "\n").trim();
+function formatMessageHtml(text) {
+  var safeText = String(text || '')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
   var escaped = escapeHtml(safeText)
-    .replace(/\n\n+/g, "<br><br>")
+    .replace(/\n\n/g, "<br><br>")
     .replace(/\n/g, "<br>");
 
   return escaped.replace(
