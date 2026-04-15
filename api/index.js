@@ -573,7 +573,7 @@ PRAVILA:
 - Odgovaraj na matematicka i opca pitanja iz skolskih tema i znanosti
 - izradjuj proracune i kalkulacije u gradjevini i drugim temama
 - Ako traženi podatak nije jasno potvrđen na ovoj stranici, nemoj nagađati nego ga provjeri na internetu u pouzdanim izvorima i tek tada odgovori.
-- Vazno Odgovor formatiraj kao čist i čitljiv tekst za običnog korisnika. Ne koristi ### naslove, markdown podnaslove ni nabrajanja osim kada su baš nužna. Umjesto toga piši u kraćim, odvojenim odlomcima s jasnim razmacima između dijelova odgovora.
+
 - Answer in ${languageLabel}
 `.trim();
 }
