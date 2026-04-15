@@ -1037,29 +1037,13 @@
     setStatus(loading ? t("loading") : "");
   }
 
-  function normalizeHistory(history) {
-    if (!Array.isArray(history)) return [];
-
-    return history
-      .map(function (item) {
-        return {
-          role: item && item.role === "assistant" ? "assistant" : "user",
-          content: truncateText(item && item.content ? item.content : "", 1200)
-        };
-      })
-      .filter(function (item) {
-        return item.content;
-      })
-      .slice(-MAX_HISTORY_ITEMS);
-  }
-
   function clearStoredHistory() {
-    try {
-      sessionStorage.removeItem(getHistoryPayloadKey());
-    } catch (e) {}
-  }
+  try {
+    sessionStorage.removeItem(getHistoryPayloadKey());
+  } catch (e) {}
+}
 
-  function getStoredHistory() {
+function getStoredHistory() {
   try {
     var raw = sessionStorage.getItem(getHistoryPayloadKey());
     if (!raw) return [];
@@ -1070,24 +1054,34 @@
       return [];
     }
 
-    return Array.isArray(parsed.history) ? parsed.history : [];
+    var savedAt = Number(parsed.savedAt || 0);
+    var history = Array.isArray(parsed.history) ? parsed.history : [];
+
+    if (!savedAt || (Date.now() - savedAt > HISTORY_EXPIRY_MS)) {
+      clearStoredHistory();
+      return [];
+    }
+
+    return normalizeHistory(history);
   } catch (e) {
     clearStoredHistory();
     return [];
   }
 }
-      
-      if (!savedAt || (Date.now() - savedAt > HISTORY_EXPIRY_MS)) {
-        clearStoredHistory();
-        return [];
-      }
 
-      return normalizeHistory(history);
-    } catch (e) {
-      clearStoredHistory();
-      return [];
-    }
-  }
+function saveStoredHistory(history) {
+  try {
+    var normalized = normalizeHistory(history).slice(-MAX_HISTORY_ITEMS);
+
+    sessionStorage.setItem(
+      getHistoryPayloadKey(),
+      JSON.stringify({
+        savedAt: Date.now(),
+        history: normalized
+      })
+    );
+  } catch (e) {}
+}
 
   function saveStoredHistory(history) {
     try {
