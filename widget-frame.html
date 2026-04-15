@@ -784,16 +784,21 @@
       .replace(/'/g, "&#039;");
   }
 
-  function formatMessageHtml(text) {
-    var escaped = escapeHtml(text).replace(/\n/g, "<br>");
-    return escaped.replace(
-      /(https?:\/\/[^\s<>()]+)/g,
-      function (url) {
-        var cleanUrl = url.replace(/&lt;br&gt;$/, "");
-        return '<a href="' + cleanUrl + '" target="_blank" rel="noopener noreferrer">' + cleanUrl + "</a>";
-      }
-    );
-  }
+ function formatMessageHtml(text) {
+  var safeText = String(text || "").replace(/\r\n/g, "\n").trim();
+
+  var escaped = escapeHtml(safeText)
+    .replace(/\n\n+/g, "<br><br>")
+    .replace(/\n/g, "<br>");
+
+  return escaped.replace(
+    /(https?:\/\/[^\s<>()]+)/g,
+    function (url) {
+      var cleanUrl = url.replace(/&lt;br&gt;$/, "");
+      return '<a href="' + cleanUrl + '" target="_blank" rel="noopener noreferrer">' + cleanUrl + "</a>";
+    }
+  );
+}
 
   function notifyParentClose() {
     if (window.parent && window.parent !== window) {
