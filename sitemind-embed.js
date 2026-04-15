@@ -383,7 +383,72 @@ function getPageContextPayload() {
     pageText: pageText
   };
 }
+----
+  function detectUserIntent(message) {
+  const msg = (message || "").toLowerCase();
 
+  if (
+    msg.includes("lektira") ||
+    msg.includes("summary") ||
+    msg.includes("inhalt")
+  ) {
+    return "education_content";
+  }
+
+  if (
+    msg.includes("how") ||
+    msg.includes("kako") ||
+    msg.includes("wie")
+  ) {
+    return "how_to";
+  }
+
+  if (
+    msg.includes("price") ||
+    msg.includes("cijena")
+  ) {
+    return "sales";
+  }
+
+  return "general";
+}
+
+function getStyleGuide(intent) {
+  if (intent === "education_content") {
+    return `
+- give a clear, concrete explanation
+- if it's a story or topic, explain what happens step by step
+- avoid abstract or overly philosophical language
+- keep it simple and useful
+- prefer concrete explanations over abstract descriptions
+`;
+  }
+
+  if (intent === "sales") {
+    return `
+- be concise
+- highlight benefits clearly
+- include a clear next step
+- prefer concrete explanations over abstract descriptions
+`;
+  }
+
+  if (intent === "how_to") {
+    return `
+- explain step by step
+- keep instructions practical and easy to follow
+- avoid unnecessary theory
+- prefer concrete explanations over abstract descriptions
+`;
+  }
+
+  return `
+- be helpful and clear
+- avoid unnecessary length
+- prefer concrete explanations over abstract descriptions
+`;
+}
+  ----
 function sendPageContext() {
   if (!iframe || !iframe.contentWindow) return;
 
