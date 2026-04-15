@@ -668,6 +668,7 @@ function buildLinkSuggestionReply(language, candidates) {
 function safeJsonArray(value) {
   if (Array.isArray(value)) return value;
   if (!value) return [];
+
   if (typeof value === 'string') {
     try {
       const parsed = JSON.parse(value);
@@ -676,18 +677,28 @@ function safeJsonArray(value) {
       return [];
     }
   }
+
   return [];
 }
 
+function normalizeSearchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function scorePageForMessage(page, message) {
-  const text = String(message || '').toLowerCase().trim();
+  const text = normalizeSearchText(message);
   if (!text) return 0;
 
-  const title = String(page.page_title || '').toLowerCase();
-  const meta = String(page.meta_description || '').toLowerCase();
-  const h1 = String(page.h1 || '').toLowerCase();
-  const headings = safeJsonArray(page.headings).join(' ').toLowerCase();
-  const preview = String(page.text_preview || '').toLowerCase();
+  const title = normalizeSearchText(page.page_title || '');
+  const meta = normalizeSearchText(page.meta_description || '');
+  const h1 = normalizeSearchText(page.h1 || '');
+  const headings = normalizeSearchText(safeJsonArray(page.headings).join(' '));
+  const preview = normalizeSearchText(page.text_preview || '');
+  const url = normalizeSearchText(page.url || '');
 
   let score = 0;
   const words = text.split(/\s+/).filter(Boolean);
@@ -700,12 +711,14 @@ function scorePageForMessage(page, message) {
     if (headings.includes(word)) score += 4;
     if (preview.includes(word)) score += 5;
     if (meta.includes(word)) score += 2;
+    if (url.includes(word)) score += 3;
   }
 
   if (title.includes(text)) score += 20;
   if (h1.includes(text)) score += 18;
   if (headings.includes(text)) score += 8;
   if (preview.includes(text)) score += 10;
+  if (url.includes(text)) score += 6;
 
   return score;
 }
@@ -723,34 +736,36 @@ function pickRelevantCrawledPages(rows, message, limit = 3) {
 
   return scored.slice(0, limit);
 }
-    for (const link of links) {
-      const score = scoreLinkMatch(link, message);
-      const href = String(link && link.href ? link.href : '').trim();
-      const title = String(link && link.text ? link.text : '').trim() || href;
 
-      if (score > 0 && href) {
-        matches.push({
-          title,
-          url: href,
-          score
-        });
-      }
-    }
-  }
+function findRelevantLinkCandidates(rows, message, limit = 3) {
+  const scored = (rows || [])
+    .map((row) => {
+      const pageScore = scorePageForMessage(row, message);
+      const pageTitle = String(row.page_title || '').trim();
+      const pageUrl = String(row.url || '').trim();
+      const pageH1 = String(row.h1 || '').trim();
+
+      return {
+        title: pageTitle || pageH1 || pageUrl,
+        url: pageUrl,
+        score: pageScore
+      };
+    })
+    .filter((item) => item.url && item.score > 0)
+    .sort((a, b) => b.score - a.score);
 
   const deduped = [];
   const seen = new Set();
 
-  matches
-    .sort((a, b) => b.score - a.score)
-    .forEach((item) => {
-      const key = String(item.url || '').trim();
-      if (!key || seen.has(key)) return;
-      seen.add(key);
-      deduped.push(item);
-    });
+  for (const item of scored) {
+    const key = String(item.url || '').trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(item);
+    if (deduped.length >= limit) break;
+  }
 
-  return deduped.slice(0, limit);
+  return deduped;
 }
 
 async function getAgentWithAccess(agentId) {
@@ -837,10 +852,11 @@ function createUtf8StreamWriter(res) {
   function ensureHeaders() {
     if (headersSent) return;
     headersSent = true;
+
     res.writeHead(200, {
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
       'X-Accel-Buffering': 'no'
     });
   }
@@ -852,15 +868,18 @@ function createUtf8StreamWriter(res) {
       ensureHeaders();
       res.write(chunk);
     },
+
     end() {
       if (ended) return;
       ensureHeaders();
       ended = true;
       res.end();
     },
+
     get ended() {
       return ended;
     },
+
     get headersSent() {
       return headersSent || res.headersSent;
     }
@@ -919,7 +938,7 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
           return;
         }
       } catch (err) {
-        // ignore incomplete event chunk
+        // ignore partial or malformed event block
       }
     }
   }
@@ -938,6 +957,7 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
     if (payload && payload !== '[DONE]') {
       try {
         const parsed = JSON.parse(payload);
+
         if (parsed.type === 'response.output_text.delta' && parsed.delta) {
           writer.write(parsed.delta);
         }
