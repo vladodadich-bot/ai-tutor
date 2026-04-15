@@ -560,6 +560,7 @@ KORISTI:
 - svoje opće znanje 
 
 PRAVILA:
+- pisi kratke i jasne odgovore do 120 rijeci
 - Za specifične informacije sa stranice (cijene, usluge, kontakt, pravila, radno vrijeme, proizvodi itd.) koristi samo podatke sa stranice. Ne nagađaj i ne izmišljaj.
 - Za opća pitanja (objašnjenja, definicije, teme, sažeci) možeš kombinirati podatke sa stranice i svoje znanje ali prvo koristi stranicu i njene linkove kao izvor, kako bi dao koristan odgovor.
 - Ako točan odgovor ne postoji na stranici, jasno to reci i ponudi najrelevantniji link i trazi da ga korisnik otvori kako bi mogao dati relevatne podatke.
