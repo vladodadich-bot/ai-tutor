@@ -1212,7 +1212,7 @@
         }
       }
 
-      fullText = cleanText(fullText);
+      fullText = String(fullText || "").trim();
 
       if (!fullText) {
         throw new Error("No reply received.");
