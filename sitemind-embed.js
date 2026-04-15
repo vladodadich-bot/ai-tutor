@@ -383,7 +383,7 @@ function getPageContextPayload() {
     pageText: pageText
   };
 }
-----
+// ===== START: INTENT + STYLE GUIDE =====
   function detectUserIntent(message) {
   const msg = (message || "").toLowerCase();
 
@@ -448,7 +448,7 @@ function getStyleGuide(intent) {
 - prefer concrete explanations over abstract descriptions
 `;
 }
-  ----
+// ===== END: INTENT + STYLE GUIDE =====
 function sendPageContext() {
   if (!iframe || !iframe.contentWindow) return;
 
