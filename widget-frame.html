@@ -524,7 +524,6 @@
   var chatSubtitle = document.getElementById("chatSubtitle");
   var chatHeader = document.getElementById("chatHeader");
   var chatClose = document.getElementById("chatClose");
-  var logoLink = document.getElementById("smLogoLink");
 
   var params = new URLSearchParams(window.location.search);
   var agentId = params.get("agentId") || "demo-agent";
@@ -598,12 +597,6 @@
     });
   }
 
-  function rgbaFromColor(color, alpha, fallbackHex) {
-    var rgb = parseRgb(color) || hexToRgb(fallbackHex || "#7f8b97");
-    if (!rgb) return "rgba(127,139,151," + alpha + ")";
-    return "rgba(" + Math.round(rgb.r) + "," + Math.round(rgb.g) + "," + Math.round(rgb.b) + "," + alpha + ")";
-  }
-
   function isValidCssColor(value) {
     if (!value || typeof value !== "string") return false;
     var test = document.createElement("div");
@@ -620,10 +613,6 @@
 
   function isDarkColor(color) {
     return getBrightness(color) < 145;
-  }
-
-  function getContrastTextColor(color, darkText, lightText) {
-    return isDarkColor(color) ? (lightText || "#ffffff") : (darkText || "#14202b");
   }
 
   function cleanText(value) {
@@ -784,25 +773,32 @@
       .replace(/'/g, "&#039;");
   }
 
-function formatMessageHtml(text) {
-  var safeText = String(text || '')
-    .replace(/^#{1,6}\s*/gm, '')
-    .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  function normalizeResponseText(text) {
+    return String(text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/__(.*?)__/g, "$1")
+      .replace(/^[ \t]*[-*•]\s+/gm, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
 
-  var escaped = escapeHtml(safeText)
-    .replace(/\n\n/g, "<br><br>")
-    .replace(/\n/g, "<br>");
+  function formatMessageHtml(text) {
+    var safeText = normalizeResponseText(text);
 
-  return escaped.replace(
-    /(https?:\/\/[^\s<>()]+)/g,
-    function (url) {
-      var cleanUrl = url.replace(/&lt;br&gt;$/, "");
-      return '<a href="' + cleanUrl + '" target="_blank" rel="noopener noreferrer">' + cleanUrl + "</a>";
-    }
-  );
-}
+    var escaped = escapeHtml(safeText)
+      .replace(/\n\n+/g, "<br><br>")
+      .replace(/\n/g, "<br>");
+
+    return escaped.replace(
+      /(https?:\/\/[^\s<>()]+)/g,
+      function (url) {
+        var cleanUrl = url.replace(/&lt;br&gt;$/, "");
+        return '<a href="' + cleanUrl + '" target="_blank" rel="noopener noreferrer">' + cleanUrl + "</a>";
+      }
+    );
+  }
 
   function notifyParentClose() {
     if (window.parent && window.parent !== window) {
@@ -1152,6 +1148,51 @@ function formatMessageHtml(text) {
     return raw.slice(0, 500);
   }
 
+  function getTypingSpeed() {
+    return 45 + Math.random() * 35;
+  }
+
+  function createStreamTyper(row) {
+    var renderedText = "";
+    var targetText = "";
+    var timer = null;
+    var finished = false;
+
+    function tick() {
+      if (renderedText.length < targetText.length) {
+        renderedText += targetText.charAt(renderedText.length);
+        updateMessage(row, renderedText);
+        timer = setTimeout(tick, getTypingSpeed());
+        return;
+      }
+
+      timer = null;
+
+      if (finished) {
+        updateMessage(row, targetText);
+      }
+    }
+
+    return {
+      push: function (text) {
+        targetText = normalizeResponseText(text);
+        if (!timer) {
+          tick();
+        }
+      },
+      finish: function (text) {
+        targetText = normalizeResponseText(text);
+        finished = true;
+
+        if (!timer && renderedText !== targetText) {
+          tick();
+        } else if (!timer) {
+            updateMessage(row, targetText);
+        }
+      }
+    };
+  }
+
   async function sendMessageToApi(userMessage, onChunk) {
     var history = getStoredHistory();
     history.push({ role: "user", content: userMessage });
@@ -1241,21 +1282,22 @@ function formatMessageHtml(text) {
     autoResizeTextarea();
     setLoading(true);
 
-    var placeholder = addMessage("assistant", t("loading"));
+    var placeholder = addMessage("assistant", "");
+    var typer = createStreamTyper(placeholder);
     var finalAnswer = "";
 
     try {
       setStatus(t("streaming"));
 
       finalAnswer = await sendMessageToApi(userMessage, function (partialText) {
-        updateMessage(placeholder, partialText || t("loading"));
+        typer.push(partialText || t("loading"));
       });
 
-      updateMessage(placeholder, finalAnswer);
+      typer.finish(finalAnswer);
 
       var history = getStoredHistory();
       history.push({ role: "user", content: userMessage });
-      history.push({ role: "assistant", content: finalAnswer });
+      history.push({ role: "assistant", content: normalizeResponseText(finalAnswer) });
       saveStoredHistory(history);
     } catch (error) {
       var msg = t("errorGeneric");
