@@ -1069,33 +1069,8 @@ function getStoredHistory() {
   }
 }
 
-function saveStoredHistory(history) {
-  try {
-    var normalized = normalizeHistory(history).slice(-MAX_HISTORY_ITEMS);
 
-    sessionStorage.setItem(
-      getHistoryPayloadKey(),
-      JSON.stringify({
-        savedAt: Date.now(),
-        history: normalized
-      })
-    );
-  } catch (e) {}
-}
-
-  function saveStoredHistory(history) {
-    try {
-      var normalized = normalizeHistory(history).slice(-MAX_HISTORY_ITEMS);
-
-      sessionStorage.setItem(
-        getHistoryPayloadKey(),
-        JSON.stringify({
-          savedAt: Date.now(),
-          history: normalized
-        })
-      );
-    } catch (e) {}
-  }
+  
 function clearStoredHistory() {
   try {
     sessionStorage.removeItem(getHistoryPayloadKey());
