@@ -1411,17 +1411,10 @@
   async function sendMessageToApi(userMessage, onChunk) {
     var history = normalizeHistory(getStoredHistory());
 
-// 🔥 DODAJ OVO
 history.push({
   role: "user",
   content: userMessage
 });
-    body: JSON.stringify({
-  action: "chat",
-  agentId: agentId,
-  language: getLang(),
-  message: userMessage,
-  history: history,
 
     if (activeController) {
       try {
