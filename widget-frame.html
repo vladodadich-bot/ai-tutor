@@ -531,7 +531,6 @@
   var chatStatus = document.getElementById("chatStatus");
   var chatTitle = document.getElementById("chatTitle");
   var chatSubtitle = document.getElementById("chatSubtitle");
-  var chatHeader = document.getElementById("chatHeader");
   var chatClose = document.getElementById("chatClose");
 
   var params = new URLSearchParams(window.location.search);
@@ -546,117 +545,6 @@
     if (lang.indexOf("fr") === 0) return "fr";
     if (lang.indexOf("en") === 0) return "en";
     return "en";
-  }
-
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-
-  function hexToRgb(hex) {
-    var cleaned = String(hex || "").replace("#", "").trim();
-    if (cleaned.length === 3) {
-      cleaned = cleaned.split("").map(function (c) { return c + c; }).join("");
-    }
-    if (!/^[0-9a-fA-F]{6}$/.test(cleaned)) return null;
-    var num = parseInt(cleaned, 16);
-    return {
-      r: (num >> 16) & 255,
-      g: (num >> 8) & 255,
-      b: num & 255
-    };
-  }
-
-  function parseRgb(value) {
-    var color = String(value || "").trim();
-    if (!color) return null;
-
-    if (color.charAt(0) === "#") {
-      return hexToRgb(color);
-    }
-
-    var match = color.match(/rgba?\(([^)]+)\)/i);
-    if (!match) return null;
-
-    var parts = match[1].split(",");
-    if (parts.length < 3) return null;
-
-    return {
-      r: parseFloat(parts[0]),
-      g: parseFloat(parts[1]),
-      b: parseFloat(parts[2])
-    };
-  }
-
-  function rgbToHex(rgb) {
-    if (!rgb) return "#7f8b97";
-    function toHex(v) {
-      var hex = clamp(Math.round(v), 0, 255).toString(16);
-      return hex.length === 1 ? "0" + hex : hex;
-    }
-    return "#" + toHex(rgb.r) + toHex(rgb.g) + toHex(rgb.b);
-  }
-
-  function adjustColor(color, amount) {
-    var rgb = parseRgb(color);
-    if (!rgb) return color || "#7f8b97";
-    return rgbToHex({
-      r: clamp(rgb.r + amount, 0, 255),
-      g: clamp(rgb.g + amount, 0, 255),
-      b: clamp(rgb.b + amount, 0, 255)
-    });
-  }
-
-  function isValidCssColor(value) {
-    if (!value || typeof value !== "string") return false;
-    var test = document.createElement("div");
-    test.style.color = "";
-    test.style.color = value;
-    return !!test.style.color;
-  }
-
-  function getBrightness(color) {
-    var rgb = parseRgb(color);
-    if (!rgb) return 255;
-    return (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
-  }
-
-  function isDarkColor(color) {
-    return getBrightness(color) < 145;
-  }
-
-  function getSafeSurfaceFromBackground(color) {
-    if (!isValidCssColor(color)) return "#f6f8fb";
-
-    var rgb = parseRgb(color);
-    if (!rgb) return "#f6f8fb";
-
-    var brightness = getBrightness(color);
-
-    if (brightness < 135) {
-      return rgbToHex({
-        r: clamp(rgb.r + 140, 0, 255),
-        g: clamp(rgb.g + 140, 0, 255),
-        b: clamp(rgb.b + 140, 0, 255)
-      });
-    }
-
-    if (brightness < 185) {
-      return rgbToHex({
-        r: clamp(rgb.r + 70, 0, 255),
-        g: clamp(rgb.g + 70, 0, 255),
-        b: clamp(rgb.b + 70, 0, 255)
-      });
-    }
-
-    if (brightness > 244) {
-      return adjustColor(color, -8);
-    }
-
-    return color;
-  }
-
-  function getReadableTextForBackground(color) {
-    return isDarkColor(color) ? "#ffffff" : "#10263e";
   }
 
   function cleanText(value) {
@@ -689,9 +577,7 @@
     h1: "",
     headings: [],
     language: initialLang,
-    pageTypeHint: "general",
-    pageBackground: "",
-    pageTextColor: ""
+    pageTypeHint: "general"
   };
 
   var agentData = {
@@ -699,15 +585,6 @@
     agentName: "SiteMind AI",
     welcomeMessage: "",
     themeColor: "#081F39"
-  };
-
-  var themeState = {
-    mode: "",
-    accentColor: "#081F39",
-    fallbackColor: "#081F39",
-    pageBackgroundHint: "",
-    pageTextHint: "",
-    source: "default"
   };
 
   var isSending = false;
@@ -993,122 +870,9 @@
     addMessage("assistant", getLocalizedWelcomeMessage());
   }
 
-  function getSystemPreferredMode() {
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-
-  function setCssVar(name, value) {
-    document.documentElement.style.setProperty(name, value);
-  }
-
-  function applyLightTheme() {
-    var accent = "#081F39";
-    var accent2 = "#103357";
-    var header1 = "#06172b";
-    var header2 = "#081F39";
-    var header3 = "#103357";
-
-    var incomingPageBg = themeState.pageBackgroundHint;
-    var safeSurface = getSafeSurfaceFromBackground(incomingPageBg || "#f6f8fb");
-    var safeSurface2 = adjustColor(safeSurface, -4);
-    var safeSurface3 = adjustColor(safeSurface, -10);
-    var inputSurface = adjustColor(safeSurface, 4);
-    var inputBorder = "rgba(8, 31, 57, 0.14)";
-
-    setCssVar("--bg-1", safeSurface);
-    setCssVar("--bg-2", safeSurface2);
-    setCssVar("--bg-3", safeSurface3);
-    setCssVar("--panel", "rgba(255,255,255,0.98)");
-    setCssVar("--panel-strong", "rgba(255,255,255,1)");
-    setCssVar("--text", "#10263e");
-    setCssVar("--muted", "#5f7388");
-    setCssVar("--muted-2", "#879bb0");
-
-    setCssVar("--header-grad-1", header1);
-    setCssVar("--header-grad-2", header2);
-    setCssVar("--header-grad-3", header3);
-
-    setCssVar("--accent", accent);
-    setCssVar("--accent-2", accent2);
-    setCssVar("--user-grad-1", accent);
-    setCssVar("--user-grad-2", accent2);
-    setCssVar("--assistant-bg", "#ffffff");
-
-    setCssVar("--border", "rgba(8, 31, 57, 0.10)");
-    setCssVar("--border-strong", "rgba(8, 31, 57, 0.18)");
-    setCssVar("--header-text", "#ffffff");
-    setCssVar("--header-subtext", "rgba(255,255,255,0.92)");
-    setCssVar("--header-brand-text", "rgba(255,255,255,0.88)");
-    setCssVar("--header-close-border", "rgba(255,255,255,0.18)");
-    setCssVar("--header-close-bg-1", "rgba(255,255,255,0.16)");
-    setCssVar("--header-close-bg-2", "rgba(255,255,255,0.06)");
-    setCssVar("--header-close-hover-bg-1", "rgba(255,255,255,0.24)");
-    setCssVar("--header-close-hover-bg-2", "rgba(255,255,255,0.10)");
-    setCssVar("--header-close-hover-border", "rgba(255,255,255,0.28)");
-    setCssVar("--send-text", "#ffffff");
-    setCssVar("--glow", "0 0 0 1px rgba(8,31,57,0.12), 0 0 20px rgba(16,51,87,0.10)");
-
-    setCssVar("--surface-derived-1", safeSurface);
-    setCssVar("--surface-derived-2", safeSurface2);
-    setCssVar("--surface-derived-3", safeSurface3);
-    setCssVar("--surface-input", inputSurface);
-    setCssVar("--surface-input-border", inputBorder);
-
-    document.body.style.background =
-      "linear-gradient(180deg, " + safeSurface + " 0%, " + safeSurface2 + " 56%, " + safeSurface3 + " 100%)";
-    chatShell.style.background =
-      "linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,255,255,0.70)), linear-gradient(180deg, " + safeSurface + " 0%, " + safeSurface2 + " 54%, " + safeSurface3 + " 100%)";
-    chatHeader.style.boxShadow = "0 12px 28px rgba(8,31,57,0.22), inset 0 1px 0 rgba(255,255,255,0.10)";
-    chatInput.style.background = inputSurface;
-    chatInput.style.color = "#10263e";
-  }
-
-  function applyDarkTheme() {
-    applyLightTheme();
-  }
-
-  function resolveThemeMode() {
-    return "light";
-  }
-
-  function applyResolvedTheme() {
-    var mode = resolveThemeMode();
-    themeState.mode = mode;
-
-    if (mode === "dark") {
-      applyDarkTheme();
-    } else {
-      applyLightTheme();
-    }
-  }
-
   function applyAgentData() {
     chatTitle.textContent = agentData.agentName || "SiteMind AI";
-    applyResolvedTheme();
     updateUiLanguage();
-  }
-
-  function applyIncomingTheme(data) {
-    if (!data || typeof data !== "object") return;
-
-    if (isValidCssColor(data.accentColor)) {
-      themeState.accentColor = data.accentColor;
-    }
-
-    if (isValidCssColor(data.fallbackColor)) {
-      themeState.fallbackColor = data.fallbackColor;
-    }
-
-    if (isValidCssColor(data.pageBackground)) {
-      themeState.pageBackgroundHint = data.pageBackground;
-    }
-
-    if (isValidCssColor(data.pageTextColor)) {
-      themeState.pageTextHint = data.pageTextColor;
-    }
-
-    themeState.source = "parent";
-    applyResolvedTheme();
   }
 
   async function fetchAgentConfig() {
@@ -1335,17 +1099,6 @@
         pageData.headings = [];
       }
 
-      if (isValidCssColor(event.data.pageBackground)) {
-        pageData.pageBackground = event.data.pageBackground;
-        themeState.pageBackgroundHint = event.data.pageBackground;
-      }
-
-      if (isValidCssColor(event.data.pageTextColor)) {
-        pageData.pageTextColor = event.data.pageTextColor;
-        themeState.pageTextHint = event.data.pageTextColor;
-      }
-
-      applyResolvedTheme();
       updateUiLanguage();
       renderWelcomeIfNeeded();
     }
@@ -1357,26 +1110,7 @@
       agentData.themeColor = event.data.themeColor || "#081F39";
       applyAgentData();
     }
-
-    if (event.data.type === "sitemind-theme") {
-      applyIncomingTheme(event.data);
-      applyAgentData();
-    }
   });
-
-  if (window.matchMedia) {
-    try {
-      var media = window.matchMedia("(prefers-color-scheme: dark)");
-      if (media && typeof media.addEventListener === "function") {
-        media.addEventListener("change", function () {
-          if (themeState.source !== "parent") {
-            themeState.mode = "";
-            applyResolvedTheme();
-          }
-        });
-      }
-    } catch (e) {}
-  }
 
   chatForm.addEventListener("submit", handleSubmit);
   chatInput.addEventListener("input", autoResizeTextarea);
