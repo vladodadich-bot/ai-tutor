@@ -594,6 +594,12 @@ function buildUserPrompt(payload) {
 User message:
 ${payload.message || 'N/A'}
 
+Active topic:
+${payload.activeTopic || 'N/A'}
+
+Resolved query:
+${payload.resolvedQuery || payload.message || 'N/A'}
+
 Page type hint:
 ${payload.pageTypeHint || 'general'}
 
@@ -684,76 +690,174 @@ function safeJsonArray(value) {
   return [];
 }
 
-function normalizeSearchText(value) {
+
+function normalizeStringForTopic(value) {
   return String(value || '')
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}\s/-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-function scorePageForMessage(page, message) {
-  const text = normalizeSearchText(message);
-  if (!text) return 0;
+function tokenizeTopic(value) {
+  return normalizeStringForTopic(value)
+    .split(' ')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
-  const title = normalizeSearchText(page.page_title || '');
-  const meta = normalizeSearchText(page.meta_description || '');
-  const h1 = normalizeSearchText(page.h1 || '');
-  const headings = normalizeSearchText(safeJsonArray(page.headings).join(' '));
-  const preview = normalizeSearchText(page.text_preview || '');
-  const url = normalizeSearchText(page.url || '');
+function uniqueItems(items) {
+  return Array.from(new Set((items || []).filter(Boolean)));
+}
 
-  let score = 0;
-  const words = text.split(/\s+/).filter(Boolean);
+function isShortFollowUpQuestion(message) {
+  const text = normalizeStringForTopic(message);
+  if (!text) return false;
 
-  for (const word of words) {
-    if (word.length < 2) continue;
+  const shortFollowUps = [
+    'koji su likovi', 'likovi', 'opis likova', 'tema', 'poruka', 'pouka',
+    'kratki sadrzaj', 'sadrzaj', 'redoslijed dogadjaja', 'redoslijed dogadanja',
+    'mjesto radnje', 'vrijeme radnje', 'gdje se radnja odvija', 'objasni',
+    'nastavi', 'moze', 'ok', 'hvala', 'tko su likovi', 'ko su likovi'
+  ];
 
-    if (title.includes(word)) score += 8;
-    if (h1.includes(word)) score += 7;
-    if (headings.includes(word)) score += 4;
-    if (preview.includes(word)) score += 5;
-    if (meta.includes(word)) score += 2;
-    if (url.includes(word)) score += 3;
+  if (text.length <= 40) return true;
+  return shortFollowUps.some((item) => text === item || text.includes(item));
+}
+
+function extractTopicFromText(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return '';
+
+  const cleaned = raw
+    .replace(/^lektira\s+/i, '')
+    .replace(/^djelo\s+/i, '')
+    .replace(/^roman\s+/i, '')
+    .replace(/^pripovijetka\s+/i, '')
+    .replace(/^pripovetka\s+/i, '')
+    .replace(/^prica\s+/i, '')
+    .replace(/^tema\s+/i, '')
+    .replace(/^analiza\s+/i, '')
+    .replace(/^objasni\s+/i, '')
+    .trim();
+
+  if (cleaned.length < 3) return '';
+  return cleaned;
+}
+
+function getActiveTopicFromHistory(history, currentMessage) {
+  const current = String(currentMessage || '').trim();
+  const safeHistory = Array.isArray(history) ? history : [];
+
+  if (!isShortFollowUpQuestion(current)) {
+    const direct = extractTopicFromText(current);
+    if (direct && direct.length > 3) return direct;
   }
 
-  if (title.includes(text)) score += 20;
-  if (h1.includes(text)) score += 18;
-  if (headings.includes(text)) score += 8;
-  if (preview.includes(text)) score += 10;
-  if (url.includes(text)) score += 6;
+  for (let i = safeHistory.length - 1; i >= 0; i -= 1) {
+    const item = safeHistory[i];
+    if (!item || item.role !== 'user') continue;
+    const topic = extractTopicFromText(item.content || '');
+    if (topic && topic.length > 3) return topic;
+  }
+
+  return extractTopicFromText(current);
+}
+
+function buildResolvedQuery(activeTopic, userMessage) {
+  const topic = String(activeTopic || '').trim();
+  const message = String(userMessage || '').trim();
+
+  if (!topic) return message;
+  if (!message) return topic;
+  if (isShortFollowUpQuestion(message)) return topic + ' ' + message;
+  return message;
+}
+
+function scoreField(fieldValue, queryTokens, wholeQuery) {
+  const value = normalizeStringForTopic(fieldValue);
+  if (!value) return 0;
+
+  let score = 0;
+  let tokenHits = 0;
+
+  for (const token of queryTokens) {
+    if (value.includes(token)) tokenHits += 1;
+  }
+
+  score += tokenHits * 8;
+
+  if (wholeQuery && value.includes(wholeQuery)) {
+    score += 30;
+  }
 
   return score;
 }
 
-function pickRelevantCrawledPages(rows, message, limit = 3) {
-  const scored = (rows || [])
-    .map((row) => ({
-      ...row,
-      _score: scorePageForMessage(row, message)
-    }))
-    .sort((a, b) => b._score - a._score);
+function scoreHeadingIntent(headings, userMessage) {
+  let score = 0;
+  const msg = normalizeStringForTopic(userMessage);
+  const joined = normalizeStringForTopic(Array.isArray(headings) ? headings.join(' | ') : headings || '');
 
-  const useful = scored.filter((row) => row._score > 0).slice(0, limit);
-  if (useful.length) return useful;
+  if (!joined || !msg) return 0;
 
-  return scored.slice(0, limit);
+  if (msg.includes('likov') && (joined.includes('opis likova') || joined.includes('likovi'))) score += 35;
+  if (msg.includes('tema') && joined.includes('tema')) score += 25;
+  if ((msg.includes('kratki sadrzaj') || msg === 'sadrzaj') && joined.includes('kratki sadrzaj')) score += 25;
+  if (msg.includes('redoslijed') && joined.includes('redoslijed')) score += 25;
+  if (msg.includes('pouka') && joined.includes('pouka')) score += 20;
+
+  return score;
 }
 
-function findRelevantLinkCandidates(rows, message, limit = 3) {
-  const scored = (rows || [])
+function rankSiteContentRows(rows, resolvedQuery, userMessage) {
+  if (!Array.isArray(rows)) return [];
+
+  const wholeQuery = normalizeStringForTopic(resolvedQuery);
+  const queryTokens = uniqueItems(tokenizeTopic(resolvedQuery)).filter((token) => token.length > 2);
+
+  return rows
     .map((row) => {
-      const pageScore = scorePageForMessage(row, message);
-      const pageTitle = String(row.page_title || '').trim();
-      const pageUrl = String(row.url || '').trim();
-      const pageH1 = String(row.h1 || '').trim();
+      let score = 0;
+
+      score += scoreField(row.url, queryTokens, wholeQuery) * 3.2;
+      score += scoreField(row.page_title, queryTokens, wholeQuery) * 2.4;
+      score += scoreField(row.h1, queryTokens, wholeQuery) * 2.8;
+      score += scoreField(Array.isArray(row.headings) ? row.headings.join(' | ') : row.headings, queryTokens, wholeQuery) * 1.6;
+      score += scoreField(row.text_preview, queryTokens, wholeQuery) * 1.0;
+      score += scoreHeadingIntent(row.headings, userMessage);
 
       return {
-        title: pageTitle || pageH1 || pageUrl,
-        url: pageUrl,
-        score: pageScore
+        ...row,
+        _score: Math.round(score)
       };
     })
+    .sort((a, b) => b._score - a._score);
+}
+
+function pickRelevantCrawledPages(rows, message, history, limit = 3) {
+  const activeTopic = getActiveTopicFromHistory(history, message);
+  const resolvedQuery = buildResolvedQuery(activeTopic, message);
+  const ranked = rankSiteContentRows(rows, resolvedQuery, message);
+  const useful = ranked.filter((row) => row._score > 0).slice(0, limit);
+
+  return {
+    activeTopic,
+    resolvedQuery,
+    pages: useful.length ? useful : ranked.slice(0, limit)
+  };
+}
+
+function findRelevantLinkCandidates(rows, message, history, limit = 3) {
+  const rankedData = pickRelevantCrawledPages(rows, message, history, Math.max(limit, 5));
+  const scored = (rankedData.pages || [])
+    .map((row) => ({
+      title: String(row.page_title || row.h1 || row.url || '').trim(),
+      url: String(row.url || '').trim(),
+      score: Number(row._score || 0)
+    }))
     .filter((item) => item.url && item.score > 0)
     .sort((a, b) => b.score - a.score);
 
@@ -761,14 +865,17 @@ function findRelevantLinkCandidates(rows, message, limit = 3) {
   const seen = new Set();
 
   for (const item of scored) {
-    const key = String(item.url || '').trim();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
+    if (!item.url || seen.has(item.url)) continue;
+    seen.add(item.url);
     deduped.push(item);
     if (deduped.length >= limit) break;
   }
 
-  return deduped;
+  return {
+    activeTopic: rankedData.activeTopic,
+    resolvedQuery: rankedData.resolvedQuery,
+    candidates: deduped
+  };
 }
 
 async function getAgentWithAccess(agentId) {
@@ -1041,13 +1148,15 @@ async function handleChat(req, res, body) {
     crawledRows = [];
   }
 
-  const relevantPages = pickRelevantCrawledPages(crawledRows, message, 3);
-  const linkCandidates = findRelevantLinkCandidates(crawledRows, message, 3);
+  const rankedContext = pickRelevantCrawledPages(crawledRows, message, history, 3);
+  const relevantPages = rankedContext.pages || [];
+  const linkCandidateData = findRelevantLinkCandidates(crawledRows, message, history, 3);
+  const linkCandidates = linkCandidateData.candidates || [];
 
   const hasStrongCurrentPageContent = pageText.length > 180 || pageContext.length > 180;
   const hasStrongRelevantContent = Array.isArray(relevantPages) && relevantPages.some((row) => {
     const content = String(row.content || row.text_preview || '');
-    return content.trim().length > 180 && scorePageForMessage(row, message) >= 4;
+    return content.trim().length > 180 && Number(row._score || 0) >= 20;
   });
 
   if (!hasStrongCurrentPageContent && !hasStrongRelevantContent && linkCandidates.length > 0) {
@@ -1086,11 +1195,26 @@ async function handleChat(req, res, body) {
     crawlContext = '';
   }
 
+  console.log('CHAT CONTEXT DEBUG:', {
+    agentId,
+    message,
+    activeTopic: rankedContext.activeTopic,
+    resolvedQuery: rankedContext.resolvedQuery,
+    topMatches: relevantPages.slice(0, 3).map((row) => ({
+      score: row._score || 0,
+      url: row.url || '',
+      h1: row.h1 || '',
+      title: row.page_title || ''
+    }))
+  });
+
   const languageLabel = getLanguageLabel(language);
   const systemPrompt = buildAdaptiveSystemPrompt(languageLabel);
 
   const userPrompt = buildUserPrompt({
     message,
+    activeTopic: rankedContext.activeTopic,
+    resolvedQuery: rankedContext.resolvedQuery,
     pageTypeHint,
     language,
     pageTitle,
