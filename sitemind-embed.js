@@ -30,12 +30,18 @@
 
   var themeColor =
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-color")) ||
-    "#2563eb";
+    "#081F39";
 
   var iframe = null;
   var bubble = null;
   var panel = null;
   var isOpen = false;
+
+  var bubbleShortLabelEl = null;
+  var bubbleFullLabelEl = null;
+  var bubbleIconEl = null;
+  var isBubbleExpanded = false;
+  var scrollExpandThreshold = 60;
 
   var originalBodyPaddingRight = "";
   var originalBodyPaddingLeft = "";
@@ -43,45 +49,57 @@
   var originalBodyOverflowX = "";
 
   function detectPageLanguage() {
-  var htmlLang = document.documentElement.getAttribute("lang") || "";
-  var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
-  var ogLocale = ogLocaleMeta && ogLocaleMeta.content ? ogLocaleMeta.content : "";
-  var browserLang = navigator.language || navigator.userLanguage || "";
+    var htmlLang = document.documentElement.getAttribute("lang") || "";
+    var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
+    var ogLocale = ogLocaleMeta && ogLocaleMeta.content ? ogLocaleMeta.content : "";
+    var browserLang = navigator.language || navigator.userLanguage || "";
 
-  var lang = (htmlLang || ogLocale || browserLang || "en").toLowerCase();
+    var lang = (htmlLang || ogLocale || browserLang || "en").toLowerCase();
 
-  if (lang.indexOf("hr") === 0) return "hr";
-  if (lang.indexOf("de") === 0) return "de";
-  if (lang.indexOf("it") === 0) return "it";
-  if (lang.indexOf("fr") === 0) return "fr";
-  return "en";
-}
-
-  function getDefaultBubbleText(lang) {
-  if (lang === "hr") {
-    return "💬 Trebaš pomoć?<br>Pitaj AI asistenta";
+    if (lang.indexOf("hr") === 0) return "hr";
+    if (lang.indexOf("de") === 0) return "de";
+    if (lang.indexOf("it") === 0) return "it";
+    if (lang.indexOf("fr") === 0) return "fr";
+    return "en";
   }
 
-  if (lang === "de") {
-    return "💬 Brauchst du Hilfe?<br>Frag den KI-Assistenten";
+  function getDefaultShortBubbleText(lang) {
+    if (lang === "hr") return "Pitaj";
+    if (lang === "de") return "Fragen";
+    if (lang === "it") return "Chiedi";
+    if (lang === "fr") return "Demander";
+    return "Ask";
   }
 
-  if (lang === "it") {
-    return "💬 Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
-  }
+  function getDefaultFullBubbleText(lang) {
+    if (lang === "hr") {
+      return "Trebaš pomoć?<br>Pitaj AI asistenta";
+    }
 
-  if (lang === "fr") {
-    return "💬 Besoin d’aide ?<br>Demandez à l’assistant IA";
-  }
+    if (lang === "de") {
+      return "Brauchst du Hilfe?<br>Frag den KI-Assistenten";
+    }
 
-  return "💬 Need help?<br>Ask the AI assistant";
-}
+    if (lang === "it") {
+      return "Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
+    }
+
+    if (lang === "fr") {
+      return "Besoin d’aide ?<br>Demandez à l’assistant IA";
+    }
+
+    return "Need help?<br>Ask the AI assistant";
+  }
 
   var detectedLang = detectPageLanguage();
 
+  var bubbleShortText =
+    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-bubble-short-text")) ||
+    getDefaultShortBubbleText(detectedLang);
+
   var bubbleText =
     (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-bubble-text")) ||
-    getDefaultBubbleText(detectedLang);
+    getDefaultFullBubbleText(detectedLang);
 
   function isDesktop() {
     return window.innerWidth >= 992;
@@ -110,8 +128,32 @@
 
   function rgbaFromHex(hex, alpha) {
     var rgb = hexToRgb(hex);
-    if (!rgb) return "rgba(37, 99, 235, " + alpha + ")";
+    if (!rgb) return "rgba(8, 31, 57, " + alpha + ")";
     return "rgba(" + rgb.r + ", " + rgb.g + ", " + rgb.b + ", " + alpha + ")";
+  }
+
+  function lightenHex(hex, amount) {
+    var rgb = hexToRgb(hex);
+    if (!rgb) return hex;
+
+    function clamp(value) {
+      return Math.max(0, Math.min(255, value));
+    }
+
+    function toHex(value) {
+      var hexValue = clamp(value).toString(16);
+      return hexValue.length === 1 ? "0" + hexValue : hexValue;
+    }
+
+    var r = clamp(rgb.r + amount);
+    var g = clamp(rgb.g + amount);
+    var b = clamp(rgb.b + amount);
+
+    return "#" + toHex(r) + toHex(g) + toHex(b);
+  }
+
+  function darkenHex(hex, amount) {
+    return lightenHex(hex, -Math.abs(amount));
   }
 
   function cleanText(text) {
@@ -298,234 +340,294 @@
     return text;
   }
 
- function getPageTypeHint() {
-  var url = String(window.location.href || "").toLowerCase();
-  var title = String(getPageTitle() || "").toLowerCase();
-  var desc = String(getPageDescription() || "").toLowerCase();
-  var h1 = String(getPageH1() || "").toLowerCase();
-  var headings = String((getHeadingsText() || []).join(" ") || "").toLowerCase();
-  var text = String(getMainContentText() || "").slice(0, 2500).toLowerCase();
+  function getPageTypeHint() {
+    var url = String(window.location.href || "").toLowerCase();
+    var title = String(getPageTitle() || "").toLowerCase();
+    var desc = String(getPageDescription() || "").toLowerCase();
+    var h1 = String(getPageH1() || "").toLowerCase();
+    var headings = String((getHeadingsText() || []).join(" ") || "").toLowerCase();
+    var text = String(getMainContentText() || "").slice(0, 2500).toLowerCase();
 
-  var blob = [url, title, desc, h1, headings, text].join(" ");
+    var blob = [url, title, desc, h1, headings, text].join(" ");
 
-  function hasAny(words) {
-    for (var i = 0; i < words.length; i++) {
-      if (blob.indexOf(words[i]) !== -1) return true;
+    function hasAny(words) {
+      for (var i = 0; i < words.length; i++) {
+        if (blob.indexOf(words[i]) !== -1) return true;
+      }
+      return false;
     }
-    return false;
+
+    if (hasAny([
+      "api", "developer", "sdk", "documentation", "docs", "integration",
+      "javascript", "typescript", "react", "code", "vercel", "supabase",
+      "endpoint", "reference"
+    ])) {
+      return "technical";
+    }
+
+    if (hasAny([
+      "shop", "product", "cart", "buy", "checkout", "store",
+      "price", "add to cart", "sku"
+    ])) {
+      return "ecommerce";
+    }
+
+    if (hasAny([
+      "travel", "hotel", "apartment", "booking", "guest",
+      "reservation", "stay", "accommodation"
+    ])) {
+      return "travel";
+    }
+
+    if (hasAny([
+      "pricing", "plan", "saas", "subscription", "service", "agency",
+      "software", "company", "business"
+    ])) {
+      return "business";
+    }
+
+    if (hasAny([
+      "news", "article", "blog", "post", "author", "published", "read more"
+    ])) {
+      return "blog";
+    }
+
+    if (hasAny([
+      "course", "lesson", "school", "lernen", "guide for students",
+      "student", "unterricht", "education", "learning", "study"
+    ])) {
+      return "education";
+    }
+
+    if (hasAny([
+      "movie", "music", "game", "show", "entertainment"
+    ])) {
+      return "entertainment";
+    }
+
+    return "general";
   }
 
-  if (hasAny([
-    "api", "developer", "sdk", "documentation", "docs", "integration",
-    "javascript", "typescript", "react", "code", "vercel", "supabase",
-    "endpoint", "reference"
-  ])) {
-    return "technical";
+  function getPageContextPayload() {
+    var pageText = getMainContentText();
+
+    return {
+      type: "sitemind-page-context",
+      agentId: agentId,
+      language: detectPageLanguage(),
+      pageTypeHint: getPageTypeHint(),
+      pageTitle: getPageTitle(),
+      pageDescription: getPageDescription(),
+      pageUrl: window.location.href,
+      h1: getPageH1(),
+      headings: getHeadingsText(),
+      pageContext: pageText,
+      pageText: pageText
+    };
   }
 
-  if (hasAny([
-    "shop", "product", "cart", "buy", "checkout", "store",
-    "price", "add to cart", "sku"
-  ])) {
-    return "ecommerce";
-  }
-
-  if (hasAny([
-    "travel", "hotel", "apartment", "booking", "guest",
-    "reservation", "stay", "accommodation"
-  ])) {
-    return "travel";
-  }
-
-  if (hasAny([
-    "pricing", "plan", "saas", "subscription", "service", "agency",
-    "software", "company", "business"
-  ])) {
-    return "business";
-  }
-
-  if (hasAny([
-    "news", "article", "blog", "post", "author", "published", "read more"
-  ])) {
-    return "blog";
-  }
-
-  if (hasAny([
-    "course", "lesson", "school", "lernen", "guide for students",
-    "student", "unterricht", "education", "learning", "study"
-  ])) {
-    return "education";
-  }
-
-  if (hasAny([
-    "movie", "music", "game", "show", "entertainment"
-  ])) {
-    return "entertainment";
-  }
-
-  return "general";
-}
-
-function getPageContextPayload() {
-  var pageText = getMainContentText();
-
-  return {
-    type: "sitemind-page-context",
-    agentId: agentId,
-    language: detectPageLanguage(),
-    pageTypeHint: getPageTypeHint(),
-    pageTitle: getPageTitle(),
-    pageDescription: getPageDescription(),
-    pageUrl: window.location.href,
-    h1: getPageH1(),
-    headings: getHeadingsText(),
-    pageContext: pageText,
-    pageText: pageText
-  };
-}
-// ===== START: INTENT + STYLE GUIDE =====
   function detectUserIntent(message) {
-  const msg = (message || "").toLowerCase();
+    const msg = (message || "").toLowerCase();
 
-  if (
-    msg.includes("lektira") ||
-    msg.includes("summary") ||
-    msg.includes("inhalt")
-  ) {
-    return "education_content";
+    if (
+      msg.includes("lektira") ||
+      msg.includes("summary") ||
+      msg.includes("inhalt")
+    ) {
+      return "education_content";
+    }
+
+    if (
+      msg.includes("how") ||
+      msg.includes("kako") ||
+      msg.includes("wie")
+    ) {
+      return "how_to";
+    }
+
+    if (
+      msg.includes("price") ||
+      msg.includes("cijena")
+    ) {
+      return "sales";
+    }
+
+    return "general";
   }
 
-  if (
-    msg.includes("how") ||
-    msg.includes("kako") ||
-    msg.includes("wie")
-  ) {
-    return "how_to";
-  }
-
-  if (
-    msg.includes("price") ||
-    msg.includes("cijena")
-  ) {
-    return "sales";
-  }
-
-  return "general";
-}
-
-function getStyleGuide(intent) {
-  if (intent === "education_content") {
-    return `
+  function getStyleGuide(intent) {
+    if (intent === "education_content") {
+      return `
 - give a clear, concrete explanation
 - if it's a story or topic, explain what happens step by step
 - avoid abstract or overly philosophical language
 - keep it simple and useful
 - prefer concrete explanations over abstract descriptions
 `;
-  }
+    }
 
-  if (intent === "sales") {
-    return `
+    if (intent === "sales") {
+      return `
 - be concise
 - highlight benefits clearly
 - include a clear next step
 - prefer concrete explanations over abstract descriptions
 `;
-  }
+    }
 
-  if (intent === "how_to") {
-    return `
+    if (intent === "how_to") {
+      return `
 - explain step by step
 - keep instructions practical and easy to follow
 - avoid unnecessary theory
 - prefer concrete explanations over abstract descriptions
 `;
-  }
+    }
 
-  return `
+    return `
 - be helpful and clear
 - avoid unnecessary length
 - prefer concrete explanations over abstract descriptions
 `;
-}
-// ===== END: INTENT + STYLE GUIDE =====
-function sendPageContext() {
-  if (!iframe || !iframe.contentWindow) return;
-
-  var payload = getPageContextPayload();
-
-  try {
-    iframe.contentWindow.postMessage(payload, BASE_URL);
-  } catch (e) {
-    try {
-      iframe.contentWindow.postMessage(payload, "*");
-    } catch (err) {}
   }
-}
+
+  function sendPageContext() {
+    if (!iframe || !iframe.contentWindow) return;
+
+    var payload = getPageContextPayload();
+
+    try {
+      iframe.contentWindow.postMessage(payload, BASE_URL);
+    } catch (e) {
+      try {
+        iframe.contentWindow.postMessage(payload, "*");
+      } catch (err) {}
+    }
+  }
+
   function applyBubblePosition() {
     if (!bubble) return;
 
     bubble.style.left = "";
     bubble.style.right = "";
-    bubble.style.bottom = "16px";
+    bubble.style.bottom = "18px";
 
     if (position === "bottom-left") {
-      bubble.style.left = "16px";
+      bubble.style.left = "18px";
     } else {
-      bubble.style.right = "16px";
+      bubble.style.right = "18px";
     }
   }
 
   function styleBubble() {
     if (!bubble) return;
 
-    var glowSoft = rgbaFromHex(themeColor, 0.14);
-    var glowStrong = rgbaFromHex(themeColor, 0.22);
-    var borderGlow = rgbaFromHex(themeColor, 0.18);
+    var bubbleBase = themeColor || "#081F39";
+    var bubbleDark = darkenHex(bubbleBase, 10);
+    var bubbleMid = lightenHex(bubbleBase, 12);
+    var bubbleHighlight = lightenHex(bubbleBase, 22);
+    var borderGlow = rgbaFromHex(bubbleHighlight, 0.24);
+    var shadowOuter = rgbaFromHex("#000000", 0.28);
+    var shadowSoft = rgbaFromHex(bubbleBase, 0.24);
+    var shadowGlow = rgbaFromHex(bubbleHighlight, 0.18);
 
     bubble.style.position = "fixed";
     bubble.style.zIndex = "999999";
     bubble.style.border = "1px solid " + borderGlow;
     bubble.style.borderRadius = "999px";
-    bubble.style.padding = "14px 22px";
     bubble.style.background =
-      "radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 34%), linear-gradient(135deg, " + themeColor + ", #1d4ed8)";
+      "radial-gradient(circle at 50% 45%, " + rgbaFromHex(bubbleHighlight, 0.30) + " 0%, " + rgbaFromHex(bubbleMid, 0.18) + " 22%, rgba(255,255,255,0.00) 50%), linear-gradient(180deg, " + bubbleDark + " 0%, " + bubbleBase + " 38%, " + bubbleMid + " 52%, " + bubbleBase + " 70%, " + bubbleDark + " 100%)";
     bubble.style.color = "#ffffff";
-    bubble.style.fontSize = "14px";
-    bubble.style.fontWeight = "700";
-    bubble.style.lineHeight = "1.35";
-    bubble.style.textAlign = "center";
-    bubble.style.maxWidth = "255px";
-    bubble.style.boxShadow =
-      "0 16px 34px rgba(37,99,235,0.18), 0 0 0 1px rgba(255,255,255,0.08), 0 0 20px " + glowSoft;
     bubble.style.cursor = "pointer";
     bubble.style.whiteSpace = "normal";
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-      "transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease, border-color 0.18s ease, filter 0.18s ease";
+      "transform 0.22s ease, box-shadow 0.22s ease, opacity 0.22s ease, border-color 0.22s ease, filter 0.22s ease, padding 0.22s ease, max-width 0.22s ease, min-width 0.22s ease";
+    bubble.style.display = "inline-flex";
+    bubble.style.alignItems = "center";
+    bubble.style.justifyContent = "center";
+    bubble.style.gap = "10px";
+    bubble.style.textAlign = "center";
+    bubble.style.boxShadow =
+      "0 18px 34px " + shadowOuter + ", 0 10px 26px " + shadowSoft + ", 0 0 0 1px rgba(255,255,255,0.06), 0 0 18px " + shadowGlow;
 
-    if (window.innerWidth < 520) {
-      bubble.style.maxWidth = "220px";
-      bubble.style.fontSize = "13px";
-      bubble.style.padding = "12px 18px";
+    if (bubbleIconEl) {
+      bubbleIconEl.style.display = "inline-flex";
+      bubbleIconEl.style.alignItems = "center";
+      bubbleIconEl.style.justifyContent = "center";
+      bubbleIconEl.style.fontSize = window.innerWidth < 520 ? "14px" : "15px";
+      bubbleIconEl.style.lineHeight = "1";
+      bubbleIconEl.style.flexShrink = "0";
+      bubbleIconEl.style.filter = "drop-shadow(0 1px 1px rgba(0,0,0,0.18))";
     }
 
+    if (bubbleShortLabelEl) {
+      bubbleShortLabelEl.style.fontSize = window.innerWidth < 520 ? "13px" : "14px";
+      bubbleShortLabelEl.style.fontWeight = "800";
+      bubbleShortLabelEl.style.lineHeight = "1";
+      bubbleShortLabelEl.style.letterSpacing = "0.01em";
+      bubbleShortLabelEl.style.whiteSpace = "nowrap";
+    }
+
+    if (bubbleFullLabelEl) {
+      bubbleFullLabelEl.style.fontSize = window.innerWidth < 520 ? "12.5px" : "13.5px";
+      bubbleFullLabelEl.style.fontWeight = "800";
+      bubbleFullLabelEl.style.lineHeight = "1.25";
+      bubbleFullLabelEl.style.whiteSpace = "normal";
+      bubbleFullLabelEl.style.textAlign = "left";
+    }
+
+    applyBubbleExpandedState(isBubbleExpanded);
+
     bubble.onmouseenter = function () {
-      bubble.style.transform = "translateY(-1px)";
-      bubble.style.borderColor = rgbaFromHex(themeColor, 0.28);
+      bubble.style.transform = "translateY(-2px)";
+      bubble.style.borderColor = rgbaFromHex(bubbleHighlight, 0.34);
       bubble.style.boxShadow =
-        "0 18px 38px rgba(37,99,235,0.22), 0 0 0 1px rgba(255,255,255,0.10), 0 0 26px " + glowStrong;
-      bubble.style.filter = "brightness(1.03)";
+        "0 22px 40px " + rgbaFromHex("#000000", 0.30) + ", 0 14px 30px " + rgbaFromHex(bubbleBase, 0.28) + ", 0 0 0 1px rgba(255,255,255,0.08), 0 0 22px " + rgbaFromHex(bubbleHighlight, 0.22);
+      bubble.style.filter = "brightness(1.04)";
     };
 
     bubble.onmouseleave = function () {
       bubble.style.transform = "translateY(0)";
       bubble.style.borderColor = borderGlow;
       bubble.style.boxShadow =
-        "0 16px 34px rgba(37,99,235,0.18), 0 0 0 1px rgba(255,255,255,0.08), 0 0 20px " + glowSoft;
+        "0 18px 34px " + shadowOuter + ", 0 10px 26px " + shadowSoft + ", 0 0 0 1px rgba(255,255,255,0.06), 0 0 18px " + shadowGlow;
       bubble.style.filter = "brightness(1)";
     };
+  }
+
+  function applyBubbleExpandedState(expanded) {
+    if (!bubble) return;
+
+    isBubbleExpanded = !!expanded;
+
+    if (isBubbleExpanded) {
+      bubble.style.padding = window.innerWidth < 520 ? "12px 16px" : "13px 18px";
+      bubble.style.minWidth = window.innerWidth < 520 ? "188px" : "222px";
+      bubble.style.maxWidth = window.innerWidth < 520 ? "220px" : "248px";
+      bubble.style.borderRadius = "999px";
+
+      if (bubbleShortLabelEl) bubbleShortLabelEl.style.display = "none";
+      if (bubbleFullLabelEl) bubbleFullLabelEl.style.display = "block";
+      if (bubbleIconEl) bubbleIconEl.style.display = "inline-flex";
+    } else {
+      bubble.style.padding = window.innerWidth < 520 ? "12px 15px" : "12px 16px";
+      bubble.style.minWidth = window.innerWidth < 520 ? "86px" : "94px";
+      bubble.style.maxWidth = window.innerWidth < 520 ? "110px" : "118px";
+      bubble.style.borderRadius = "999px";
+
+      if (bubbleShortLabelEl) bubbleShortLabelEl.style.display = "inline";
+      if (bubbleFullLabelEl) bubbleFullLabelEl.style.display = "none";
+      if (bubbleIconEl) bubbleIconEl.style.display = "inline-flex";
+    }
+  }
+
+  function updateBubbleByScroll() {
+    if (!bubble || isOpen) return;
+
+    var shouldExpand = (window.pageYOffset || document.documentElement.scrollTop || 0) > scrollExpandThreshold;
+    applyBubbleExpandedState(shouldExpand);
   }
 
   function applyPanelLayout() {
@@ -587,7 +689,7 @@ function sendPageContext() {
       }
     }
 
-    bubble.style.display = isOpen ? "none" : "block";
+    bubble.style.display = isOpen ? "none" : "inline-flex";
   }
 
   function applyPageShrink() {
@@ -637,6 +739,7 @@ function sendPageContext() {
     isOpen = false;
     applyPanelLayout();
     resetPageShrink();
+    updateBubbleByScroll();
   }
 
   function togglePanel() {
@@ -657,7 +760,14 @@ function sendPageContext() {
     bubble = document.createElement("button");
     bubble.type = "button";
     bubble.setAttribute("aria-label", "Open chat");
-    bubble.innerHTML = bubbleText;
+    bubble.innerHTML =
+      '<span class="sitemind-bubble-icon">💬</span>' +
+      '<span class="sitemind-bubble-short">' + bubbleShortText + '</span>' +
+      '<span class="sitemind-bubble-full">' + bubbleText + '</span>';
+
+    bubbleIconEl = bubble.querySelector(".sitemind-bubble-icon");
+    bubbleShortLabelEl = bubble.querySelector(".sitemind-bubble-short");
+    bubbleFullLabelEl = bubble.querySelector(".sitemind-bubble-full");
 
     panel = document.createElement("div");
     panel.style.position = "fixed";
@@ -683,6 +793,7 @@ function sendPageContext() {
 
     applyBubblePosition();
     styleBubble();
+    updateBubbleByScroll();
     applyPanelLayout();
 
     bubble.addEventListener("click", togglePanel);
@@ -713,6 +824,7 @@ function sendPageContext() {
   window.addEventListener("resize", function () {
     applyBubblePosition();
     styleBubble();
+    updateBubbleByScroll();
     applyPanelLayout();
 
     if (isOpen) {
@@ -725,6 +837,10 @@ function sendPageContext() {
       resetPageShrink();
     }
   });
+
+  window.addEventListener("scroll", function () {
+    updateBubbleByScroll();
+  }, { passive: true });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", createWidget);
