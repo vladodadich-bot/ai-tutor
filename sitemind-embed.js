@@ -407,24 +407,75 @@
 
     return "general";
   }
+  function getComputedBackgroundColor(element) {
+    if (!element || !window.getComputedStyle) return "";
 
-  function getPageContextPayload() {
-    var pageText = getMainContentText();
+    try {
+      var style = window.getComputedStyle(element);
+      var bg = style && style.backgroundColor ? String(style.backgroundColor).trim() : "";
 
-    return {
-      type: "sitemind-page-context",
-      agentId: agentId,
-      language: detectPageLanguage(),
-      pageTypeHint: getPageTypeHint(),
-      pageTitle: getPageTitle(),
-      pageDescription: getPageDescription(),
-      pageUrl: window.location.href,
-      h1: getPageH1(),
-      headings: getHeadingsText(),
-      pageContext: pageText,
-      pageText: pageText
-    };
+      if (!bg) return "";
+      if (bg === "transparent") return "";
+      if (/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)/i.test(bg)) return "";
+
+      return bg;
+    } catch (e) {
+      return "";
+    }
   }
+
+  function getPageBackgroundColor() {
+    var candidates = [
+      getBestContentRoot(),
+      document.body,
+      document.documentElement
+    ];
+
+    for (var i = 0; i < candidates.length; i++) {
+      var color = getComputedBackgroundColor(candidates[i]);
+      if (color) return color;
+    }
+
+    return "#ffffff";
+  }
+
+  function getPageTextColor() {
+    var candidates = [
+      getBestContentRoot(),
+      document.body,
+      document.documentElement
+    ];
+
+    for (var i = 0; i < candidates.length; i++) {
+      try {
+        if (!candidates[i] || !window.getComputedStyle) continue;
+        var style = window.getComputedStyle(candidates[i]);
+        var color = style && style.color ? String(style.color).trim() : "";
+        if (color) return color;
+      } catch (e) {}
+    }
+
+    return "#111111";
+  }
+  function getPageContextPayload() {
+  var pageText = getMainContentText();
+
+  return {
+    type: "sitemind-page-context",
+    agentId: agentId,
+    language: detectPageLanguage(),
+    pageTypeHint: getPageTypeHint(),
+    pageTitle: getPageTitle(),
+    pageDescription: getPageDescription(),
+    pageUrl: window.location.href,
+    h1: getPageH1(),
+    headings: getHeadingsText(),
+    pageContext: pageText,
+    pageText: pageText,
+    pageBackground: getPageBackgroundColor(),
+    pageTextColor: getPageTextColor()
+  };
+}
 
   function detectUserIntent(message) {
     const msg = (message || "").toLowerCase();
