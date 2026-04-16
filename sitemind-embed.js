@@ -407,23 +407,139 @@
 
     return "general";
   }
+  function getComputedBackgroundColor(element) {
+    if (!element || !window.getComputedStyle) return "";
 
+    try {
+      var style = window.getComputedStyle(element);
+      var bg = style && style.backgroundColor ? String(style.backgroundColor).trim() : "";
+
+      if (!bg) return "";
+      if (bg === "transparent") return "";
+      if (/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)/i.test(bg)) return "";
+
+      return bg;
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function getPageBackgroundColor() {
+    var candidates = [
+      getBestContentRoot(),
+      document.body,
+      document.documentElement
+    ];
+
+    for (var i = 0; i < candidates.length; i++) {
+      var color = getComputedBackgroundColor(candidates[i]);
+      if (color) return color;
+    }
+
+    return "#ffffff";
+  }
+
+  function getPageTextColor() {
+    var candidates = [
+      getBestContentRoot(),
+      document.body,
+      document.documentElement
+    ];
+
+    for (var i = 0; i < candidates.length; i++) {
+      try {
+        if (!candidates[i] || !window.getComputedStyle) continue;
+        var style = window.getComputedStyle(candidates[i]);
+        var color = style && style.color ? String(style.color).trim() : "";
+        if (color) return color;
+      } catch (e) {}
+    }
+
+    return "#111111";
+  }
   function getPageContextPayload() {
-    var pageText = getMainContentText();
+  var pageText = getMainContentText();
 
-    return {
-      type: "sitemind-page-context",
-      agentId: agentId,
-      language: detectPageLanguage(),
-      pageTypeHint: getPageTypeHint(),
-      pageTitle: getPageTitle(),
-      pageDescription: getPageDescription(),
-      pageUrl: window.location.href,
-      h1: getPageH1(),
-      headings: getHeadingsText(),
-      pageContext: pageText,
-      pageText: pageText
-    };
+  return {
+    type: "sitemind-page-context",
+    agentId: agentId,
+    language: detectPageLanguage(),
+    pageTypeHint: getPageTypeHint(),
+    pageTitle: getPageTitle(),
+    pageDescription: getPageDescription(),
+    pageUrl: window.location.href,
+    h1: getPageH1(),
+    headings: getHeadingsText(),
+    pageContext: pageText,
+    pageText: pageText,
+    pageBackground: getPageBackgroundColor(),
+    pageTextColor: getPageTextColor()
+  };
+}
+
+  function detectUserIntent(message) {
+    const msg = (message || "").toLowerCase();
+
+    if (
+      msg.includes("lektira") ||
+      msg.includes("summary") ||
+      msg.includes("inhalt")
+    ) {
+      return "education_content";
+    }
+
+    if (
+      msg.includes("how") ||
+      msg.includes("kako") ||
+      msg.includes("wie")
+    ) {
+      return "how_to";
+    }
+
+    if (
+      msg.includes("price") ||
+      msg.includes("cijena")
+    ) {
+      return "sales";
+    }
+
+    return "general";
+  }
+
+  function getStyleGuide(intent) {
+    if (intent === "education_content") {
+      return `
+- give a clear, concrete explanation
+- if it's a story or topic, explain what happens step by step
+- avoid abstract or overly philosophical language
+- keep it simple and useful
+- prefer concrete explanations over abstract descriptions
+`;
+    }
+
+    if (intent === "sales") {
+      return `
+- be concise
+- highlight benefits clearly
+- include a clear next step
+- prefer concrete explanations over abstract descriptions
+`;
+    }
+
+    if (intent === "how_to") {
+      return `
+- explain step by step
+- keep instructions practical and easy to follow
+- avoid unnecessary theory
+- prefer concrete explanations over abstract descriptions
+`;
+    }
+
+    return `
+- be helpful and clear
+- avoid unnecessary length
+- prefer concrete explanations over abstract descriptions
+`;
   }
 
   function sendPageContext() {
@@ -478,7 +594,7 @@
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-      "transform 0.34s ease, box-shadow 0.24s ease, opacity 0.24s ease, border-color 0.24s ease, filter 0.24s ease, padding 0.30s ease, max-width 0.34s ease, min-width 0.34s ease";
+    "transform 0.32s ease, box-shadow 0.32s ease, opacity 0.32s ease, border-color 0.32s ease, filter 0.32s ease, padding 0.92s ease, max-width 0.32s ease, min-width 0.32s ease";
     bubble.style.display = "inline-flex";
     bubble.style.alignItems = "center";
     bubble.style.justifyContent = "center";
@@ -503,9 +619,6 @@
       bubbleShortLabelEl.style.lineHeight = "1";
       bubbleShortLabelEl.style.letterSpacing = "0.01em";
       bubbleShortLabelEl.style.whiteSpace = "nowrap";
-      bubbleShortLabelEl.style.overflow = "hidden";
-      bubbleShortLabelEl.style.transition =
-        "opacity 0.26s ease, max-width 0.26s ease, transform 0.26s ease, margin 0.26s ease";
     }
 
     if (bubbleFullLabelEl) {
@@ -514,9 +627,6 @@
       bubbleFullLabelEl.style.lineHeight = "1.25";
       bubbleFullLabelEl.style.whiteSpace = "normal";
       bubbleFullLabelEl.style.textAlign = "left";
-      bubbleFullLabelEl.style.overflow = "hidden";
-      bubbleFullLabelEl.style.transition =
-        "opacity 0.28s ease, max-width 0.28s ease, transform 0.28s ease, margin 0.28s ease";
     }
 
     applyBubbleExpandedState(isBubbleExpanded);
@@ -549,51 +659,19 @@
       bubble.style.maxWidth = window.innerWidth < 520 ? "220px" : "248px";
       bubble.style.borderRadius = "999px";
 
-      if (bubbleShortLabelEl) {
-        bubbleShortLabelEl.style.opacity = "0";
-        bubbleShortLabelEl.style.maxWidth = "0px";
-        bubbleShortLabelEl.style.transform = "translateX(-6px)";
-        bubbleShortLabelEl.style.marginRight = "0";
-        bubbleShortLabelEl.style.pointerEvents = "none";
-      }
-
-      if (bubbleFullLabelEl) {
-        bubbleFullLabelEl.style.opacity = "1";
-        bubbleFullLabelEl.style.maxWidth = window.innerWidth < 520 ? "150px" : "170px";
-        bubbleFullLabelEl.style.transform = "translateX(0)";
-        bubbleFullLabelEl.style.marginLeft = "0";
-        bubbleFullLabelEl.style.pointerEvents = "auto";
-      }
-
-      if (bubbleIconEl) {
-        bubbleIconEl.style.display = "inline-flex";
-      }
+      if (bubbleShortLabelEl) bubbleShortLabelEl.style.display = "none";
+      if (bubbleFullLabelEl) bubbleFullLabelEl.style.display = "block";
+      if (bubbleIconEl) bubbleIconEl.style.display = "inline-flex";
     } else {
-  bubble.style.padding = window.innerWidth < 520 ? "11px 14px" : "11px 15px";
-  bubble.style.minWidth = window.innerWidth < 520 ? "104px" : "118px";
-  bubble.style.maxWidth = window.innerWidth < 520 ? "128px" : "142px";
-  bubble.style.borderRadius = "999px";
+      bubble.style.padding = window.innerWidth < 520 ? "12px 15px" : "12px 16px";
+      bubble.style.minWidth = window.innerWidth < 520 ? "86px" : "94px";
+      bubble.style.maxWidth = window.innerWidth < 520 ? "110px" : "118px";
+      bubble.style.borderRadius = "999px";
 
-  if (bubbleShortLabelEl) {
-    bubbleShortLabelEl.style.opacity = "1";
-    bubbleShortLabelEl.style.maxWidth = "80px";
-    bubbleShortLabelEl.style.transform = "translateX(0)";
-    bubbleShortLabelEl.style.marginRight = "0";
-    bubbleShortLabelEl.style.pointerEvents = "auto";
-  }
-
-  if (bubbleFullLabelEl) {
-    bubbleFullLabelEl.style.opacity = "0";
-    bubbleFullLabelEl.style.maxWidth = "0px";
-    bubbleFullLabelEl.style.transform = "translateX(8px)";
-    bubbleFullLabelEl.style.marginLeft = "0";
-    bubbleFullLabelEl.style.pointerEvents = "none";
-  }
-
-  if (bubbleIconEl) {
-    bubbleIconEl.style.display = "inline-flex";
-  }
-}
+      if (bubbleShortLabelEl) bubbleShortLabelEl.style.display = "inline";
+      if (bubbleFullLabelEl) bubbleFullLabelEl.style.display = "none";
+      if (bubbleIconEl) bubbleIconEl.style.display = "inline-flex";
+    }
   }
 
   function updateBubbleByScroll() {
