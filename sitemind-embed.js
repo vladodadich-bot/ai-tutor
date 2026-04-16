@@ -543,7 +543,7 @@
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-    "transform 0.32s ease, box-shadow 0.32s ease, opacity 0.32s ease, border-color 0.32s ease, filter 0.32s ease, padding 0.32s ease, max-width 0.32s ease, min-width 0.32s ease";
+    "transform 0.32s ease, box-shadow 0.32s ease, opacity 0.32s ease, border-color 0.32s ease, filter 0.32s ease, padding 0.92s ease, max-width 0.32s ease, min-width 0.32s ease";
     bubble.style.display = "inline-flex";
     bubble.style.alignItems = "center";
     bubble.style.justifyContent = "center";
