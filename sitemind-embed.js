@@ -426,71 +426,6 @@
     };
   }
 
-  function detectUserIntent(message) {
-    const msg = (message || "").toLowerCase();
-
-    if (
-      msg.includes("lektira") ||
-      msg.includes("summary") ||
-      msg.includes("inhalt")
-    ) {
-      return "education_content";
-    }
-
-    if (
-      msg.includes("how") ||
-      msg.includes("kako") ||
-      msg.includes("wie")
-    ) {
-      return "how_to";
-    }
-
-    if (
-      msg.includes("price") ||
-      msg.includes("cijena")
-    ) {
-      return "sales";
-    }
-
-    return "general";
-  }
-
-  function getStyleGuide(intent) {
-    if (intent === "education_content") {
-      return `
-- give a clear, concrete explanation
-- if it's a story or topic, explain what happens step by step
-- avoid abstract or overly philosophical language
-- keep it simple and useful
-- prefer concrete explanations over abstract descriptions
-`;
-    }
-
-    if (intent === "sales") {
-      return `
-- be concise
-- highlight benefits clearly
-- include a clear next step
-- prefer concrete explanations over abstract descriptions
-`;
-    }
-
-    if (intent === "how_to") {
-      return `
-- explain step by step
-- keep instructions practical and easy to follow
-- avoid unnecessary theory
-- prefer concrete explanations over abstract descriptions
-`;
-    }
-
-    return `
-- be helpful and clear
-- avoid unnecessary length
-- prefer concrete explanations over abstract descriptions
-`;
-  }
-
   function sendPageContext() {
     if (!iframe || !iframe.contentWindow) return;
 
@@ -543,7 +478,7 @@
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-    "transform 0.34s ease, box-shadow 0.24s ease, opacity 0.24s ease, border-color 0.24s ease, filter 0.24s ease, padding 0.30s ease, max-width 0.34s ease, min-width 0.34s ease";
+      "transform 0.34s ease, box-shadow 0.24s ease, opacity 0.24s ease, border-color 0.24s ease, filter 0.24s ease, padding 0.30s ease, max-width 0.34s ease, min-width 0.34s ease";
     bubble.style.display = "inline-flex";
     bubble.style.alignItems = "center";
     bubble.style.justifyContent = "center";
@@ -562,25 +497,27 @@
       bubbleIconEl.style.filter = "drop-shadow(0 1px 1px rgba(0,0,0,0.18))";
     }
 
-   if (bubbleShortLabelEl) {
-  bubbleShortLabelEl.style.fontSize = window.innerWidth < 520 ? "13px" : "14px";
-  bubbleShortLabelEl.style.fontWeight = "800";
-  bubbleShortLabelEl.style.lineHeight = "1";
-  bubbleShortLabelEl.style.letterSpacing = "0.01em";
-  bubbleShortLabelEl.style.whiteSpace = "nowrap";
-  bubbleShortLabelEl.style.overflow = "hidden";
-  bubbleShortLabelEl.style.transition = "opacity 0.26s ease, max-width 0.26s ease, transform 0.26s ease, margin 0.26s ease";
-}
+    if (bubbleShortLabelEl) {
+      bubbleShortLabelEl.style.fontSize = window.innerWidth < 520 ? "13px" : "14px";
+      bubbleShortLabelEl.style.fontWeight = "800";
+      bubbleShortLabelEl.style.lineHeight = "1";
+      bubbleShortLabelEl.style.letterSpacing = "0.01em";
+      bubbleShortLabelEl.style.whiteSpace = "nowrap";
+      bubbleShortLabelEl.style.overflow = "hidden";
+      bubbleShortLabelEl.style.transition =
+        "opacity 0.26s ease, max-width 0.26s ease, transform 0.26s ease, margin 0.26s ease";
+    }
 
-if (bubbleFullLabelEl) {
-  bubbleFullLabelEl.style.fontSize = window.innerWidth < 520 ? "12.5px" : "13.5px";
-  bubbleFullLabelEl.style.fontWeight = "800";
-  bubbleFullLabelEl.style.lineHeight = "1.25";
-  bubbleFullLabelEl.style.whiteSpace = "normal";
-  bubbleFullLabelEl.style.textAlign = "left";
-  bubbleFullLabelEl.style.overflow = "hidden";
-  bubbleFullLabelEl.style.transition = "opacity 0.28s ease, max-width 0.28s ease, transform 0.28s ease, margin 0.28s ease";
-}
+    if (bubbleFullLabelEl) {
+      bubbleFullLabelEl.style.fontSize = window.innerWidth < 520 ? "12.5px" : "13.5px";
+      bubbleFullLabelEl.style.fontWeight = "800";
+      bubbleFullLabelEl.style.lineHeight = "1.25";
+      bubbleFullLabelEl.style.whiteSpace = "normal";
+      bubbleFullLabelEl.style.textAlign = "left";
+      bubbleFullLabelEl.style.overflow = "hidden";
+      bubbleFullLabelEl.style.transition =
+        "opacity 0.28s ease, max-width 0.28s ease, transform 0.28s ease, margin 0.28s ease";
+    }
 
     applyBubbleExpandedState(isBubbleExpanded);
 
@@ -592,63 +529,72 @@ if (bubbleFullLabelEl) {
       bubble.style.filter = "brightness(1.04)";
     };
 
-    function applyBubbleExpandedState(expanded) {
-  if (!bubble) return;
+    bubble.onmouseleave = function () {
+      bubble.style.transform = "translateY(0)";
+      bubble.style.borderColor = borderGlow;
+      bubble.style.boxShadow =
+        "0 18px 34px " + shadowOuter + ", 0 10px 26px " + shadowSoft + ", 0 0 0 1px rgba(255,255,255,0.06), 0 0 18px " + shadowGlow;
+      bubble.style.filter = "brightness(1)";
+    };
+  }
 
-  isBubbleExpanded = !!expanded;
+  function applyBubbleExpandedState(expanded) {
+    if (!bubble) return;
 
-  if (isBubbleExpanded) {
-    bubble.style.padding = window.innerWidth < 520 ? "12px 16px" : "13px 18px";
-    bubble.style.minWidth = window.innerWidth < 520 ? "188px" : "222px";
-    bubble.style.maxWidth = window.innerWidth < 520 ? "220px" : "248px";
-    bubble.style.borderRadius = "999px";
+    isBubbleExpanded = !!expanded;
 
-    if (bubbleShortLabelEl) {
-      bubbleShortLabelEl.style.opacity = "0";
-      bubbleShortLabelEl.style.maxWidth = "0px";
-      bubbleShortLabelEl.style.transform = "translateX(-6px)";
-      bubbleShortLabelEl.style.marginRight = "0";
-      bubbleShortLabelEl.style.pointerEvents = "none";
-    }
+    if (isBubbleExpanded) {
+      bubble.style.padding = window.innerWidth < 520 ? "12px 16px" : "13px 18px";
+      bubble.style.minWidth = window.innerWidth < 520 ? "188px" : "222px";
+      bubble.style.maxWidth = window.innerWidth < 520 ? "220px" : "248px";
+      bubble.style.borderRadius = "999px";
 
-    if (bubbleFullLabelEl) {
-      bubbleFullLabelEl.style.opacity = "1";
-      bubbleFullLabelEl.style.maxWidth = window.innerWidth < 520 ? "150px" : "170px";
-      bubbleFullLabelEl.style.transform = "translateX(0)";
-      bubbleFullLabelEl.style.marginLeft = "0";
-      bubbleFullLabelEl.style.pointerEvents = "auto";
-    }
+      if (bubbleShortLabelEl) {
+        bubbleShortLabelEl.style.opacity = "0";
+        bubbleShortLabelEl.style.maxWidth = "0px";
+        bubbleShortLabelEl.style.transform = "translateX(-6px)";
+        bubbleShortLabelEl.style.marginRight = "0";
+        bubbleShortLabelEl.style.pointerEvents = "none";
+      }
 
-    if (bubbleIconEl) {
-      bubbleIconEl.style.display = "inline-flex";
-    }
-  } else {
-    bubble.style.padding = window.innerWidth < 520 ? "12px 15px" : "12px 16px";
-    bubble.style.minWidth = window.innerWidth < 520 ? "86px" : "94px";
-    bubble.style.maxWidth = window.innerWidth < 520 ? "110px" : "118px";
-    bubble.style.borderRadius = "999px";
+      if (bubbleFullLabelEl) {
+        bubbleFullLabelEl.style.opacity = "1";
+        bubbleFullLabelEl.style.maxWidth = window.innerWidth < 520 ? "150px" : "170px";
+        bubbleFullLabelEl.style.transform = "translateX(0)";
+        bubbleFullLabelEl.style.marginLeft = "0";
+        bubbleFullLabelEl.style.pointerEvents = "auto";
+      }
 
-    if (bubbleShortLabelEl) {
-      bubbleShortLabelEl.style.opacity = "1";
-      bubbleShortLabelEl.style.maxWidth = "80px";
-      bubbleShortLabelEl.style.transform = "translateX(0)";
-      bubbleShortLabelEl.style.marginRight = "0";
-      bubbleShortLabelEl.style.pointerEvents = "auto";
-    }
+      if (bubbleIconEl) {
+        bubbleIconEl.style.display = "inline-flex";
+      }
+    } else {
+      bubble.style.padding = window.innerWidth < 520 ? "12px 15px" : "12px 16px";
+      bubble.style.minWidth = window.innerWidth < 520 ? "86px" : "94px";
+      bubble.style.maxWidth = window.innerWidth < 520 ? "110px" : "118px";
+      bubble.style.borderRadius = "999px";
 
-    if (bubbleFullLabelEl) {
-      bubbleFullLabelEl.style.opacity = "0";
-      bubbleFullLabelEl.style.maxWidth = "0px";
-      bubbleFullLabelEl.style.transform = "translateX(8px)";
-      bubbleFullLabelEl.style.marginLeft = "0";
-      bubbleFullLabelEl.style.pointerEvents = "none";
-    }
+      if (bubbleShortLabelEl) {
+        bubbleShortLabelEl.style.opacity = "1";
+        bubbleShortLabelEl.style.maxWidth = "80px";
+        bubbleShortLabelEl.style.transform = "translateX(0)";
+        bubbleShortLabelEl.style.marginRight = "0";
+        bubbleShortLabelEl.style.pointerEvents = "auto";
+      }
 
-    if (bubbleIconEl) {
-      bubbleIconEl.style.display = "inline-flex";
+      if (bubbleFullLabelEl) {
+        bubbleFullLabelEl.style.opacity = "0";
+        bubbleFullLabelEl.style.maxWidth = "0px";
+        bubbleFullLabelEl.style.transform = "translateX(8px)";
+        bubbleFullLabelEl.style.marginLeft = "0";
+        bubbleFullLabelEl.style.pointerEvents = "none";
+      }
+
+      if (bubbleIconEl) {
+        bubbleIconEl.style.display = "inline-flex";
+      }
     }
   }
-}
 
   function updateBubbleByScroll() {
     if (!bubble || isOpen) return;
