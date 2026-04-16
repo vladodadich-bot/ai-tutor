@@ -8,44 +8,44 @@
     * { box-sizing: border-box; }
 
     :root {
-      --bg-1: #f7f7f8;
-      --bg-2: #f0f1f3;
-      --bg-3: #e3e5e8;
-      --panel: rgba(255,255,255,0.96);
+      --bg-1: #ffffff;
+      --bg-2: #f8fbff;
+      --bg-3: #eef5ff;
+      --panel: rgba(255,255,255,0.98);
       --panel-strong: rgba(255,255,255,1);
-      --text: #16181c;
-      --muted: #666b72;
-      --muted-2: #8d9299;
+      --text: #163047;
+      --muted: #5f7388;
+      --muted-2: #88a0b8;
 
-      --header-grad-1: #7b97b8;
-      --header-grad-2: #6684a8;
-      --header-grad-3: #536f92;
+      --header-grad-1: #2f7ff6;
+      --header-grad-2: #1f6fe5;
+      --header-grad-3: #155bc4;
 
-      --accent: #6d8fb5;
-      --accent-2: #58779a;
-      --user-grad-1: #6d8fb5;
-      --user-grad-2: #58779a;
-      --assistant-bg: rgba(255,255,255,0.82);
+      --accent: #2f7ff6;
+      --accent-2: #1b69dc;
+      --user-grad-1: #2f7ff6;
+      --user-grad-2: #1b69dc;
+      --assistant-bg: #ffffff;
 
-      --border: rgba(70, 74, 80, 0.12);
-      --border-strong: rgba(70, 74, 80, 0.20);
+      --border: rgba(47, 127, 246, 0.12);
+      --border-strong: rgba(47, 127, 246, 0.22);
 
       --header-text: #ffffff;
-      --header-subtext: rgba(255,255,255,0.92);
-      --header-brand-text: rgba(255,255,255,0.88);
+      --header-subtext: rgba(255,255,255,0.94);
+      --header-brand-text: rgba(255,255,255,0.90);
 
-      --header-close-border: rgba(255,255,255,0.20);
-      --header-close-bg-1: rgba(255,255,255,0.20);
+      --header-close-border: rgba(255,255,255,0.24);
+      --header-close-bg-1: rgba(255,255,255,0.22);
       --header-close-bg-2: rgba(255,255,255,0.08);
-      --header-close-hover-bg-1: rgba(255,255,255,0.28);
-      --header-close-hover-bg-2: rgba(255,255,255,0.12);
-      --header-close-hover-border: rgba(255,255,255,0.30);
+      --header-close-hover-bg-1: rgba(255,255,255,0.30);
+      --header-close-hover-bg-2: rgba(255,255,255,0.14);
+      --header-close-hover-border: rgba(255,255,255,0.34);
 
       --send-text: #ffffff;
 
-      --shadow-md: 0 10px 24px rgba(15, 23, 42, 0.10);
-      --shadow-lg: 0 14px 34px rgba(15, 23, 42, 0.12);
-      --glow: 0 0 0 1px rgba(109,143,181,0.12), 0 0 22px rgba(109,143,181,0.10);
+      --shadow-md: 0 10px 24px rgba(20, 62, 126, 0.10);
+      --shadow-lg: 0 14px 34px rgba(20, 62, 126, 0.12);
+      --glow: 0 0 0 1px rgba(47,127,246,0.16), 0 0 22px rgba(47,127,246,0.14);
     }
 
     html, body {
@@ -56,8 +56,7 @@
       font-family: Arial, sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at top left, rgba(255,255,255,0.55), transparent 24%),
-        linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 52%, var(--bg-3) 100%);
+        linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 56%, var(--bg-3) 100%);
     }
 
     body {
@@ -74,7 +73,7 @@
       min-height: 0;
       overflow: hidden;
       background:
-        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(240,244,247,0.98));
+        linear-gradient(180deg, rgba(255,255,255,0.99), rgba(248,251,255,1));
     }
 
     .chat-shell::before {
@@ -84,8 +83,8 @@
       pointer-events: none;
       z-index: 0;
       background:
-        radial-gradient(circle at top right, rgba(255,255,255,0.50), transparent 22%),
-        radial-gradient(circle at bottom left, rgba(255,255,255,0.32), transparent 26%);
+        radial-gradient(circle at top right, rgba(47,127,246,0.05), transparent 24%),
+        radial-gradient(circle at bottom left, rgba(47,127,246,0.04), transparent 28%);
     }
 
     .chat-header {
@@ -94,17 +93,15 @@
       padding: 14px 18px 16px;
       color: var(--header-text);
       background:
-        radial-gradient(circle at 18% 8%, rgba(255,255,255,0.24), transparent 20%),
-        radial-gradient(circle at 85% 12%, rgba(255,255,255,0.14), transparent 28%),
-        linear-gradient(135deg, var(--header-grad-1) 0%, var(--header-grad-2) 56%, var(--header-grad-3) 100%);
+        linear-gradient(135deg, var(--header-grad-1) 0%, var(--header-grad-2) 58%, var(--header-grad-3) 100%);
       display: flex;
       flex-direction: column;
       gap: 8px;
       flex-shrink: 0;
       border-bottom: 1px solid rgba(255,255,255,0.18);
       box-shadow:
-        0 14px 30px rgba(65, 77, 89, 0.18),
-        inset 0 1px 0 rgba(255,255,255,0.18);
+        0 12px 28px rgba(21, 91, 196, 0.20),
+        inset 0 1px 0 rgba(255,255,255,0.16);
       overflow: hidden;
     }
 
@@ -325,7 +322,7 @@
     }
 
     .message-row.assistant .bubble {
-      background: var(--assistant-bg);
+      background: linear-gradient(180deg, #ffffff 0%, #fafdff 100%);
       color: var(--text);
       border: 1px solid var(--border);
       border-bottom-left-radius: 6px;
@@ -359,7 +356,7 @@
       align-items: flex-end;
       gap: 10px;
       padding: 12px;
-      background: rgba(255,255,255,0.92);
+      background: rgba(255,255,255,0.98);
       backdrop-filter: blur(14px);
       border-top: 1px solid var(--border);
       flex-shrink: 0;
@@ -388,7 +385,7 @@
     .chat-input::placeholder { color: var(--muted-2); }
 
     .chat-input:focus {
-      border-color: rgba(127,139,151,0.42);
+      border-color: rgba(47,127,246,0.34);
       box-shadow: var(--glow);
       background: rgba(255,255,255,1);
     }
@@ -407,7 +404,7 @@
       height: 48px;
       cursor: pointer;
       box-shadow:
-        0 12px 24px rgba(65, 77, 89, 0.18),
+        0 12px 24px rgba(27,105,220,0.22),
         inset 0 1px 0 rgba(255,255,255,0.10);
       transition: transform 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
       white-space: nowrap;
@@ -956,20 +953,20 @@
   }
 
   function applyLightTheme() {
-    var accent = "#6f8fb3";
-    var accent2 = "#5a789a";
-    var header1 = "#7f9bbc";
-    var header2 = "#6987ab";
-    var header3 = "#547194";
+    var accent = "#2f7ff6";
+    var accent2 = "#1b69dc";
+    var header1 = "#2f7ff6";
+    var header2 = "#1f6fe5";
+    var header3 = "#155bc4";
 
-    setCssVar("--bg-1", "#f5f8fb");
-    setCssVar("--bg-2", "#edf3f8");
-    setCssVar("--bg-3", "#e3ebf3");
-    setCssVar("--panel", "rgba(255,255,255,0.96)");
+    setCssVar("--bg-1", "#ffffff");
+    setCssVar("--bg-2", "#f8fbff");
+    setCssVar("--bg-3", "#eef5ff");
+    setCssVar("--panel", "rgba(255,255,255,0.98)");
     setCssVar("--panel-strong", "rgba(255,255,255,1)");
-    setCssVar("--text", "#16202a");
-    setCssVar("--muted", "#617080");
-    setCssVar("--muted-2", "#8a99aa");
+    setCssVar("--text", "#163047");
+    setCssVar("--muted", "#5f7388");
+    setCssVar("--muted-2", "#88a0b8");
 
     setCssVar("--header-grad-1", header1);
     setCssVar("--header-grad-2", header2);
@@ -979,92 +976,36 @@
     setCssVar("--accent-2", accent2);
     setCssVar("--user-grad-1", accent);
     setCssVar("--user-grad-2", accent2);
-    setCssVar("--assistant-bg", "rgba(255,255,255,0.86)");
+    setCssVar("--assistant-bg", "#ffffff");
 
-    setCssVar("--border", "rgba(90, 120, 154, 0.14)");
-    setCssVar("--border-strong", "rgba(90, 120, 154, 0.24)");
+    setCssVar("--border", "rgba(47, 127, 246, 0.12)");
+    setCssVar("--border-strong", "rgba(47, 127, 246, 0.22)");
     setCssVar("--header-text", "#ffffff");
     setCssVar("--header-subtext", "rgba(255,255,255,0.94)");
     setCssVar("--header-brand-text", "rgba(255,255,255,0.90)");
-    setCssVar("--header-close-border", "rgba(255,255,255,0.22)");
+    setCssVar("--header-close-border", "rgba(255,255,255,0.24)");
     setCssVar("--header-close-bg-1", "rgba(255,255,255,0.22)");
-    setCssVar("--header-close-bg-2", "rgba(255,255,255,0.09)");
+    setCssVar("--header-close-bg-2", "rgba(255,255,255,0.08)");
     setCssVar("--header-close-hover-bg-1", "rgba(255,255,255,0.30)");
     setCssVar("--header-close-hover-bg-2", "rgba(255,255,255,0.14)");
     setCssVar("--header-close-hover-border", "rgba(255,255,255,0.34)");
     setCssVar("--send-text", "#ffffff");
-    setCssVar("--glow", "0 0 0 1px rgba(111,143,179,0.12), 0 0 20px rgba(111,143,179,0.10)");
+    setCssVar("--glow", "0 0 0 1px rgba(47,127,246,0.16), 0 0 22px rgba(47,127,246,0.14)");
 
     document.body.style.background =
-      "radial-gradient(circle at top left, rgba(111,143,179,0.08), transparent 24%), linear-gradient(180deg, #f5f8fb 0%, #edf3f8 52%, #e3ebf3 100%)";
-    chatShell.style.background = "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(240,245,250,0.99))";
-    chatHeader.style.boxShadow = "0 12px 28px rgba(84,113,148,0.16), inset 0 1px 0 rgba(255,255,255,0.18)";
-    chatInput.style.background = "rgba(255,255,255,0.98)";
-    chatInput.style.color = "#16202a";
+      "linear-gradient(180deg, #ffffff 0%, #f8fbff 56%, #eef5ff 100%)";
+    chatShell.style.background = "linear-gradient(180deg, rgba(255,255,255,0.99), rgba(248,251,255,1))";
+    chatHeader.style.boxShadow = "0 12px 28px rgba(21,91,196,0.20), inset 0 1px 0 rgba(255,255,255,0.16)";
+    chatInput.style.background = "rgba(255,255,255,0.99)";
+    chatInput.style.color = "#163047";
   }
 
   function applyDarkTheme() {
-    var accent = "#7d97b8";
-    var accent2 = "#627d9f";
-    var header1 = "#1f3348";
-    var header2 = "#1a2b3e";
-    var header3 = "#142232";
-
-    setCssVar("--bg-1", "#0f1720");
-    setCssVar("--bg-2", "#13202c");
-    setCssVar("--bg-3", "#182736");
-    setCssVar("--panel", "rgba(15,23,32,0.96)");
-    setCssVar("--panel-strong", "rgba(15,23,32,1)");
-    setCssVar("--text", "#ecf3fb");
-    setCssVar("--muted", "#98a8ba");
-    setCssVar("--muted-2", "#7f91a4");
-
-    setCssVar("--header-grad-1", header1);
-    setCssVar("--header-grad-2", header2);
-    setCssVar("--header-grad-3", header3);
-
-    setCssVar("--accent", accent);
-    setCssVar("--accent-2", accent2);
-    setCssVar("--user-grad-1", accent);
-    setCssVar("--user-grad-2", accent2);
-    setCssVar("--assistant-bg", "rgba(255,255,255,0.05)");
-
-    setCssVar("--border", "rgba(125,151,184,0.16)");
-    setCssVar("--border-strong", "rgba(125,151,184,0.25)");
-    setCssVar("--header-text", "#f5f9ff");
-    setCssVar("--header-subtext", "rgba(245,249,255,0.88)");
-    setCssVar("--header-brand-text", "rgba(245,249,255,0.80)");
-    setCssVar("--header-close-border", "rgba(255,255,255,0.14)");
-    setCssVar("--header-close-bg-1", "rgba(255,255,255,0.10)");
-    setCssVar("--header-close-bg-2", "rgba(255,255,255,0.04)");
-    setCssVar("--header-close-hover-bg-1", "rgba(255,255,255,0.18)");
-    setCssVar("--header-close-hover-bg-2", "rgba(255,255,255,0.07)");
-    setCssVar("--header-close-hover-border", "rgba(255,255,255,0.20)");
-    setCssVar("--send-text", "#ffffff");
-    setCssVar("--glow", "0 0 0 1px rgba(125,151,184,0.16), 0 0 18px rgba(125,151,184,0.10)");
-
-    document.body.style.background =
-      "radial-gradient(circle at top left, rgba(125,151,184,0.10), transparent 24%), linear-gradient(180deg, #0f1720 0%, #13202c 52%, #182736 100%)";
-    chatShell.style.background = "linear-gradient(180deg, rgba(15,23,32,0.98), rgba(19,32,44,0.99))";
-    chatHeader.style.boxShadow = "0 12px 28px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.06)";
-    chatInput.style.background = "rgba(255,255,255,0.05)";
-    chatInput.style.color = "#ecf3fb";
+    applyLightTheme();
   }
 
   function resolveThemeMode() {
-    if (themeState.mode === "dark" || themeState.mode === "light") {
-      return themeState.mode;
-    }
-
-    if (isValidCssColor(themeState.pageBackground)) {
-      return isDarkColor(themeState.pageBackground) ? "dark" : "light";
-    }
-
-    if (isValidCssColor(themeState.headerBackground)) {
-      return isDarkColor(themeState.headerBackground) ? "dark" : "light";
-    }
-
-    return getSystemPreferredMode();
+    return "light";
   }
 
   function applyResolvedTheme() {
@@ -1086,20 +1027,6 @@
 
   function applyIncomingTheme(data) {
     if (!data || typeof data !== "object") return;
-
-    if (data.mode === "dark" || data.mode === "light") {
-      themeState.mode = data.mode;
-    } else {
-      themeState.mode = "";
-    }
-
-    if (isValidCssColor(data.pageBackground)) {
-      themeState.pageBackground = data.pageBackground;
-    }
-
-    if (isValidCssColor(data.headerBackground)) {
-      themeState.headerBackground = data.headerBackground;
-    }
 
     if (isValidCssColor(data.accentColor)) {
       themeState.accentColor = data.accentColor;
