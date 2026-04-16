@@ -569,31 +569,31 @@
         bubbleIconEl.style.display = "inline-flex";
       }
     } else {
-      bubble.style.padding = window.innerWidth < 520 ? "12px 15px" : "12px 16px";
-      bubble.style.minWidth = window.innerWidth < 520 ? "86px" : "94px";
-      bubble.style.maxWidth = window.innerWidth < 520 ? "110px" : "118px";
-      bubble.style.borderRadius = "999px";
+  bubble.style.padding = window.innerWidth < 520 ? "11px 14px" : "11px 15px";
+  bubble.style.minWidth = window.innerWidth < 520 ? "104px" : "118px";
+  bubble.style.maxWidth = window.innerWidth < 520 ? "128px" : "142px";
+  bubble.style.borderRadius = "999px";
 
-      if (bubbleShortLabelEl) {
-        bubbleShortLabelEl.style.opacity = "1";
-        bubbleShortLabelEl.style.maxWidth = "80px";
-        bubbleShortLabelEl.style.transform = "translateX(0)";
-        bubbleShortLabelEl.style.marginRight = "0";
-        bubbleShortLabelEl.style.pointerEvents = "auto";
-      }
+  if (bubbleShortLabelEl) {
+    bubbleShortLabelEl.style.opacity = "1";
+    bubbleShortLabelEl.style.maxWidth = "80px";
+    bubbleShortLabelEl.style.transform = "translateX(0)";
+    bubbleShortLabelEl.style.marginRight = "0";
+    bubbleShortLabelEl.style.pointerEvents = "auto";
+  }
 
-      if (bubbleFullLabelEl) {
-        bubbleFullLabelEl.style.opacity = "0";
-        bubbleFullLabelEl.style.maxWidth = "0px";
-        bubbleFullLabelEl.style.transform = "translateX(8px)";
-        bubbleFullLabelEl.style.marginLeft = "0";
-        bubbleFullLabelEl.style.pointerEvents = "none";
-      }
+  if (bubbleFullLabelEl) {
+    bubbleFullLabelEl.style.opacity = "0";
+    bubbleFullLabelEl.style.maxWidth = "0px";
+    bubbleFullLabelEl.style.transform = "translateX(8px)";
+    bubbleFullLabelEl.style.marginLeft = "0";
+    bubbleFullLabelEl.style.pointerEvents = "none";
+  }
 
-      if (bubbleIconEl) {
-        bubbleIconEl.style.display = "inline-flex";
-      }
-    }
+  if (bubbleIconEl) {
+    bubbleIconEl.style.display = "inline-flex";
+  }
+}
   }
 
   function updateBubbleByScroll() {
