@@ -543,7 +543,7 @@
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-      "transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease, border-color 0.14s ease, filter 0.14s ease, padding 0.16s ease, max-width 0.14s ease, min-width 0.14s ease";
+    "transform 0.34s ease, box-shadow 0.24s ease, opacity 0.24s ease, border-color 0.24s ease, filter 0.24s ease, padding 0.30s ease, max-width 0.34s ease, min-width 0.34s ease";
     bubble.style.display = "inline-flex";
     bubble.style.alignItems = "center";
     bubble.style.justifyContent = "center";
@@ -562,21 +562,25 @@
       bubbleIconEl.style.filter = "drop-shadow(0 1px 1px rgba(0,0,0,0.18))";
     }
 
-    if (bubbleShortLabelEl) {
-      bubbleShortLabelEl.style.fontSize = window.innerWidth < 520 ? "13px" : "14px";
-      bubbleShortLabelEl.style.fontWeight = "800";
-      bubbleShortLabelEl.style.lineHeight = "1";
-      bubbleShortLabelEl.style.letterSpacing = "0.01em";
-      bubbleShortLabelEl.style.whiteSpace = "nowrap";
-    }
+   if (bubbleShortLabelEl) {
+  bubbleShortLabelEl.style.fontSize = window.innerWidth < 520 ? "13px" : "14px";
+  bubbleShortLabelEl.style.fontWeight = "800";
+  bubbleShortLabelEl.style.lineHeight = "1";
+  bubbleShortLabelEl.style.letterSpacing = "0.01em";
+  bubbleShortLabelEl.style.whiteSpace = "nowrap";
+  bubbleShortLabelEl.style.overflow = "hidden";
+  bubbleShortLabelEl.style.transition = "opacity 0.26s ease, max-width 0.26s ease, transform 0.26s ease, margin 0.26s ease";
+}
 
-    if (bubbleFullLabelEl) {
-      bubbleFullLabelEl.style.fontSize = window.innerWidth < 520 ? "12.5px" : "13.5px";
-      bubbleFullLabelEl.style.fontWeight = "800";
-      bubbleFullLabelEl.style.lineHeight = "1.25";
-      bubbleFullLabelEl.style.whiteSpace = "normal";
-      bubbleFullLabelEl.style.textAlign = "left";
-    }
+if (bubbleFullLabelEl) {
+  bubbleFullLabelEl.style.fontSize = window.innerWidth < 520 ? "12.5px" : "13.5px";
+  bubbleFullLabelEl.style.fontWeight = "800";
+  bubbleFullLabelEl.style.lineHeight = "1.25";
+  bubbleFullLabelEl.style.whiteSpace = "normal";
+  bubbleFullLabelEl.style.textAlign = "left";
+  bubbleFullLabelEl.style.overflow = "hidden";
+  bubbleFullLabelEl.style.transition = "opacity 0.28s ease, max-width 0.28s ease, transform 0.28s ease, margin 0.28s ease";
+}
 
     applyBubbleExpandedState(isBubbleExpanded);
 
@@ -602,26 +606,63 @@
 
     isBubbleExpanded = !!expanded;
 
-    if (isBubbleExpanded) {
-      bubble.style.padding = window.innerWidth < 520 ? "12px 16px" : "13px 18px";
-      bubble.style.minWidth = window.innerWidth < 520 ? "188px" : "222px";
-      bubble.style.maxWidth = window.innerWidth < 520 ? "220px" : "248px";
-      bubble.style.borderRadius = "999px";
+    function applyBubbleExpandedState(expanded) {
+  if (!bubble) return;
 
-      if (bubbleShortLabelEl) bubbleShortLabelEl.style.display = "none";
-      if (bubbleFullLabelEl) bubbleFullLabelEl.style.display = "block";
-      if (bubbleIconEl) bubbleIconEl.style.display = "inline-flex";
-    } else {
-      bubble.style.padding = window.innerWidth < 520 ? "12px 15px" : "12px 16px";
-      bubble.style.minWidth = window.innerWidth < 520 ? "86px" : "94px";
-      bubble.style.maxWidth = window.innerWidth < 520 ? "110px" : "118px";
-      bubble.style.borderRadius = "999px";
+  isBubbleExpanded = !!expanded;
 
-      if (bubbleShortLabelEl) bubbleShortLabelEl.style.display = "inline";
-      if (bubbleFullLabelEl) bubbleFullLabelEl.style.display = "none";
-      if (bubbleIconEl) bubbleIconEl.style.display = "inline-flex";
+  if (isBubbleExpanded) {
+    bubble.style.padding = window.innerWidth < 520 ? "12px 16px" : "13px 18px";
+    bubble.style.minWidth = window.innerWidth < 520 ? "188px" : "222px";
+    bubble.style.maxWidth = window.innerWidth < 520 ? "220px" : "248px";
+    bubble.style.borderRadius = "999px";
+
+    if (bubbleShortLabelEl) {
+      bubbleShortLabelEl.style.opacity = "0";
+      bubbleShortLabelEl.style.maxWidth = "0px";
+      bubbleShortLabelEl.style.transform = "translateX(-6px)";
+      bubbleShortLabelEl.style.marginRight = "0";
+      bubbleShortLabelEl.style.pointerEvents = "none";
+    }
+
+    if (bubbleFullLabelEl) {
+      bubbleFullLabelEl.style.opacity = "1";
+      bubbleFullLabelEl.style.maxWidth = window.innerWidth < 520 ? "150px" : "170px";
+      bubbleFullLabelEl.style.transform = "translateX(0)";
+      bubbleFullLabelEl.style.marginLeft = "0";
+      bubbleFullLabelEl.style.pointerEvents = "auto";
+    }
+
+    if (bubbleIconEl) {
+      bubbleIconEl.style.display = "inline-flex";
+    }
+  } else {
+    bubble.style.padding = window.innerWidth < 520 ? "12px 15px" : "12px 16px";
+    bubble.style.minWidth = window.innerWidth < 520 ? "86px" : "94px";
+    bubble.style.maxWidth = window.innerWidth < 520 ? "110px" : "118px";
+    bubble.style.borderRadius = "999px";
+
+    if (bubbleShortLabelEl) {
+      bubbleShortLabelEl.style.opacity = "1";
+      bubbleShortLabelEl.style.maxWidth = "80px";
+      bubbleShortLabelEl.style.transform = "translateX(0)";
+      bubbleShortLabelEl.style.marginRight = "0";
+      bubbleShortLabelEl.style.pointerEvents = "auto";
+    }
+
+    if (bubbleFullLabelEl) {
+      bubbleFullLabelEl.style.opacity = "0";
+      bubbleFullLabelEl.style.maxWidth = "0px";
+      bubbleFullLabelEl.style.transform = "translateX(8px)";
+      bubbleFullLabelEl.style.marginLeft = "0";
+      bubbleFullLabelEl.style.pointerEvents = "none";
+    }
+
+    if (bubbleIconEl) {
+      bubbleIconEl.style.display = "inline-flex";
     }
   }
+}
 
   function updateBubbleByScroll() {
     if (!bubble || isOpen) return;
