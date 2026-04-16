@@ -600,12 +600,6 @@ if (bubbleFullLabelEl) {
       bubble.style.filter = "brightness(1)";
     };
   }
-
-  function applyBubbleExpandedState(expanded) {
-    if (!bubble) return;
-
-    isBubbleExpanded = !!expanded;
-
     function applyBubbleExpandedState(expanded) {
   if (!bubble) return;
 
