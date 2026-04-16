@@ -407,75 +407,122 @@
 
     return "general";
   }
-  function getComputedBackgroundColor(element) {
-    if (!element || !window.getComputedStyle) return "";
 
+  function isTransparentColor(value) {
+    var color = String(value || "").trim().toLowerCase();
+    if (!color) return true;
+    if (color === "transparent") return true;
+    if (color === "rgba(0, 0, 0, 0)") return true;
+    if (/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)/i.test(color)) return true;
+    return false;
+  }
+
+  function getStyleValue(element, prop) {
+    if (!element || !window.getComputedStyle) return "";
     try {
       var style = window.getComputedStyle(element);
-      var bg = style && style.backgroundColor ? String(style.backgroundColor).trim() : "";
-
-      if (!bg) return "";
-      if (bg === "transparent") return "";
-      if (/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)/i.test(bg)) return "";
-
-      return bg;
+      return style && style[prop] ? String(style[prop]).trim() : "";
     } catch (e) {
       return "";
     }
   }
 
+  function getComputedBackgroundColor(element) {
+    var bg = getStyleValue(element, "backgroundColor");
+    if (!isTransparentColor(bg)) return bg;
+    return "";
+  }
+
+  function getComputedTextColor(element) {
+    var color = getStyleValue(element, "color");
+    return color || "";
+  }
+
+  function collectBackgroundCandidates() {
+    var candidates = [];
+    var root = getBestContentRoot();
+
+    function pushUnique(el) {
+      if (!el) return;
+      if (candidates.indexOf(el) === -1) {
+        candidates.push(el);
+      }
+    }
+
+    pushUnique(root);
+
+    var current = root;
+    var guard = 0;
+    while (current && current.parentElement && guard < 8) {
+      current = current.parentElement;
+      pushUnique(current);
+      guard++;
+    }
+
+    pushUnique(document.querySelector("main"));
+    pushUnique(document.querySelector('[role="main"]'));
+    pushUnique(document.querySelector("#content"));
+    pushUnique(document.querySelector(".content"));
+    pushUnique(document.querySelector(".main-content"));
+    pushUnique(document.body);
+    pushUnique(document.documentElement);
+
+    return candidates.filter(Boolean);
+  }
+
+  function getMetaThemeColor() {
+    var meta =
+      document.querySelector('meta[name="theme-color"]') ||
+      document.querySelector('meta[name="msapplication-navbutton-color"]');
+
+    if (!meta || !meta.content) return "";
+    return String(meta.content).trim();
+  }
+
   function getPageBackgroundColor() {
-    var candidates = [
-      getBestContentRoot(),
-      document.body,
-      document.documentElement
-    ];
+    var candidates = collectBackgroundCandidates();
 
     for (var i = 0; i < candidates.length; i++) {
       var color = getComputedBackgroundColor(candidates[i]);
       if (color) return color;
     }
 
+    var metaTheme = getMetaThemeColor();
+    if (metaTheme) return metaTheme;
+
     return "#ffffff";
   }
 
   function getPageTextColor() {
-    var candidates = [
-      getBestContentRoot(),
-      document.body,
-      document.documentElement
-    ];
+    var candidates = collectBackgroundCandidates();
 
     for (var i = 0; i < candidates.length; i++) {
-      try {
-        if (!candidates[i] || !window.getComputedStyle) continue;
-        var style = window.getComputedStyle(candidates[i]);
-        var color = style && style.color ? String(style.color).trim() : "";
-        if (color) return color;
-      } catch (e) {}
+      var color = getComputedTextColor(candidates[i]);
+      if (color) return color;
     }
 
     return "#111111";
   }
-  function getPageContextPayload() {
-  var pageText = getMainContentText();
 
-  return {
-    type: "sitemind-page-context",
-    agentId: agentId,
-    language: detectPageLanguage(),
-    pageTypeHint: getPageTypeHint(),
-    pageTitle: getPageTitle(),
-    pageDescription: getPageDescription(),
-    pageUrl: window.location.href,
-    h1: getPageH1(),
-    headings: getHeadingsText(),
-    pageContext: pageText,
-    pageText: pageText,
-    pageBackground: getPageBackgroundColor(),
-    pageTextColor: getPageTextColor()
-  };
-}
+  function getPageContextPayload() {
+    var pageText = getMainContentText();
+
+    return {
+      type: "sitemind-page-context",
+      agentId: agentId,
+      language: detectPageLanguage(),
+      pageTypeHint: getPageTypeHint(),
+      pageTitle: getPageTitle(),
+      pageDescription: getPageDescription(),
+      pageUrl: window.location.href,
+      h1: getPageH1(),
+      headings: getHeadingsText(),
+      pageContext: pageText,
+      pageText: pageText,
+      pageBackground: getPageBackgroundColor(),
+      pageTextColor: getPageTextColor()
+    };
+  }
 
   function detectUserIntent(message) {
     const msg = (message || "").toLowerCase();
@@ -594,7 +641,7 @@
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-    "transform 0.32s ease, box-shadow 0.32s ease, opacity 0.32s ease, border-color 0.32s ease, filter 0.32s ease, padding 0.92s ease, max-width 0.32s ease, min-width 0.32s ease";
+      "transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease, border-color 0.14s ease, filter 0.14s ease, padding 0.16s ease, max-width 0.14s ease, min-width 0.14s ease";
     bubble.style.display = "inline-flex";
     bubble.style.alignItems = "center";
     bubble.style.justifyContent = "center";
