@@ -585,9 +585,13 @@ function buildUserPrompt(payload) {
   const headingsText = Array.isArray(payload.headings) ? payload.headings.join(' | ') : '';
   const historyText = Array.isArray(payload.history) && payload.history.length
     ? payload.history
-        .slice(- 4)
+        .slice(-4)
         .map((item) => `${item.role}: ${item.content}`)
         .join('\n')
+    : 'N/A';
+
+  const currentPageContent = payload.includeCurrentPageContent
+    ? (payload.pageText || payload.pageContext || 'N/A')
     : 'N/A';
 
   return `
@@ -622,7 +626,7 @@ Headings:
 ${headingsText || 'N/A'}
 
 Current page content:
-${payload.pageText || payload.pageContext || 'N/A'}
+${currentPageContent}
 
 Relevant crawled website context:
 ${payload.crawlContext || 'N/A'}
@@ -690,6 +694,14 @@ function safeJsonArray(value) {
   return [];
 }
 
+const GENERIC_STOP_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'but', 'for', 'to', 'of', 'in', 'on', 'at', 'by', 'with',
+  'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'da', 'je', 'su', 'u', 'na', 'za', 'od', 'do', 'i', 'ili', 'ali', 'se', 'po', 'sa',
+  'der', 'die', 'das', 'und', 'oder', 'aber', 'ein', 'eine', 'ist', 'im', 'in', 'am', 'zu', 'von', 'mit',
+  'il', 'lo', 'la', 'gli', 'le', 'e', 'o', 'ma', 'di', 'da', 'in', 'su', 'per', 'con', 'un', 'una', 'è',
+  'le', 'la', 'les', 'de', 'des', 'du', 'et', 'ou', 'mais', 'dans', 'sur', 'pour', 'avec', 'est', 'une', 'un'
+]);
 
 function normalizeStringForTopic(value) {
   return String(value || '')
@@ -712,19 +724,34 @@ function uniqueItems(items) {
   return Array.from(new Set((items || []).filter(Boolean)));
 }
 
+function filterSignificantTokens(tokens) {
+  return (tokens || []).filter((token) => token && token.length > 2 && !LOW_VALUE_QUERY_WORDS.has(token));
+}
+
 function isShortFollowUpQuestion(message) {
   const text = normalizeStringForTopic(message);
   if (!text) return false;
 
-  const shortFollowUps = [
-    'koji su likovi', 'likovi', 'opis likova', 'tema', 'poruka', 'pouka',
-    'kratki sadrzaj', 'sadrzaj', 'redoslijed dogadjaja', 'redoslijed dogadanja',
-    'mjesto radnje', 'vrijeme radnje', 'gdje se radnja odvija', 'objasni',
-    'nastavi', 'moze', 'ok', 'hvala', 'tko su likovi', 'ko su likovi'
-  ];
+  const genericFollowUps = new Set([
+    'ok', 'okej', 'okey', 'da', 'ne', 'moze', 'može', 'hvala',
+    'nastavi', 'continue', 'thanks', 'thank you', 'yes', 'no',
+    'detaljnije', 'detail', 'details', 'more', 'mehr', 'grazie', 'danke'
+  ]);
 
-  if (text.length <= 40) return true;
-  return shortFollowUps.some((item) => text === item || text.includes(item));
+  if (genericFollowUps.has(text)) return true;
+
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+
+  if (text.length <= 18) return true;
+  if (wordCount <= 2) return true;
+
+  if (/^(what|who|where|when|why|how)\b/.test(text)) return true;
+  if (/^(sto|šta|sta|tko|ko|gdje|gde|kada|kad|zasto|zašto|kako)\b/.test(text)) return true;
+  if (/^(was|wer|wo|wann|warum|wie)\b/.test(text)) return true;
+  if (/^(che|chi|dove|quando|perche|perché|come)\b/.test(text)) return true;
+  if (/^(quel|quale|quali)\b/.test(text)) return true;
+
+  return false;
 }
 
 function extractTopicFromText(text) {
@@ -732,21 +759,22 @@ function extractTopicFromText(text) {
   if (!raw) return '';
 
   const cleaned = raw
-    .replace(/^lektira\s+/i, '')
-    .replace(/^djelo\s+/i, '')
-    .replace(/^roman\s+/i, '')
-    .replace(/^pripovijetka\s+/i, '')
-    .replace(/^pripovetka\s+/i, '')
-    .replace(/^prica\s+/i, '')
-    .replace(/^tema\s+/i, '')
-    .replace(/^analiza\s+/i, '')
-    .replace(/^objasni\s+/i, '')
+    .replace(/^[\s"'`„“”‘’]+|[\s"'`„“”‘’]+$/g, '')
+    .replace(/^(please|pls|pls\.?|can you|could you|would you|tell me about)\s+/i, '')
+    .replace(/^(molim|mozes li|možeš li|reci mi|objasni|napisi|napiši)\s+/i, '')
+    .replace(/^(bitte|erklar|erklär|erklaere|erkläre|sag mir)\s+/i, '')
+    .replace(/^(per favore|spiega|dimmi|parlami di)\s+/i, '')
+    .replace(/^(what is|who is|where is|tell me about|explain)\s+/i, '')
+    .replace(/^(tema|analiza|opis|details|detail|info|information|about)\s+/i, '')
+    .replace(/\?+$/g, '')
     .trim();
 
   if (cleaned.length < 3) return '';
+
+  if (isShortFollowUpQuestion(cleaned)) return '';
+
   return cleaned;
 }
-
 function getActiveTopicFromHistory(history, currentMessage) {
   const current = String(currentMessage || '').trim();
   const safeHistory = Array.isArray(history) ? history : [];
@@ -776,57 +804,118 @@ function buildResolvedQuery(activeTopic, userMessage) {
   return message;
 }
 
-function scoreField(fieldValue, queryTokens, wholeQuery) {
+function compactUrlPath(value) {
+  return normalizeStringForTopic(String(value || '').replace(/^https?:\/\//i, '').replace(/^www\./i, ''));
+}
+
+function exactPhraseBoost(fieldValue, phrase, score) {
+  const value = normalizeStringForTopic(fieldValue);
+  const normalizedPhrase = normalizeStringForTopic(phrase);
+  if (!value || !normalizedPhrase) return 0;
+  return value.includes(normalizedPhrase) ? score : 0;
+}
+
+function tokenMatchScore(fieldValue, tokens, weight) {
   const value = normalizeStringForTopic(fieldValue);
   if (!value) return 0;
 
   let score = 0;
-  let tokenHits = 0;
-
-  for (const token of queryTokens) {
-    if (value.includes(token)) tokenHits += 1;
+  for (const token of tokens) {
+    if (value.includes(token)) score += weight;
   }
-
-  score += tokenHits * 8;
-
-  if (wholeQuery && value.includes(wholeQuery)) {
-    score += 30;
-  }
-
   return score;
 }
 
 function scoreHeadingIntent(headings, userMessage) {
   let score = 0;
+
   const msg = normalizeStringForTopic(userMessage);
-  const joined = normalizeStringForTopic(Array.isArray(headings) ? headings.join(' | ') : headings || '');
+  const joined = normalizeStringForTopic(
+    Array.isArray(headings) ? headings.join(' | ') : (headings || '')
+  );
 
   if (!joined || !msg) return 0;
 
-  if (msg.includes('likov') && (joined.includes('opis likova') || joined.includes('likovi'))) score += 35;
-  if (msg.includes('tema') && joined.includes('tema')) score += 25;
-  if ((msg.includes('kratki sadrzaj') || msg === 'sadrzaj') && joined.includes('kratki sadrzaj')) score += 25;
-  if (msg.includes('redoslijed') && joined.includes('redoslijed')) score += 25;
-  if (msg.includes('pouka') && joined.includes('pouka')) score += 20;
+  const wantsWho = /\b(who|tko|ko|wer|chi)\b/.test(msg);
+  const wantsWhat = /\b(what|sto|sta|was|che)\b/.test(msg);
+  const wantsWhere = /\b(where|gdje|gde|wo|dove)\b/.test(msg);
+  const wantsWhen = /\b(when|kada|kad|wann|quando)\b/.test(msg);
+  const wantsHow = /\b(how|kako|wie|come)\b/.test(msg);
+  const wantsWhy = /\b(why|zasto|zašto|warum|perche|perché)\b/.test(msg);
+
+  const wantsPrice = /\b(price|pricing|cost|cijena|cijene|kosten|preis|prezzo)\b/.test(msg);
+  const wantsContact = /\b(contact|kontakt|kontakti|email|e-mail|phone|telefon|tel)\b/.test(msg);
+  const wantsLocation = /\b(location|address|adresa|lokacija|standort|indirizzo)\b/.test(msg);
+  const wantsTime = /\b(hours|opening|working hours|radno vrijeme|working time|arbeitszeit|orario)\b/.test(msg);
+  const wantsAbout = /\b(about|overview|summary|sadrzaj|sazetak|sažetak|overview|ubersicht|überblick|riassunto)\b/.test(msg);
+  const wantsFeatures = /\b(features|services|service|usluge|funkcije|mogucnosti|mogućnosti|leistungen|servizi)\b/.test(msg);
+  const wantsSteps = /\b(steps|process|how to|kako|procedure|postupak|koraci|schritte|passaggi)\b/.test(msg);
+  const wantsFaq = /\b(faq|questions|pitanja|fragen|domande)\b/.test(msg);
+  const wantsPolicy = /\b(policy|terms|privacy|refund|returns|uvjeti|pravila|politika|datenschutz|condizioni)\b/.test(msg);
+
+  if (wantsPrice && /\b(price|pricing|cost|cijena|cijene|preis|kosten|prezzo)\b/.test(joined)) score += 34;
+  if (wantsContact && /\b(contact|kontakt|email|e-mail|phone|telefon|tel)\b/.test(joined)) score += 34;
+  if (wantsLocation && /\b(location|address|adresa|lokacija|standort|indirizzo)\b/.test(joined)) score += 34;
+  if (wantsTime && /\b(hours|opening|working hours|radno vrijeme|arbeitszeit|orario)\b/.test(joined)) score += 34;
+  if (wantsAbout && /\b(about|overview|summary|sadrzaj|sa[žz]etak|uberblick|überblick|riassunto)\b/.test(joined)) score += 28;
+  if (wantsFeatures && /\b(features|services|service|usluge|funkcije|mogucnosti|mogućnosti|leistungen|servizi)\b/.test(joined)) score += 30;
+  if (wantsSteps && /\b(steps|process|how to|kako|procedure|postupak|koraci|schritte|passaggi)\b/.test(joined)) score += 28;
+  if (wantsFaq && /\b(faq|questions|pitanja|fragen|domande)\b/.test(joined)) score += 22;
+  if (wantsPolicy && /\b(policy|terms|privacy|refund|returns|uvjeti|pravila|politika|datenschutz|condizioni)\b/.test(joined)) score += 30;
+
+  if (wantsWho && /\b(team|author|about us|o nama|tim|kontakt|writer|creator|founder|osnivac|osnivač)\b/.test(joined)) score += 18;
+  if (wantsWhat && /\b(overview|about|summary|opis|description|about us|o nama)\b/.test(joined)) score += 14;
+  if (wantsWhere && /\b(location|address|adresa|lokacija|standort|indirizzo)\b/.test(joined)) score += 18;
+  if (wantsWhen && /\b(hours|opening|schedule|vrijeme|datum|date|termin|orario)\b/.test(joined)) score += 18;
+  if (wantsHow && /\b(process|steps|how to|kako|guide|upute|instructions|schritte|passaggi)\b/.test(joined)) score += 18;
+  if (wantsWhy && /\b(about|benefits|advantages|zasto|zašto|warum|perche|perché)\b/.test(joined)) score += 14;
 
   return score;
 }
-
-function rankSiteContentRows(rows, resolvedQuery, userMessage) {
+function rankSiteContentRows(rows, activeTopic, resolvedQuery, userMessage) {
   if (!Array.isArray(rows)) return [];
 
-  const wholeQuery = normalizeStringForTopic(resolvedQuery);
-  const queryTokens = uniqueItems(tokenizeTopic(resolvedQuery)).filter((token) => token.length > 2);
+  const topic = normalizeStringForTopic(activeTopic || '');
+  const resolved = normalizeStringForTopic(resolvedQuery || '');
+  const topicTokens = filterSignificantTokens(uniqueItems(tokenizeTopic(activeTopic || '')));
+  const resolvedTokens = filterSignificantTokens(uniqueItems(tokenizeTopic(resolvedQuery || '')));
 
   return rows
     .map((row) => {
       let score = 0;
 
-      score += scoreField(row.url, queryTokens, wholeQuery) * 3.2;
-      score += scoreField(row.page_title, queryTokens, wholeQuery) * 2.4;
-      score += scoreField(row.h1, queryTokens, wholeQuery) * 2.8;
-      score += scoreField(Array.isArray(row.headings) ? row.headings.join(' | ') : row.headings, queryTokens, wholeQuery) * 1.6;
-      score += scoreField(row.text_preview, queryTokens, wholeQuery) * 1.0;
+      const urlValue = compactUrlPath(row.url || '');
+      const titleValue = normalizeStringForTopic(row.page_title || '');
+      const h1Value = normalizeStringForTopic(row.h1 || '');
+      const headingsValue = normalizeStringForTopic(Array.isArray(row.headings) ? row.headings.join(' | ') : row.headings || '');
+      const previewValue = normalizeStringForTopic(row.text_preview || '');
+
+      if (topic) {
+        score += exactPhraseBoost(urlValue, topic, 220);
+        score += exactPhraseBoost(titleValue, topic, 180);
+        score += exactPhraseBoost(h1Value, topic, 180);
+        score += exactPhraseBoost(headingsValue, topic, 80);
+        score += exactPhraseBoost(previewValue, topic, 50);
+      }
+
+      if (resolved && resolved !== topic) {
+        score += exactPhraseBoost(urlValue, resolved, 70);
+        score += exactPhraseBoost(titleValue, resolved, 60);
+        score += exactPhraseBoost(h1Value, resolved, 60);
+      }
+
+      score += tokenMatchScore(urlValue, topicTokens, 34);
+      score += tokenMatchScore(titleValue, topicTokens, 28);
+      score += tokenMatchScore(h1Value, topicTokens, 28);
+      score += tokenMatchScore(headingsValue, topicTokens, 10);
+      score += tokenMatchScore(previewValue, topicTokens, 8);
+
+      score += tokenMatchScore(urlValue, resolvedTokens, 10);
+      score += tokenMatchScore(titleValue, resolvedTokens, 8);
+      score += tokenMatchScore(h1Value, resolvedTokens, 8);
+      score += tokenMatchScore(headingsValue, resolvedTokens, 4);
+      score += tokenMatchScore(previewValue, resolvedTokens, 3);
+
       score += scoreHeadingIntent(row.headings, userMessage);
 
       return {
@@ -840,7 +929,7 @@ function rankSiteContentRows(rows, resolvedQuery, userMessage) {
 function pickRelevantCrawledPages(rows, message, history, limit = 3) {
   const activeTopic = getActiveTopicFromHistory(history, message);
   const resolvedQuery = buildResolvedQuery(activeTopic, message);
-  const ranked = rankSiteContentRows(rows, resolvedQuery, message);
+  const ranked = rankSiteContentRows(rows, activeTopic, resolvedQuery, message);
   const useful = ranked.filter((row) => row._score > 0).slice(0, limit);
 
   return {
@@ -875,83 +964,6 @@ function findRelevantLinkCandidates(rows, message, history, limit = 3) {
     activeTopic: rankedData.activeTopic,
     resolvedQuery: rankedData.resolvedQuery,
     candidates: deduped
-  };
-}
-
-async function getAgentWithAccess(agentId) {
-  const { data: agent, error: agentError } = await supabase
-    .from('agents')
-    .select('agent_id, user_id, agent_name, welcome_message, theme_color, site_domain')
-    .eq('agent_id', agentId)
-    .maybeSingle();
-
-  if (agentError || !agent) {
-    return {
-      agent: null,
-      accessAllowed: false,
-      reason: 'AGENT_NOT_FOUND'
-    };
-  }
-
-  const { data: subscription, error: subscriptionError } = await supabase
-    .from('subscriptions')
-    .select('status, is_active, current_period_end, created_at')
-    .eq('user_id', agent.user_id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (subscriptionError || !subscription) {
-    return {
-      agent,
-      accessAllowed: false,
-      reason: 'NO_SUBSCRIPTION'
-    };
-  }
-
-  const isActive = subscription.is_active === true;
-  const status = String(subscription.status || '').toLowerCase().trim();
-  const periodEndRaw = subscription.current_period_end || null;
-
-  if (!isActive) {
-    return {
-      agent,
-      accessAllowed: false,
-      reason: 'INACTIVE_SUBSCRIPTION'
-    };
-  }
-
-  if (!periodEndRaw) {
-    return {
-      agent,
-      accessAllowed: false,
-      reason: 'MISSING_PERIOD_END'
-    };
-  }
-
-  const now = new Date();
-  const periodEnd = new Date(periodEndRaw);
-
-  if (Number.isNaN(periodEnd.getTime()) || periodEnd < now) {
-    return {
-      agent,
-      accessAllowed: false,
-      reason: 'TRIAL_EXPIRED'
-    };
-  }
-
-  if (!['trial', 'active', 'paid'].includes(status)) {
-    return {
-      agent,
-      accessAllowed: false,
-      reason: 'INVALID_STATUS'
-    };
-  }
-
-  return {
-    agent,
-    accessAllowed: true,
-    reason: null
   };
 }
 
@@ -1138,7 +1150,7 @@ async function handleChat(req, res, body) {
   try {
     const { data, error } = await supabase
       .from('site_content')
-      .select('url, page_title, meta_description, h1, headings, internal_links, text_preview, content')
+      .select('url, page_title, meta_description, h1, headings, text_preview, content')
       .eq('agent_id', agentId);
 
     if (!error && Array.isArray(data)) {
@@ -1175,7 +1187,6 @@ async function handleChat(req, res, body) {
     if (rowsToUse.length > 0) {
       const shortRows = rowsToUse.map((row) => {
         const headingsValue = safeJsonArray(row.headings);
-        const linksValue = safeJsonArray(row.internal_links);
 
         return {
           url: row.url || '',
@@ -1183,7 +1194,6 @@ async function handleChat(req, res, body) {
           meta_description: row.meta_description || '',
           h1: row.h1 || '',
           headings: headingsValue.slice(0, 8),
-          internal_links: linksValue.slice(0, 12),
           text_preview: limitText(row.text_preview || '', 1000),
           content: limitText(row.content || '', 2500)
         };
@@ -1195,11 +1205,14 @@ async function handleChat(req, res, body) {
     crawlContext = '';
   }
 
+  const includeCurrentPageContent = !hasStrongRelevantContent;
+
   console.log('CHAT CONTEXT DEBUG:', {
     agentId,
     message,
     activeTopic: rankedContext.activeTopic,
     resolvedQuery: rankedContext.resolvedQuery,
+    includeCurrentPageContent,
     topMatches: relevantPages.slice(0, 3).map((row) => ({
       score: row._score || 0,
       url: row.url || '',
@@ -1225,7 +1238,8 @@ async function handleChat(req, res, body) {
     pageContext,
     pageText,
     crawlContext,
-    history
+    history,
+    includeCurrentPageContent
   });
 
   try {
