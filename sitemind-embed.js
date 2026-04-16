@@ -592,14 +592,6 @@ if (bubbleFullLabelEl) {
       bubble.style.filter = "brightness(1.04)";
     };
 
-    bubble.onmouseleave = function () {
-      bubble.style.transform = "translateY(0)";
-      bubble.style.borderColor = borderGlow;
-      bubble.style.boxShadow =
-        "0 18px 34px " + shadowOuter + ", 0 10px 26px " + shadowSoft + ", 0 0 0 1px rgba(255,255,255,0.06), 0 0 18px " + shadowGlow;
-      bubble.style.filter = "brightness(1)";
-    };
-  }
     function applyBubbleExpandedState(expanded) {
   if (!bubble) return;
 
