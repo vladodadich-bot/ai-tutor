@@ -725,7 +725,12 @@ function uniqueItems(items) {
 }
 
 function filterSignificantTokens(tokens) {
-  return (tokens || []).filter((token) => token && token.length > 2 && !LOW_VALUE_QUERY_WORDS.has(token));
+  return (tokens || []).filter((token) => {
+    if (!token) return false;
+    if (token.length <= 2) return false;
+    if (GENERIC_STOP_WORDS.has(token)) return false;
+    return true;
+  });
 }
 
 function isShortFollowUpQuestion(message) {
@@ -770,11 +775,11 @@ function extractTopicFromText(text) {
     .trim();
 
   if (cleaned.length < 3) return '';
-
   if (isShortFollowUpQuestion(cleaned)) return '';
 
   return cleaned;
 }
+
 function getActiveTopicFromHistory(history, currentMessage) {
   const current = String(currentMessage || '').trim();
   const safeHistory = Array.isArray(history) ? history : [];
@@ -847,7 +852,7 @@ function scoreHeadingIntent(headings, userMessage) {
   const wantsContact = /\b(contact|kontakt|kontakti|email|e-mail|phone|telefon|tel)\b/.test(msg);
   const wantsLocation = /\b(location|address|adresa|lokacija|standort|indirizzo)\b/.test(msg);
   const wantsTime = /\b(hours|opening|working hours|radno vrijeme|working time|arbeitszeit|orario)\b/.test(msg);
-  const wantsAbout = /\b(about|overview|summary|sadrzaj|sazetak|sažetak|overview|ubersicht|überblick|riassunto)\b/.test(msg);
+  const wantsAbout = /\b(about|overview|summary|sadrzaj|sazetak|sažetak|ubersicht|überblick|riassunto)\b/.test(msg);
   const wantsFeatures = /\b(features|services|service|usluge|funkcije|mogucnosti|mogućnosti|leistungen|servizi)\b/.test(msg);
   const wantsSteps = /\b(steps|process|how to|kako|procedure|postupak|koraci|schritte|passaggi)\b/.test(msg);
   const wantsFaq = /\b(faq|questions|pitanja|fragen|domande)\b/.test(msg);
@@ -872,6 +877,7 @@ function scoreHeadingIntent(headings, userMessage) {
 
   return score;
 }
+
 function rankSiteContentRows(rows, activeTopic, resolvedQuery, userMessage) {
   if (!Array.isArray(rows)) return [];
 
