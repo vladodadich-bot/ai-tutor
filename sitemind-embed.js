@@ -408,102 +408,6 @@
     return "general";
   }
 
-  function isTransparentColor(value) {
-    var color = String(value || "").trim().toLowerCase();
-    if (!color) return true;
-    if (color === "transparent") return true;
-    if (color === "rgba(0, 0, 0, 0)") return true;
-    if (/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)/i.test(color)) return true;
-    return false;
-  }
-
-  function getStyleValue(element, prop) {
-    if (!element || !window.getComputedStyle) return "";
-    try {
-      var style = window.getComputedStyle(element);
-      return style && style[prop] ? String(style[prop]).trim() : "";
-    } catch (e) {
-      return "";
-    }
-  }
-
-  function getComputedBackgroundColor(element) {
-    var bg = getStyleValue(element, "backgroundColor");
-    if (!isTransparentColor(bg)) return bg;
-    return "";
-  }
-
-  function getComputedTextColor(element) {
-    var color = getStyleValue(element, "color");
-    return color || "";
-  }
-
-  function collectBackgroundCandidates() {
-    var candidates = [];
-    var root = getBestContentRoot();
-
-    function pushUnique(el) {
-      if (!el) return;
-      if (candidates.indexOf(el) === -1) {
-        candidates.push(el);
-      }
-    }
-
-    pushUnique(root);
-
-    var current = root;
-    var guard = 0;
-    while (current && current.parentElement && guard < 8) {
-      current = current.parentElement;
-      pushUnique(current);
-      guard++;
-    }
-
-    pushUnique(document.querySelector("main"));
-    pushUnique(document.querySelector('[role="main"]'));
-    pushUnique(document.querySelector("#content"));
-    pushUnique(document.querySelector(".content"));
-    pushUnique(document.querySelector(".main-content"));
-    pushUnique(document.body);
-    pushUnique(document.documentElement);
-
-    return candidates.filter(Boolean);
-  }
-
-  function getMetaThemeColor() {
-    var meta =
-      document.querySelector('meta[name="theme-color"]') ||
-      document.querySelector('meta[name="msapplication-navbutton-color"]');
-
-    if (!meta || !meta.content) return "";
-    return String(meta.content).trim();
-  }
-
-  function getPageBackgroundColor() {
-    var candidates = collectBackgroundCandidates();
-
-    for (var i = 0; i < candidates.length; i++) {
-      var color = getComputedBackgroundColor(candidates[i]);
-      if (color) return color;
-    }
-
-    var metaTheme = getMetaThemeColor();
-    if (metaTheme) return metaTheme;
-
-    return "#ffffff";
-  }
-
-  function getPageTextColor() {
-    var candidates = collectBackgroundCandidates();
-
-    for (var i = 0; i < candidates.length; i++) {
-      var color = getComputedTextColor(candidates[i]);
-      if (color) return color;
-    }
-
-    return "#111111";
-  }
-
   function getPageContextPayload() {
     var pageText = getMainContentText();
 
@@ -518,9 +422,7 @@
       h1: getPageH1(),
       headings: getHeadingsText(),
       pageContext: pageText,
-      pageText: pageText,
-      pageBackground: getPageBackgroundColor(),
-      pageTextColor: getPageTextColor()
+      pageText: pageText
     };
   }
 
