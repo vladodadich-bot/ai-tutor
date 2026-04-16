@@ -407,75 +407,24 @@
 
     return "general";
   }
-  function getComputedBackgroundColor(element) {
-    if (!element || !window.getComputedStyle) return "";
 
-    try {
-      var style = window.getComputedStyle(element);
-      var bg = style && style.backgroundColor ? String(style.backgroundColor).trim() : "";
-
-      if (!bg) return "";
-      if (bg === "transparent") return "";
-      if (/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)/i.test(bg)) return "";
-
-      return bg;
-    } catch (e) {
-      return "";
-    }
-  }
-
-  function getPageBackgroundColor() {
-    var candidates = [
-      getBestContentRoot(),
-      document.body,
-      document.documentElement
-    ];
-
-    for (var i = 0; i < candidates.length; i++) {
-      var color = getComputedBackgroundColor(candidates[i]);
-      if (color) return color;
-    }
-
-    return "#ffffff";
-  }
-
-  function getPageTextColor() {
-    var candidates = [
-      getBestContentRoot(),
-      document.body,
-      document.documentElement
-    ];
-
-    for (var i = 0; i < candidates.length; i++) {
-      try {
-        if (!candidates[i] || !window.getComputedStyle) continue;
-        var style = window.getComputedStyle(candidates[i]);
-        var color = style && style.color ? String(style.color).trim() : "";
-        if (color) return color;
-      } catch (e) {}
-    }
-
-    return "#111111";
-  }
   function getPageContextPayload() {
-  var pageText = getMainContentText();
+    var pageText = getMainContentText();
 
-  return {
-    type: "sitemind-page-context",
-    agentId: agentId,
-    language: detectPageLanguage(),
-    pageTypeHint: getPageTypeHint(),
-    pageTitle: getPageTitle(),
-    pageDescription: getPageDescription(),
-    pageUrl: window.location.href,
-    h1: getPageH1(),
-    headings: getHeadingsText(),
-    pageContext: pageText,
-    pageText: pageText,
-    pageBackground: getPageBackgroundColor(),
-    pageTextColor: getPageTextColor()
-  };
-}
+    return {
+      type: "sitemind-page-context",
+      agentId: agentId,
+      language: detectPageLanguage(),
+      pageTypeHint: getPageTypeHint(),
+      pageTitle: getPageTitle(),
+      pageDescription: getPageDescription(),
+      pageUrl: window.location.href,
+      h1: getPageH1(),
+      headings: getHeadingsText(),
+      pageContext: pageText,
+      pageText: pageText
+    };
+  }
 
   function detectUserIntent(message) {
     const msg = (message || "").toLowerCase();
@@ -594,7 +543,7 @@
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-    "transform 0.32s ease, box-shadow 0.32s ease, opacity 0.32s ease, border-color 0.32s ease, filter 0.32s ease, padding 0.92s ease, max-width 0.32s ease, min-width 0.32s ease";
+      "transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease, border-color 0.14s ease, filter 0.14s ease, padding 0.16s ease, max-width 0.14s ease, min-width 0.14s ease";
     bubble.style.display = "inline-flex";
     bubble.style.alignItems = "center";
     bubble.style.justifyContent = "center";
