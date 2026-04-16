@@ -897,27 +897,28 @@ function rankSiteContentRows(rows, activeTopic, resolvedQuery, userMessage) {
       if (topic) {
         score += exactPhraseBoost(urlValue, topic, 220);
         score += exactPhraseBoost(titleValue, topic, 180);
-        score += exactPhraseBoost(h1Value, topic, 180);
-        score += exactPhraseBoost(headingsValue, topic, 80);
+        score += exactPhraseBoost(headingsValue, topic, 170);
+        score += exactPhraseBoost(h1Value, topic, 120);
         score += exactPhraseBoost(previewValue, topic, 50);
       }
 
       if (resolved && resolved !== topic) {
         score += exactPhraseBoost(urlValue, resolved, 70);
         score += exactPhraseBoost(titleValue, resolved, 60);
-        score += exactPhraseBoost(h1Value, resolved, 60);
+        score += exactPhraseBoost(headingsValue, resolved, 55);
+        score += exactPhraseBoost(h1Value, resolved, 40);
       }
 
       score += tokenMatchScore(urlValue, topicTokens, 34);
       score += tokenMatchScore(titleValue, topicTokens, 28);
-      score += tokenMatchScore(h1Value, topicTokens, 28);
-      score += tokenMatchScore(headingsValue, topicTokens, 10);
+      score += tokenMatchScore(headingsValue, topicTokens, 22);
+      score += tokenMatchScore(h1Value, topicTokens, 14);
       score += tokenMatchScore(previewValue, topicTokens, 8);
 
       score += tokenMatchScore(urlValue, resolvedTokens, 10);
       score += tokenMatchScore(titleValue, resolvedTokens, 8);
-      score += tokenMatchScore(h1Value, resolvedTokens, 8);
-      score += tokenMatchScore(headingsValue, resolvedTokens, 4);
+      score += tokenMatchScore(headingsValue, resolvedTokens, 7);
+      score += tokenMatchScore(h1Value, resolvedTokens, 4);
       score += tokenMatchScore(previewValue, resolvedTokens, 3);
 
       score += scoreHeadingIntent(row.headings, userMessage);
