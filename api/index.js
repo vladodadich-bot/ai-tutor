@@ -1100,6 +1100,82 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
 // CHAT - START
 // ========================================
 
+async function getAgentWithAccess(agentId) {
+  const { data: agent, error: agentError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id, agent_name, welcome_message, theme_color, site_domain')
+    .eq('agent_id', agentId)
+    .maybeSingle();
+
+  if (agentError || !agent) {
+    return {
+      agent: null,
+      accessAllowed: false,
+      reason: 'AGENT_NOT_FOUND'
+    };
+  }
+
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from('subscriptions')
+    .select('status, is_active, current_period_end, created_at')
+    .eq('user_id', agent.user_id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (subscriptionError || !subscription) {
+    return {
+      agent,
+      accessAllowed: false,
+      reason: 'NO_SUBSCRIPTION'
+    };
+  }
+
+  const isActive = subscription.is_active === true;
+  const status = String(subscription.status || '').toLowerCase().trim();
+  const periodEndRaw = subscription.current_period_end || null;
+
+  if (!isActive) {
+    return {
+      agent,
+      accessAllowed: false,
+      reason: 'INACTIVE_SUBSCRIPTION'
+    };
+  }
+
+  if (!periodEndRaw) {
+    return {
+      agent,
+      accessAllowed: false,
+      reason: 'MISSING_PERIOD_END'
+    };
+  }
+
+  const now = new Date();
+  const periodEnd = new Date(periodEndRaw);
+
+  if (Number.isNaN(periodEnd.getTime()) || periodEnd < now) {
+    return {
+      agent,
+      accessAllowed: false,
+      reason: 'TRIAL_EXPIRED'
+    };
+  }
+
+  if (!['trial', 'active', 'paid'].includes(status)) {
+    return {
+      agent,
+      accessAllowed: false,
+      reason: 'INVALID_STATUS'
+    };
+  }
+
+  return {
+    agent,
+    accessAllowed: true,
+    reason: null
+  };
+}
 async function handleChat(req, res, body) {
   const agentId = String(body.agentId || body.agent_id || '').trim();
   const message = String(body.message || '').trim();
