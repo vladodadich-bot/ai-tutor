@@ -577,7 +577,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-        "transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease, border-color 0.14s ease, filter 0.14s ease, padding 0.10s ease";
+  "transform 0.26s ease, box-shadow 0.26s ease, opacity 0.22s ease, border-color 0.26s ease, filter 0.26s ease, padding 0.20s ease";
     bubble.style.display = "inline-flex";
     bubble.style.alignItems = "center";
     bubble.style.justifyContent = "center";
