@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
+// =========================
+// CORS + SETUP START
+// =========================
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -26,16 +29,160 @@ function applyCors(req, res) {
   }
 
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Max-Age', '86400');
 }
+// =======================
+// CORS + SETUP END
+// =======================
 
+
+// =========================
+// ANALYTICS SUMMARY START
+// =========================
+async function getAnalyticsSummary(agentId) {
+  const [
+    activeNowResult,
+    todayResult,
+    yesterdayResult,
+    last30DaysResult,
+    avgTimeResult
+  ] = await Promise.all([
+    supabase
+      .from('live_presence')
+      .select('session_id', { count: 'exact', head: false })
+      .eq('agent_id', agentId)
+      .gte('last_seen_at', new Date(Date.now() - 60 * 1000).toISOString()),
+
+    supabase
+      .from('analytics_sessions')
+      .select('visitor_id, started_at')
+      .eq('agent_id', agentId)
+      .gte('started_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
+
+    supabase
+      .from('analytics_sessions')
+      .select('visitor_id, started_at')
+      .eq('agent_id', agentId)
+      .gte(
+        'started_at',
+        new Date(
+          new Date(new Date().setHours(0, 0, 0, 0)).getTime() - 24 * 60 * 60 * 1000
+        ).toISOString()
+      )
+      .lt('started_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
+
+    supabase
+      .from('analytics_sessions')
+      .select('visitor_id, started_at')
+      .eq('agent_id', agentId)
+      .gte(
+        'started_at',
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      ),
+
+    supabase
+      .from('analytics_sessions')
+      .select('started_at, last_seen_at')
+      .eq('agent_id', agentId)
+      .gte(
+        'started_at',
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      )
+  ]);
+
+  if (activeNowResult.error) throw activeNowResult.error;
+  if (todayResult.error) throw todayResult.error;
+  if (yesterdayResult.error) throw yesterdayResult.error;
+  if (last30DaysResult.error) throw last30DaysResult.error;
+  if (avgTimeResult.error) throw avgTimeResult.error;
+
+  function countUniqueVisitors(rows) {
+    const set = new Set();
+
+    (rows || []).forEach((row) => {
+      if (row && row.visitor_id) {
+        set.add(row.visitor_id);
+      }
+    });
+
+    return set.size;
+  }
+
+  function countUniqueSessions(rows) {
+    const set = new Set();
+
+    (rows || []).forEach((row) => {
+      if (row && row.session_id) {
+        set.add(row.session_id);
+      }
+    });
+
+    return set.size;
+  }
+
+  function calculateAverageTimeSpentSeconds(rows) {
+    if (!Array.isArray(rows) || !rows.length) return 0;
+
+    let totalSeconds = 0;
+    let validSessions = 0;
+
+    rows.forEach((row) => {
+      if (!row || !row.started_at || !row.last_seen_at) return;
+
+      const started = new Date(row.started_at).getTime();
+      const lastSeen = new Date(row.last_seen_at).getTime();
+
+      if (isNaN(started) || isNaN(lastSeen) || lastSeen < started) return;
+
+      const seconds = Math.round((lastSeen - started) / 1000);
+
+      totalSeconds += seconds;
+      validSessions += 1;
+    });
+
+    if (!validSessions) return 0;
+    return Math.round(totalSeconds / validSessions);
+  }
+
+  return {
+    active_now: countUniqueSessions(activeNowResult.data),
+    visitors_today: countUniqueVisitors(todayResult.data),
+    visitors_yesterday: countUniqueVisitors(yesterdayResult.data),
+    visitors_last_30_days: countUniqueVisitors(last30DaysResult.data),
+    avg_time_spent_seconds: calculateAverageTimeSpentSeconds(avgTimeResult.data)
+  };
+}
+// =======================
+// ANALYTICS SUMMARY END
+// =======================
+
+
+// =========================
+// SESSION HEARTBEAT START
+// =========================
 export default async function handler(req, res) {
   applyCors(req, res);
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  if (req.method === 'GET') {
+    try {
+      const agentId = req.query.agentId || req.query.agent_id;
+
+      if (!agentId) {
+        return res.status(400).json({ error: 'Missing agentId' });
+      }
+
+      const summary = await getAnalyticsSummary(agentId);
+      return res.status(200).json({ success: true, summary });
+    } catch (err) {
+      console.error('Analytics summary error:', err);
+      return res.status(500).json({ error: 'Failed to load analytics summary' });
+    }
   }
 
   if (req.method !== 'POST') {
@@ -84,3 +231,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error' });
   }
 }
+// =======================
+// SESSION HEARTBEAT END
+// =======================
