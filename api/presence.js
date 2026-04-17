@@ -55,6 +55,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    const city = req.headers['x-vercel-ip-city'] || null;
+    const country = req.headers['x-vercel-ip-country'] || null;
     const now = new Date().toISOString();
 
     const { error } = await supabase
@@ -66,6 +68,8 @@ export default async function handler(req, res) {
           page_url: page_url || null,
           page_title: page_title || null,
           user_agent: user_agent || null,
+          city: city || null,
+          country: country || null,
           last_seen_at: now
         },
         {
