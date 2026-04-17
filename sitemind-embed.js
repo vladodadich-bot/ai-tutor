@@ -1,3 +1,45 @@
+// ============================
+// 🔥 ANALYTICS: TRACK VISIT
+// ============================
+function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle) {
+  try {
+    fetch(BASE_URL + "/api/index", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "track_visit",
+        agent_id: agentId,
+        page_url: window.location.href,
+        page_title: getPageTitle(),
+        referrer: document.referrer || null
+      })
+    });
+  } catch (e) {}
+}
+
+// ============================
+// ⏱ TIME TRACKING
+// ============================
+var __sitemindVisitStart = Date.now();
+
+function __sitemindTrackTime(BASE_URL, agentId) {
+  try {
+    var duration = Math.floor((Date.now() - __sitemindVisitStart) / 1000);
+
+    navigator.sendBeacon(
+      BASE_URL + "/api/index",
+      JSON.stringify({
+        action: "track_time",
+        agent_id: agentId,
+        page_url: window.location.href,
+        duration: duration
+      })
+    );
+  } catch (e) {}
+}
+
 (function () {
   "use strict";
 
@@ -48,6 +90,18 @@
   var originalHtmlOverflowX = "";
   var originalBodyOverflowX = "";
 
+  var initialVisitTracked = false;
+  var lastTrackedTitle = "";
+  var lastSentContextSignature = "";
+  var contextRetryTimers = [];
+
+  function cleanText(text) {
+    return String(text || "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   function detectPageLanguage() {
     var htmlLang = document.documentElement.getAttribute("lang") || "";
     var ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
@@ -56,7 +110,7 @@
 
     var lang = (htmlLang || ogLocale || browserLang || "en").toLowerCase();
 
-    if (lang.indexOf("hr") === 0) return "hr";
+    if (lang.indexOf("hr") === 0 || lang.indexOf("bs") === 0 || lang.indexOf("sr") === 0) return "hr";
     if (lang.indexOf("de") === 0) return "de";
     if (lang.indexOf("it") === 0) return "it";
     if (lang.indexOf("fr") === 0) return "fr";
@@ -154,13 +208,6 @@
 
   function darkenHex(hex, amount) {
     return lightenHex(hex, -Math.abs(amount));
-  }
-
-  function cleanText(text) {
-    return String(text || "")
-      .replace(/\u00A0/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
   }
 
   function getPageTitle() {
@@ -352,7 +399,7 @@
 
     function hasAny(words) {
       for (var i = 0; i < words.length; i++) {
-        if (blob.indexOf(words[i]) !== -1) return true;
+        if (blob.indexOf(String(words[i]).toLowerCase()) !== -1) return true;
       }
       return false;
     }
@@ -393,7 +440,7 @@
     }
 
     if (hasAny([
-      "course", "lesson", "Lektira", "Lektüre", "school", "lernen", "guide for students",
+      "course", "lesson", "lektira", "lektüre", "school", "lernen", "guide for students",
       "student", "unterricht", "education", "learning", "study"
     ])) {
       return "education";
@@ -426,75 +473,45 @@
     };
   }
 
-  function detectUserIntent(message) {
-    const msg = (message || "").toLowerCase();
-
-    if (
-      msg.includes("lektira") ||
-      msg.includes("summary") ||
-      msg.includes("inhalt")
-    ) {
-      return "education_content";
-    }
-
-    if (
-      msg.includes("how") ||
-      msg.includes("kako") ||
-      msg.includes("wie")
-    ) {
-      return "how_to";
-    }
-
-    if (
-      msg.includes("price") ||
-      msg.includes("cijena")
-    ) {
-      return "sales";
-    }
-
-    return "general";
+  function trackInitialVisitOnce() {
+    if (initialVisitTracked) return;
+    initialVisitTracked = true;
+    lastTrackedTitle = getPageTitle();
+    __sitemindTrackVisit(BASE_URL, agentId, getPageTitle);
   }
 
-  function getStyleGuide(intent) {
-    if (intent === "education_content") {
-      return `
-- give a clear, concrete explanation
-- if it's a story or topic, explain what happens step by step
-- avoid abstract or overly philosophical language
-- keep it simple and useful
-- prefer concrete explanations over abstract descriptions
-`;
+  function scheduleInitialVisitTracking() {
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+      setTimeout(trackInitialVisitOnce, 350);
+    } else {
+      document.addEventListener("DOMContentLoaded", function () {
+        setTimeout(trackInitialVisitOnce, 350);
+      }, { once: true });
     }
 
-    if (intent === "sales") {
-      return `
-- be concise
-- highlight benefits clearly
-- include a clear next step
-- prefer concrete explanations over abstract descriptions
-`;
-    }
-
-    if (intent === "how_to") {
-      return `
-- explain step by step
-- keep instructions practical and easy to follow
-- avoid unnecessary theory
-- prefer concrete explanations over abstract descriptions
-`;
-    }
-
-    return `
-- be helpful and clear
-- avoid unnecessary length
-- prefer concrete explanations over abstract descriptions
-`;
+    window.addEventListener("load", function () {
+      if (!initialVisitTracked) {
+        setTimeout(trackInitialVisitOnce, 250);
+      }
+    }, { once: true });
   }
 
-  function sendPageContext() {
+  function sendPageContext(force) {
     if (!iframe || !iframe.contentWindow) return;
 
     var payload = getPageContextPayload();
+    var signature = JSON.stringify({
+      title: payload.pageTitle,
+      url: payload.pageUrl,
+      lang: payload.language,
+      h1: payload.h1,
+      desc: payload.pageDescription,
+      type: payload.pageTypeHint,
+      headings: payload.headings
+    });
+
+    if (!force && signature === lastSentContextSignature) return;
+    lastSentContextSignature = signature;
 
     try {
       iframe.contentWindow.postMessage(payload, BASE_URL);
@@ -502,6 +519,23 @@
       try {
         iframe.contentWindow.postMessage(payload, "*");
       } catch (err) {}
+    }
+  }
+
+  function scheduleContextRefreshes() {
+    while (contextRetryTimers.length) {
+      clearTimeout(contextRetryTimers.pop());
+    }
+
+    var delays = [120, 600, 1600, 3200];
+
+    for (var i = 0; i < delays.length; i++) {
+      (function (delay) {
+        var timer = setTimeout(function () {
+          sendPageContext(i === delays.length - 1);
+        }, delay);
+        contextRetryTimers.push(timer);
+      })(delays[i]);
     }
   }
 
@@ -732,7 +766,7 @@
     isOpen = true;
     applyPanelLayout();
     applyPageShrink();
-    sendPageContext();
+    sendPageContext(true);
   }
 
   function closePanel() {
@@ -799,8 +833,8 @@
     bubble.addEventListener("click", togglePanel);
 
     iframe.addEventListener("load", function () {
-      setTimeout(sendPageContext, 300);
-      setTimeout(sendPageContext, 1200);
+      sendPageContext(true);
+      scheduleContextRefreshes();
     });
   }
 
@@ -809,11 +843,12 @@
     if (!event.data || typeof event.data !== "object") return;
 
     if (event.data.type === "sitemind-widget-ready") {
-      sendPageContext();
+      sendPageContext(true);
+      scheduleContextRefreshes();
     }
 
     if (event.data.type === "sitemind-refresh-page-context") {
-      sendPageContext();
+      sendPageContext(true);
     }
 
     if (event.data.type === "sitemind-close-widget") {
@@ -836,15 +871,38 @@
     } else {
       resetPageShrink();
     }
+
+    sendPageContext(true);
   });
 
   window.addEventListener("scroll", function () {
     updateBubbleByScroll();
   }, { passive: true });
 
+  window.addEventListener("load", function () {
+    sendPageContext(true);
+    scheduleContextRefreshes();
+  });
+
+  window.addEventListener("pageshow", function () {
+    sendPageContext(true);
+  });
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") {
+      sendPageContext(true);
+    }
+  });
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", createWidget);
   } else {
     createWidget();
   }
+
+  scheduleInitialVisitTracking();
+
+  window.addEventListener("beforeunload", function () {
+    __sitemindTrackTime(BASE_URL, agentId);
+  });
 })();
