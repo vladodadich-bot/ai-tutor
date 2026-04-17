@@ -18,6 +18,8 @@ function applyCors(req, res) {
     'https://zusammenfassung24.de',
     'https://sitemindai.app',
     'https://www.sitemindai.app',
+    'https://popustolovac.com',
+    'https://www.popustolovac.com',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:5500',
