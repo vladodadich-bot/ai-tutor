@@ -360,7 +360,7 @@
     if (hasAny([
       "api", "developer", "sdk", "documentation", "docs", "integration",
       "javascript", "typescript", "react", "code", "vercel", "supabase",
-      "endpoint", "reference"
+      "endpoint", "reference", "tools", "werkzeug"
     ])) {
       return "technical";
     }
@@ -393,7 +393,7 @@
     }
 
     if (hasAny([
-      "course", "lesson", "school", "lernen", "guide for students",
+      "course", "lesson", "Lektira", "Lektüre", "school", "lernen", "guide for students",
       "student", "unterricht", "education", "learning", "study"
     ])) {
       return "education";
