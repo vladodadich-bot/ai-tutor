@@ -524,6 +524,7 @@
   var HISTORY_EXPIRY_MS = 45 * 60 * 1000;
   
   var PRESENCE_API = "https://ai-tutor-rouge-theta.vercel.app/api/presence";
+  var SESSION_API = "https://ai-tutor-rouge-theta.vercel.app/api/session";
   var PRESENCE_INTERVAL_MS = 15000;
   var PRESENCE_ACTIVE_WINDOW_MS = 60000;
   var presenceTimer = null;
@@ -748,7 +749,27 @@ function getPresenceSessionId() {
     return generatePresenceSessionId();
   }
 }
+function getVisitorIdKey() {
+  return "sitemind_visitor_id_" + agentId;
+}
 
+function generateVisitorId() {
+  return "visitor_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
+}
+
+function getVisitorId() {
+  try {
+    var existing = localStorage.getItem(getVisitorIdKey());
+    if (existing) return existing;
+
+    var created = generateVisitorId();
+    localStorage.setItem(getVisitorIdKey(), created);
+    return created;
+  } catch (e) {
+    return generateVisitorId();
+  }
+}
+  
 async function sendPresenceHeartbeat() {
   if (document.visibilityState && document.visibilityState !== "visible") {
     return;
@@ -768,7 +789,26 @@ async function sendPresenceHeartbeat() {
     });
   } catch (e) {}
 }
+async function sendSessionHeartbeat() {
+  if (document.visibilityState && document.visibilityState !== "visible") {
+    return;
+  }
 
+  try {
+    await fetch(SESSION_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        agent_id: agentId,
+        visitor_id: getVisitorId(),
+        session_id: getPresenceSessionId(),
+        entry_page_url: pageData.pageUrl || "",
+        entry_page_title: pageData.pageTitle || document.title || ""
+      })
+    });
+  } catch (e) {}
+}
+  
 function startPresenceHeartbeat() {
   if (presenceTimer) {
     clearInterval(presenceTimer);
@@ -776,9 +816,11 @@ function startPresenceHeartbeat() {
   }
 
   sendPresenceHeartbeat();
+  sendSessionHeartbeat();
 
   presenceTimer = setInterval(function () {
     sendPresenceHeartbeat();
+    sendSessionHeartbeat();
   }, PRESENCE_INTERVAL_MS);
 }
   
