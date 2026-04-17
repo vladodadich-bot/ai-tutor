@@ -522,7 +522,12 @@
   var REQUEST_TIMEOUT = 30000;
   var MAX_HISTORY_ITEMS = 10;
   var HISTORY_EXPIRY_MS = 45 * 60 * 1000;
-
+  
+  var PRESENCE_API = "https://ai-tutor-rouge-theta.vercel.app/api/presence";
+  var PRESENCE_INTERVAL_MS = 15000;
+  var PRESENCE_ACTIVE_WINDOW_MS = 60000;
+  var presenceTimer = null;
+  
   var chatShell = document.getElementById("chatShell");
   var chatForm = document.getElementById("chatForm");
   var chatInput = document.getElementById("chatInput");
@@ -687,6 +692,7 @@
     return "sitemind_history_payload_" + agentId;
   }
 
+  
   function escapeHtml(str) {
     return String(str || "")
       .replace(/&/g, "&amp;")
@@ -722,7 +728,60 @@
       }
     );
   }
+function getPresenceSessionKey() {
+  return "sitemind_presence_session_" + agentId;
+}
 
+function generatePresenceSessionId() {
+  return "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
+}
+
+function getPresenceSessionId() {
+  try {
+    var existing = sessionStorage.getItem(getPresenceSessionKey());
+    if (existing) return existing;
+
+    var created = generatePresenceSessionId();
+    sessionStorage.setItem(getPresenceSessionKey(), created);
+    return created;
+  } catch (e) {
+    return generatePresenceSessionId();
+  }
+}
+
+async function sendPresenceHeartbeat() {
+  if (document.visibilityState && document.visibilityState !== "visible") {
+    return;
+  }
+
+  try {
+    await fetch(PRESENCE_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        agent_id: agentId,
+        session_id: getPresenceSessionId(),
+        page_url: pageData.pageUrl || "",
+        page_title: pageData.pageTitle || document.title || "",
+        user_agent: navigator.userAgent || ""
+      })
+    });
+  } catch (e) {}
+}
+
+function startPresenceHeartbeat() {
+  if (presenceTimer) {
+    clearInterval(presenceTimer);
+    presenceTimer = null;
+  }
+
+  sendPresenceHeartbeat();
+
+  presenceTimer = setInterval(function () {
+    sendPresenceHeartbeat();
+  }, PRESENCE_INTERVAL_MS);
+}
+  
   function notifyParentClose() {
     if (window.parent && window.parent !== window) {
       try {
@@ -1137,7 +1196,8 @@
   }, 300);
 
   requestPageContextRefresh();
-
+  startPresenceHeartbeat();
+  
   if (window.parent && window.parent !== window) {
     try {
       window.parent.postMessage({ type: "sitemind-widget-ready", agentId: agentId }, "*");
