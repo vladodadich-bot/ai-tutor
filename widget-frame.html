@@ -522,13 +522,14 @@
   var REQUEST_TIMEOUT = 30000;
   var MAX_HISTORY_ITEMS = 10;
   var HISTORY_EXPIRY_MS = 45 * 60 * 1000;
-  
+
   var PRESENCE_API = "https://ai-tutor-rouge-theta.vercel.app/api/presence";
   var SESSION_API = "https://ai-tutor-rouge-theta.vercel.app/api/session";
   var PRESENCE_INTERVAL_MS = 15000;
-  var PRESENCE_ACTIVE_WINDOW_MS = 60000;
   var presenceTimer = null;
-  
+  var sessionStarted = false;
+  var lastPresenceSignature = "";
+
   var chatShell = document.getElementById("chatShell");
   var chatForm = document.getElementById("chatForm");
   var chatInput = document.getElementById("chatInput");
@@ -693,7 +694,6 @@
     return "sitemind_history_payload_" + agentId;
   }
 
-  
   function escapeHtml(str) {
     return String(str || "")
       .replace(/&/g, "&amp;")
@@ -729,101 +729,161 @@
       }
     );
   }
-function getPresenceSessionKey() {
-  return "sitemind_presence_session_" + agentId;
-}
 
-function generatePresenceSessionId() {
-  return "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
-}
-
-function getPresenceSessionId() {
-  try {
-    var existing = sessionStorage.getItem(getPresenceSessionKey());
-    if (existing) return existing;
-
-    var created = generatePresenceSessionId();
-    sessionStorage.setItem(getPresenceSessionKey(), created);
-    return created;
-  } catch (e) {
-    return generatePresenceSessionId();
-  }
-}
-function getVisitorIdKey() {
-  return "sitemind_visitor_id_" + agentId;
-}
-
-function generateVisitorId() {
-  return "visitor_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
-}
-
-function getVisitorId() {
-  try {
-    var existing = localStorage.getItem(getVisitorIdKey());
-    if (existing) return existing;
-
-    var created = generateVisitorId();
-    localStorage.setItem(getVisitorIdKey(), created);
-    return created;
-  } catch (e) {
-    return generateVisitorId();
-  }
-}
-  
-async function sendPresenceHeartbeat() {
-  if (document.visibilityState && document.visibilityState !== "visible") {
-    return;
+  function getPresenceSessionKey() {
+    return "sitemind_presence_session_" + agentId;
   }
 
-  try {
-    await fetch(PRESENCE_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        agent_id: agentId,
-        session_id: getPresenceSessionId(),
-        page_url: pageData.pageUrl || "",
-        page_title: pageData.pageTitle || document.title || "",
-        user_agent: navigator.userAgent || ""
-      })
-    });
-  } catch (e) {}
-}
-async function sendSessionHeartbeat() {
-  if (document.visibilityState && document.visibilityState !== "visible") {
-    return;
+  function generatePresenceSessionId() {
+    return "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
   }
 
-  try {
-    await fetch(SESSION_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        agent_id: agentId,
-        visitor_id: getVisitorId(),
-        session_id: getPresenceSessionId(),
-        entry_page_url: pageData.pageUrl || "",
-        entry_page_title: pageData.pageTitle || document.title || ""
-      })
-    });
-  } catch (e) {}
-}
-  
-function startPresenceHeartbeat() {
-  if (presenceTimer) {
-    clearInterval(presenceTimer);
-    presenceTimer = null;
+  function getPresenceSessionId() {
+    try {
+      var existing = sessionStorage.getItem(getPresenceSessionKey());
+      if (existing) return existing;
+
+      var created = generatePresenceSessionId();
+      sessionStorage.setItem(getPresenceSessionKey(), created);
+      return created;
+    } catch (e) {
+      return generatePresenceSessionId();
+    }
   }
 
-  sendPresenceHeartbeat();
-  sendSessionHeartbeat();
+  function getVisitorIdKey() {
+    return "sitemind_visitor_id_" + agentId;
+  }
 
-  presenceTimer = setInterval(function () {
-    sendPresenceHeartbeat();
-    sendSessionHeartbeat();
-  }, PRESENCE_INTERVAL_MS);
-}
-  
+  function generateVisitorId() {
+    return "visitor_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
+  }
+
+  function getVisitorId() {
+    try {
+      var existing = localStorage.getItem(getVisitorIdKey());
+      if (existing) return existing;
+
+      var created = generateVisitorId();
+      localStorage.setItem(getVisitorIdKey(), created);
+      return created;
+    } catch (e) {
+      return generateVisitorId();
+    }
+  }
+
+  function isWidgetTitle(value) {
+    var title = cleanText(value).toLowerCase();
+    return !title || title === "sitemind ai" || title === "ask ai agent";
+  }
+
+  function hasUsablePageUrl() {
+    var url = cleanText(pageData.pageUrl);
+    return /^https?:\/\//i.test(url);
+  }
+
+  function hasUsablePageTitle() {
+    return !isWidgetTitle(pageData.pageTitle);
+  }
+
+  function hasUsableAnalyticsContext() {
+    return hasUsablePageUrl() || hasUsablePageTitle();
+  }
+
+  function getAnalyticsPageTitle() {
+    if (hasUsablePageTitle()) return cleanText(pageData.pageTitle);
+    return "";
+  }
+
+  function getAnalyticsPageUrl() {
+    if (hasUsablePageUrl()) return cleanText(pageData.pageUrl);
+    return "";
+  }
+
+  function getPresenceSignature() {
+    return [agentId, getPresenceSessionId(), getAnalyticsPageUrl(), getAnalyticsPageTitle()].join("|");
+  }
+
+  async function sendPresenceHeartbeat(force) {
+    if (document.visibilityState && document.visibilityState !== "visible") {
+      return;
+    }
+
+    if (!hasUsableAnalyticsContext()) {
+      return;
+    }
+
+    var signature = getPresenceSignature();
+    if (!force && signature === lastPresenceSignature) {
+      return;
+    }
+
+    try {
+      await fetch(PRESENCE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agent_id: agentId,
+          session_id: getPresenceSessionId(),
+          page_url: getAnalyticsPageUrl(),
+          page_title: getAnalyticsPageTitle(),
+          user_agent: navigator.userAgent || ""
+        })
+      });
+
+      lastPresenceSignature = signature;
+    } catch (e) {}
+  }
+
+  async function sendSessionStartIfNeeded() {
+    if (sessionStarted) return;
+    if (document.visibilityState && document.visibilityState !== "visible") {
+      return;
+    }
+    if (!hasUsableAnalyticsContext()) {
+      return;
+    }
+
+    try {
+      await fetch(SESSION_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agent_id: agentId,
+          visitor_id: getVisitorId(),
+          session_id: getPresenceSessionId(),
+          entry_page_url: getAnalyticsPageUrl(),
+          entry_page_title: getAnalyticsPageTitle()
+        })
+      });
+
+      sessionStarted = true;
+    } catch (e) {}
+  }
+
+  function flushAnalyticsContext(forcePresence) {
+    sendSessionStartIfNeeded();
+    sendPresenceHeartbeat(!!forcePresence);
+  }
+
+  function startPresenceHeartbeat() {
+    if (presenceTimer) {
+      clearInterval(presenceTimer);
+      presenceTimer = null;
+    }
+
+    flushAnalyticsContext(true);
+
+    presenceTimer = setInterval(function () {
+      if (!hasUsableAnalyticsContext()) {
+        requestPageContextRefresh();
+        return;
+      }
+
+      sendPresenceHeartbeat(true);
+    }, PRESENCE_INTERVAL_MS);
+  }
+
   function notifyParentClose() {
     if (window.parent && window.parent !== window) {
       try {
@@ -1202,6 +1262,7 @@ function startPresenceHeartbeat() {
 
       updateUiLanguage();
       renderWelcomeIfNeeded();
+      flushAnalyticsContext(true);
     }
 
     if (event.data.type === "sitemind-agent-config") {
@@ -1227,6 +1288,18 @@ function startPresenceHeartbeat() {
     notifyParentClose();
   });
 
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") {
+      requestPageContextRefresh();
+      flushAnalyticsContext(true);
+    }
+  });
+
+  window.addEventListener("focus", function () {
+    requestPageContextRefresh();
+    flushAnalyticsContext(true);
+  });
+
   renderStoredHistory();
   updateUiLanguage();
   applyAgentData();
@@ -1239,7 +1312,7 @@ function startPresenceHeartbeat() {
 
   requestPageContextRefresh();
   startPresenceHeartbeat();
-  
+
   if (window.parent && window.parent !== window) {
     try {
       window.parent.postMessage({ type: "sitemind-widget-ready", agentId: agentId }, "*");
