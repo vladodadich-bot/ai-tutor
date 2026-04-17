@@ -638,8 +638,8 @@ function __sitemindTrackTime(BASE_URL, agentId) {
 
     if (isBubbleExpanded) {
       bubble.style.padding = window.innerWidth < 520 ? "12px 16px" : "13px 18px";
-      bubble.style.minWidth = window.innerWidth < 520 ? "188px" : "222px";
-      bubble.style.maxWidth = window.innerWidth < 520 ? "220px" : "248px";
+      bubble.style.minWidth = window.innerWidth < 520 ? "166px" : "200px";
+      bubble.style.maxWidth = window.innerWidth < 520 ? "198px" : "226px";
       bubble.style.borderRadius = "999px";
 
       if (bubbleShortLabelEl) bubbleShortLabelEl.style.display = "none";
