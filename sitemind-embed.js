@@ -1,3 +1,146 @@
+// ============================
+// 🔥 ANALYTICS: TRACK VISIT
+// ============================
+function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle) {
+  try {
+    fetch(BASE_URL + "/api/index", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "track_visit",
+        agent_id: agentId,
+        page_url: window.location.href,
+        page_title: getPageTitle(),
+        referrer: document.referrer || null
+      })
+    });
+  } catch (e) {}
+}
+
+// ============================
+// ⏱ TIME TRACKING
+// ============================
+var __sitemindVisitStart = Date.now();
+
+function __sitemindTrackTime(BASE_URL, agentId) {
+  try {
+    var duration = Math.floor((Date.now() - __sitemindVisitStart) / 1000);
+
+    navigator.sendBeacon(
+      BASE_URL + "/api/index",
+      JSON.stringify({
+        action: "track_time",
+        agent_id: agentId,
+        page_url: window.location.href,
+        duration: duration
+      })
+    );
+  } catch (e) {}
+}
+
+(function () {
+  "use strict";
+
+  if (window.__sitemindWidgetLoaded) return;
+  window.__sitemindWidgetLoaded = true;
+
+  var CURRENT_SCRIPT = document.currentScript || (function () {
+    var scripts = document.getElementsByTagName("script");
+    return scripts[scripts.length - 1] || null;
+  })();
+
+  var SCRIPT_SRC = CURRENT_SCRIPT ? CURRENT_SCRIPT.src : "";
+  var SCRIPT_URL;
+
+  try {
+    SCRIPT_URL = new URL(SCRIPT_SRC, window.location.href);
+  } catch (e) {
+    return;
+  }
+
+  var BASE_URL = SCRIPT_URL.origin;
+
+  var agentId =
+    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-agent-id")) ||
+    "demo-agent";
+
+  var position =
+    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-position")) ||
+    "bottom-right";
+
+  var themeColor =
+    (CURRENT_SCRIPT && CURRENT_SCRIPT.getAttribute("data-color")) ||
+    "#081F39";
+
+  var iframe = null;
+  var bubble = null;
+  var panel = null;
+  var isOpen = false;
+
+  var bubbleShortLabelEl = null;
+  var bubbleFullLabelEl = null;
+  var bubbleIconEl = null;
+  var isBubbleExpanded = false;
+  var scrollExpandThreshold = 60;
+
+  var originalBodyPaddingRight = "";
+  var originalBodyPaddingLeft = "";
+  var originalHtmlOverflowX = "";
+  var originalBodyOverflowX = "";
+
+  function cleanText(text) {
+    return String(text || "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function getPageTitle() {
+    var ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle && ogTitle.content) return cleanText(ogTitle.content);
+
+    var title = document.title || "";
+    if (title) return cleanText(title);
+
+    var h1 = document.querySelector("h1");
+    if (h1 && h1.textContent) return cleanText(h1.textContent);
+
+    return "";
+  }
+
+  // 🔥 TRACK VISIT ODMAH
+  __sitemindTrackVisit(BASE_URL, agentId, getPageTitle);
+
+  function getPageDescription() {
+    var meta =
+      document.querySelector('meta[name="description"]') ||
+      document.querySelector('meta[property="og:description"]');
+
+    return meta && meta.content ? cleanText(meta.content) : "";
+  }
+
+  function getPageH1() {
+    var h1 = document.querySelector("h1");
+    return h1 && h1.textContent ? cleanText(h1.textContent) : "";
+  }
+
+  function getHeadingsText() {
+    var headings = [];
+    var nodes = document.querySelectorAll("h1, h2, h3");
+
+    for (var i = 0; i < nodes.length; i++) {
+      var text = cleanText(nodes[i].innerText || nodes[i].textContent || "");
+      if (text && headings.indexOf(text) === -1) {
+        headings.push(text);
+      }
+      if (headings.length >= 12) break;
+    }
+
+    return headings;
+  }
+
 (function () {
   "use strict";
 
@@ -848,76 +991,10 @@
     createWidget();
   }
 })();
-// ===== ANALYTICS / PRESENCE START =====
 
-// session id (persist kroz tab)
-function getOrCreateSessionId() {
-  try {
-    var key = 'sitemind_session_id_' + agentId;
-    var existing = sessionStorage.getItem(key);
-    if (existing) return existing;
 
-    var value = 'sess_' + Math.random().toString(36).slice(2) + Date.now();
-    sessionStorage.setItem(key, value);
-    return value;
-  } catch (e) {
-    return 'sess_' + Math.random().toString(36).slice(2) + Date.now();
-  }
-}
+  window.addEventListener("beforeunload", function () {
+    __sitemindTrackTime(BASE_URL, agentId);
+  });
 
-var sessionId = getOrCreateSessionId();
-
-// slanje presence
-function sendPresence() {
-  try {
-    fetch(BASE_URL + '/api/presence', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        agent_id: agentId,
-        session_id: sessionId,
-        page_url: window.location.href,
-        page_title: document.title || '',
-        user_agent: navigator.userAgent || ''
-      })
-    }).catch(function () {});
-  } catch (e) {}
-}
-
-// slanje session (analytics)
-function sendSessionPing() {
-  try {
-    fetch(BASE_URL + '/api/session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        agent_id: agentId,
-        session_id: sessionId,
-        page_url: window.location.href,
-        page_title: document.title || '',
-        user_agent: navigator.userAgent || ''
-      })
-    }).catch(function () {});
-  } catch (e) {}
-}
-
-// pokreni odmah
-setTimeout(function () {
-  sendPresence();
-  sendSessionPing();
-}, 800);
-
-// heartbeat
-setInterval(function () {
-  sendPresence();
-}, 15000);
-
-setInterval(function () {
-  sendSessionPing();
-}, 30000);
-
-// ===== ANALYTICS / PRESENCE END =====
+})();
