@@ -26,7 +26,7 @@ function applyCors(req, res) {
   }
 
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Max-Age', '86400');
 }
@@ -36,6 +36,43 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  if (req.method === 'GET') {
+    try {
+      const agentId = req.query.agentId || null;
+
+      if (!agentId) {
+        return res.status(400).json({ success: false, error: 'Missing agentId' });
+      }
+
+      const cutoffIso = new Date(Date.now() - 60 * 1000).toISOString();
+
+      const { data, error } = await supabase
+        .from('live_presence')
+        .select('agent_id, session_id, page_url, page_title, user_agent, city, country, last_seen_at')
+        .eq('agent_id', agentId)
+        .gte('last_seen_at', cutoffIso)
+        .order('last_seen_at', { ascending: false })
+        .limit(12);
+
+      if (error) {
+        console.error('Presence GET error:', error);
+        return res.status(500).json({
+          success: false,
+          error: 'Database error',
+          details: error.message
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        visitors: Array.isArray(data) ? data : []
+      });
+    } catch (err) {
+      console.error('Presence GET crash:', err);
+      return res.status(500).json({ success: false, error: 'Server error' });
+    }
   }
 
   if (req.method !== 'POST') {
@@ -78,13 +115,13 @@ export default async function handler(req, res) {
       );
 
     if (error) {
-      console.error('Presence error:', error);
+      console.error('Presence POST error:', error);
       return res.status(500).json({ error: 'Database error', details: error.message });
     }
 
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Presence crash:', err);
+    console.error('Presence POST crash:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
