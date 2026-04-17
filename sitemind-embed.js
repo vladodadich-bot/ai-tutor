@@ -848,3 +848,76 @@
     createWidget();
   }
 })();
+// ===== ANALYTICS / PRESENCE START =====
+
+// session id (persist kroz tab)
+function getOrCreateSessionId() {
+  try {
+    var key = 'sitemind_session_id_' + agentId;
+    var existing = sessionStorage.getItem(key);
+    if (existing) return existing;
+
+    var value = 'sess_' + Math.random().toString(36).slice(2) + Date.now();
+    sessionStorage.setItem(key, value);
+    return value;
+  } catch (e) {
+    return 'sess_' + Math.random().toString(36).slice(2) + Date.now();
+  }
+}
+
+var sessionId = getOrCreateSessionId();
+
+// slanje presence
+function sendPresence() {
+  try {
+    fetch(BASE_URL + '/api/presence', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        agent_id: agentId,
+        session_id: sessionId,
+        page_url: window.location.href,
+        page_title: document.title || '',
+        user_agent: navigator.userAgent || ''
+      })
+    }).catch(function () {});
+  } catch (e) {}
+}
+
+// slanje session (analytics)
+function sendSessionPing() {
+  try {
+    fetch(BASE_URL + '/api/session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        agent_id: agentId,
+        session_id: sessionId,
+        page_url: window.location.href,
+        page_title: document.title || '',
+        user_agent: navigator.userAgent || ''
+      })
+    }).catch(function () {});
+  } catch (e) {}
+}
+
+// pokreni odmah
+setTimeout(function () {
+  sendPresence();
+  sendSessionPing();
+}, 800);
+
+// heartbeat
+setInterval(function () {
+  sendPresence();
+}, 15000);
+
+setInterval(function () {
+  sendSessionPing();
+}, 30000);
+
+// ===== ANALYTICS / PRESENCE END =====
