@@ -596,14 +596,11 @@ function buildUserPrompt(payload) {
 User message:
 ${payload.message || 'N/A'}
 
-Active topic:
-${payload.activeTopic || 'N/A'}
-
 Resolved query:
 ${payload.resolvedQuery || payload.message || 'N/A'}
 
-Page type hint:
-${payload.pageTypeHint || 'general'}
+Active topic:
+${payload.activeTopic || 'N/A'}
 
 Page language:
 ${payload.language || 'en'}
@@ -614,14 +611,11 @@ ${payload.pageTitle || 'N/A'}
 Page description:
 ${payload.pageDescription || 'N/A'}
 
-Page URL:
-${payload.pageUrl || 'N/A'}
+Headings:
+${headingsText || 'N/A'}
 
 Main H1:
 ${payload.h1 || 'N/A'}
-
-Headings:
-${headingsText || 'N/A'}
 
 Current page content:
 ${currentPageContent}
@@ -629,9 +623,15 @@ ${currentPageContent}
 Relevant crawled website context:
 ${payload.crawlContext || 'N/A'}
 
+Page URL:
+${payload.pageUrl || 'N/A'}
+
+Page type hint:
+${payload.pageTypeHint || 'general'}
+
 Recent conversation:
 ${historyText}
-  `.trim();
+`.trim();
 }
 
 function buildLinkSuggestionReply(language, candidates) {
@@ -1306,22 +1306,22 @@ async function handleChat(req, res, body) {
   const systemPrompt = buildAdaptiveSystemPrompt(languageLabel);
 
   const userPrompt = buildUserPrompt({
-    message,
-    activeTopic: rankedContext.activeTopic,
-    resolvedQuery: rankedContext.resolvedQuery,
-    pageTypeHint,
-    language,
-    pageTitle,
-    pageDescription,
-    pageUrl,
-    h1,
-    headings,
-    pageContext,
-    pageText,
-    crawlContext,
-    history,
-    includeCurrentPageContent
-  });
+  message,
+  resolvedQuery: rankedContext.resolvedQuery,
+  activeTopic: rankedContext.activeTopic,
+  language,
+  pageTitle,
+  pageDescription,
+  headings,
+  h1,
+  pageContext,
+  pageText,
+  crawlContext,
+  pageUrl,
+  pageTypeHint,
+  history,
+  includeCurrentPageContent
+});
 
   try {
     const openaiRes = await fetch('https://api.openai.com/v1/responses', {
