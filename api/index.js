@@ -595,11 +595,17 @@ if (rowsToInsert.length) {
 
   const discoveredQueueRows = [];
   const seenDiscovered = new Set();
+  const queuedRowDepthMap = new Map(
+    queuedRows.map((row) => [
+      String(row.normalized_url || row.url || '').trim(),
+      Number(row.depth || 0)
+    ])
+  );
 
   for (const page of successPages) {
     const links = Array.isArray(page.internal_links) ? page.internal_links : [];
     const currentDepth = Number(
-      queuedRows.find((row) => String(row.normalized_url || row.url || '').trim() === String(page.url || '').trim())?.depth || 0
+      queuedRowDepthMap.get(String(page.url || '').trim()) || 0
     );
 
     let discoveryAddedForPage = 0;
@@ -613,7 +619,7 @@ if (rowsToInsert.length) {
 
       if (kind === 'discovery') {
         if (currentDepth >= 1) continue;
-        if (discoveryAddedForPage >= 3) continue;
+        if (discoveryAddedForPage >= 4) continue;
       }
 
       if (kind === 'content' && currentDepth >= 3) continue;
