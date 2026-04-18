@@ -572,16 +572,9 @@ async function handleCrawlRunBatch(req, res, body) {
     ? page.headings.map((item) => String(item || '').trim()).filter(Boolean)
     : [],
   internal_links: [],
-    ? page.internal_links
-        .map((link) => ({
-          text: String(link && link.text ? link.text : '').trim(),
-          href: String(link && link.href ? link.href : '').trim()
-        }))
-        .filter((link) => link.href)
-    : [],
   text_preview: String(page.text_preview || '').trim()
 })).filter((row) => row.url);
-
+  
 if (rowsToInsert.length) {
   const upsertContent = await supabase
     .from('site_content')
