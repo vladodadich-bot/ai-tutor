@@ -571,7 +571,7 @@ async function handleCrawlRunBatch(req, res, body) {
   headings: Array.isArray(page.headings)
     ? page.headings.map((item) => String(item || '').trim()).filter(Boolean)
     : [],
-  internal_links: Array.isArray(page.internal_links)
+  internal_links: [],
     ? page.internal_links
         .map((link) => ({
           text: String(link && link.text ? link.text : '').trim(),
