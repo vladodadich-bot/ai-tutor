@@ -326,6 +326,49 @@ function normalizeUrlValue(value) {
   return String(value || '').trim();
 }
 
+function normalizeLinkItems(links) {
+  return (Array.isArray(links) ? links : [])
+    .map((link) => ({
+      text: String(link?.text || '').trim(),
+      href: String(link?.href || '').trim()
+    }))
+    .filter((link) => link.href);
+}
+
+function normalizeHeadingItems(headings) {
+  return (Array.isArray(headings) ? headings : [])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+}
+
+function getQueueRowLookup(rows) {
+  const map = new Map();
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const normalized = String(row?.normalized_url || '').trim();
+    const raw = String(row?.url || '').trim();
+
+    if (normalized) map.set(normalized, row);
+    if (raw) map.set(raw, row);
+  }
+
+  return map;
+}
+
+function buildSiteContentRowFromBatchPage(page, agentId) {
+  return {
+    agent_id: agentId,
+    url: String(page?.url || '').trim(),
+    content: String(page?.content || '').trim(),
+    page_title: String(page?.page_title || page?.pageTitle || '').trim(),
+    meta_description: String(page?.meta_description || page?.metaDescription || '').trim(),
+    h1: String(page?.h1 || '').trim(),
+    headings: normalizeHeadingItems(page?.headings),
+    internal_links: normalizeLinkItems(page?.internal_links || page?.internalLinks),
+    text_preview: String(page?.text_preview || page?.textPreview || '').trim()
+  };
+}
+
 function normalizeCrawlResultToRows(crawlResult, agentId) {
   let pages = [];
 
@@ -340,23 +383,8 @@ function normalizeCrawlResultToRows(crawlResult, agentId) {
   const normalizedRows = pages
     .filter(Boolean)
     .map((page) => {
-      const headings = Array.isArray(page?.headings) ? page.headings : [];
-      const internalLinks = Array.isArray(page?.internal_links)
-        ? page.internal_links
-        : Array.isArray(page?.internalLinks)
-          ? page.internalLinks
-          : [];
-
-      const safeHeadings = headings
-        .map((item) => String(item || '').trim())
-        .filter(Boolean);
-
-      const safeInternalLinks = internalLinks
-        .map((link) => ({
-          text: String(link?.text || '').trim(),
-          href: String(link?.href || '').trim()
-        }))
-        .filter((link) => link.href);
+      const safeHeadings = normalizeHeadingItems(page?.headings);
+      const safeInternalLinks = normalizeLinkItems(page?.internal_links || page?.internalLinks);
 
       return {
         agent_id: agentId,
@@ -477,7 +505,10 @@ async function handleCrawlRunBatch(req, res, body) {
   if (!user) return;
 
   const jobId = String(body.jobId || body.job_id || '').trim();
-  const BATCH_SIZE = 40;
+  const requestedBatchSize = Number(body.batchSize || body.batch_size || 40);
+  const BATCH_SIZE = Number.isFinite(requestedBatchSize)
+    ? Math.max(1, Math.min(60, Math.floor(requestedBatchSize)))
+    : 40;
 
   if (!jobId) {
     return res.status(400).json({ error: 'Missing jobId' });
@@ -530,11 +561,19 @@ async function handleCrawlRunBatch(req, res, body) {
       success: true,
       jobId,
       status: 'completed',
-      message: 'No more queued URLs'
+      message: 'No more queued URLs',
+      batchSize: 0,
+      crawledNow: 0,
+      failedNow: 0,
+      discoveredNow: 0,
+      totalCrawled: Number(job.total_crawled || 0),
+      totalSaved: Number(job.total_saved || 0),
+      totalDiscovered: Number(job.total_discovered || 0)
     });
   }
 
   const queueIds = queuedRows.map((row) => row.id);
+  const queueRowLookup = getQueueRowLookup(queuedRows);
 
   const markProcessing = await supabase
     .from('crawl_queue')
@@ -553,50 +592,78 @@ async function handleCrawlRunBatch(req, res, body) {
     })
     .eq('id', jobId);
 
-  const rootOrigin = new URL(job.start_url || job.site_domain).origin;
-  const urlsToCrawl = queuedRows.map((row) => row.normalized_url || row.url).filter(Boolean);
+  let rootOrigin = '';
 
-  const crawledPages = await crawlBatchPages(urlsToCrawl, rootOrigin);
-
-  const successPages = crawledPages.filter((page) => !page.error);
-  const failedPages = crawledPages.filter((page) => page.error);
-
- const rowsToInsert = successPages.map((page) => ({
-  agent_id: job.agent_id,
-  url: String(page.url || '').trim(),
-  content: '',
-  page_title: String(page.page_title || '').trim(),
-  meta_description: String(page.meta_description || '').trim(),
-  h1: String(page.h1 || '').trim(),
-  headings: Array.isArray(page.headings)
-    ? page.headings.map((item) => String(item || '').trim()).filter(Boolean)
-    : [],
-  internal_links: [],
-  text_preview: String(page.text_preview || '').trim()
-})).filter((row) => row.url);
-  
-if (rowsToInsert.length) {
-  const upsertContent = await supabase
-    .from('site_content')
-    .upsert(rowsToInsert, {
-      onConflict: 'agent_id,url'
-    });
-
-  if (upsertContent.error) {
-    console.error('SITE_CONTENT UPSERT ERROR:', upsertContent.error);
-    return res.status(500).json({ error: upsertContent.error.message });
+  try {
+    rootOrigin = new URL(job.start_url || job.site_domain).origin;
+  } catch (err) {
+    return res.status(400).json({ error: 'Invalid job start_url/site_domain' });
   }
-}
+
+  const urlsToCrawl = queuedRows
+    .map((row) => String(row.normalized_url || row.url || '').trim())
+    .filter(Boolean);
+
+  let crawledPages = [];
+
+  try {
+    crawledPages = await crawlBatchPages(urlsToCrawl, rootOrigin);
+  } catch (err) {
+    await supabase
+      .from('crawl_queue')
+      .update({
+        status: 'failed',
+        last_error: err?.message || 'crawlBatchPages failed'
+      })
+      .in('id', queueIds);
+
+    return res.status(500).json({
+      error: err?.message || 'crawlBatchPages failed'
+    });
+  }
+
+  const successPages = crawledPages.filter((page) => page && !page.error && page.url);
+  const failedPages = crawledPages.filter((page) => page && page.error);
+
+  const rowsToInsert = successPages
+    .map((page) => buildSiteContentRowFromBatchPage(page, job.agent_id))
+    .filter((row) => row.url);
+
+  if (rowsToInsert.length) {
+    const upsertContent = await supabase
+      .from('site_content')
+      .upsert(rowsToInsert, {
+        onConflict: 'agent_id,url'
+      });
+
+    if (upsertContent.error) {
+      console.error('SITE_CONTENT UPSERT ERROR:', upsertContent.error);
+      return res.status(500).json({ error: upsertContent.error.message });
+    }
+  }
 
   const discoveredQueueRows = [];
   const seenDiscovered = new Set();
 
   for (const page of successPages) {
-    const links = Array.isArray(page.internal_links) ? page.internal_links : [];
+    const pageUrl = normalizeUrl(page?.url || '');
+    const sourceQueueRow = queueRowLookup.get(pageUrl) || null;
+    const nextDepth = Number(sourceQueueRow?.depth || 0) + 1;
+    const links = normalizeLinkItems(page?.internal_links || page?.internalLinks);
 
     for (const link of links) {
-      const href = normalizeUrl(link && link.href ? link.href : '');
+      const href = normalizeUrl(link.href);
       if (!href) continue;
+
+      let hrefOrigin = '';
+      try {
+        hrefOrigin = new URL(href).origin;
+      } catch {
+        continue;
+      }
+
+      if (hrefOrigin !== rootOrigin) continue;
+      if (href === pageUrl) continue;
 
       const dedupeKey = jobId + '::' + href;
       if (seenDiscovered.has(dedupeKey)) continue;
@@ -607,10 +674,10 @@ if (rowsToInsert.length) {
         url: href,
         normalized_url: href,
         status: 'queued',
-        depth: 1,
-        priority: 0,
-        discovered_from: page.url || null,
-        page_title: String(link && link.text ? link.text : '').trim()
+        depth: nextDepth,
+        priority: Math.max(0, 100 - nextDepth),
+        discovered_from: pageUrl || null,
+        page_title: String(link.text || '').trim()
       });
     }
   }
@@ -627,63 +694,169 @@ if (rowsToInsert.length) {
     }
   }
 
-  if (successPages.length) {
-    for (const page of successPages) {
-      await supabase
-        .from('crawl_queue')
-        .update({
-          status: 'done',
-          last_error: null
-        })
-        .eq('job_id', jobId)
-        .eq('normalized_url', page.url);
+  const successNormalizedUrls = successPages
+    .map((page) => normalizeUrl(page?.url || ''))
+    .filter(Boolean);
+
+  const failedNormalizedUrls = failedPages
+    .map((page) => normalizeUrl(page?.url || ''))
+    .filter(Boolean);
+
+  if (successNormalizedUrls.length) {
+    const successUpdate = await supabase
+      .from('crawl_queue')
+      .update({
+        status: 'done',
+        last_error: null
+      })
+      .eq('job_id', jobId)
+      .in('normalized_url', successNormalizedUrls);
+
+    if (successUpdate.error) {
+      return res.status(500).json({ error: successUpdate.error.message });
     }
   }
 
-  if (failedPages.length) {
+  if (failedNormalizedUrls.length) {
     for (const page of failedPages) {
-      await supabase
+      const failedUrl = normalizeUrl(page?.url || '');
+      if (!failedUrl) continue;
+
+      const failedUpdate = await supabase
         .from('crawl_queue')
         .update({
           status: 'failed',
           last_error: page.error || 'Failed to crawl page'
         })
         .eq('job_id', jobId)
-        .eq('normalized_url', page.url);
+        .eq('normalized_url', failedUrl);
+
+      if (failedUpdate.error) {
+        return res.status(500).json({ error: failedUpdate.error.message });
+      }
     }
   }
 
   const newTotalCrawled = Number(job.total_crawled || 0) + queuedRows.length;
   const newTotalSaved = Number(job.total_saved || 0) + successPages.length;
-  const newTotalDiscovered = Number(job.total_discovered || 0) + discoveredQueueRows.length;
+
+  const queueStats = await supabase
+    .from('crawl_queue')
+    .select('id', { count: 'exact', head: true })
+    .eq('job_id', jobId);
+
+  const totalDiscoveredCount = Number(queueStats.count || 0);
+
+  const queuedCountResult = await supabase
+    .from('crawl_queue')
+    .select('id', { count: 'exact', head: true })
+    .eq('job_id', jobId)
+    .eq('status', 'queued');
+
+  const processingCountResult = await supabase
+    .from('crawl_queue')
+    .select('id', { count: 'exact', head: true })
+    .eq('job_id', jobId)
+    .eq('status', 'processing');
+
+  const remainingQueued = Number(queuedCountResult.count || 0);
+  const processingCount = Number(processingCountResult.count || 0);
+  const nextStatus = remainingQueued === 0 && processingCount === 0 ? 'completed' : 'running';
 
   await supabase
     .from('crawl_jobs')
     .update({
       total_crawled: newTotalCrawled,
       total_saved: newTotalSaved,
-      total_discovered: newTotalDiscovered,
-      status: 'running'
+      total_discovered: totalDiscoveredCount,
+      status: nextStatus,
+      finished_at: nextStatus === 'completed' ? new Date().toISOString() : null
     })
     .eq('id', jobId);
 
   return res.status(200).json({
     success: true,
     jobId,
-    status: 'running',
+    status: nextStatus,
     batchSize: queuedRows.length,
     crawledNow: successPages.length,
     failedNow: failedPages.length,
     discoveredNow: discoveredQueueRows.length,
+    remainingQueued,
     totalCrawled: newTotalCrawled,
     totalSaved: newTotalSaved,
-    totalDiscovered: newTotalDiscovered
+    totalDiscovered: totalDiscoveredCount
   });
 }
 
 // ========================================
 // CRAWL RUN BATCH - END
 // ========================================
+// ========================================
+// CRAWL STATUS - START
+// ========================================
+
+async function handleCrawlStatus(req, res, body) {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
+  const jobId = String(body.jobId || body.job_id || '').trim();
+
+  if (!jobId) {
+    return res.status(400).json({ error: 'Missing jobId' });
+  }
+
+  const { data: job, error: jobError } = await supabase
+    .from('crawl_jobs')
+    .select('id, agent_id, site_domain, start_url, status, total_discovered, total_crawled, total_saved, current_batch, finished_at, created_at')
+    .eq('id', jobId)
+    .single();
+
+  if (jobError || !job) {
+    return res.status(404).json({ error: 'Crawl job not found' });
+  }
+
+  const { data: agent, error: agentError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id')
+    .eq('agent_id', job.agent_id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (agentError || !agent) {
+    return res.status(403).json({ error: 'Access denied for this crawl job' });
+  }
+
+  const [queuedResult, processingResult, doneResult, failedResult] = await Promise.all([
+    supabase.from('crawl_queue').select('id', { count: 'exact', head: true }).eq('job_id', jobId).eq('status', 'queued'),
+    supabase.from('crawl_queue').select('id', { count: 'exact', head: true }).eq('job_id', jobId).eq('status', 'processing'),
+    supabase.from('crawl_queue').select('id', { count: 'exact', head: true }).eq('job_id', jobId).eq('status', 'done'),
+    supabase.from('crawl_queue').select('id', { count: 'exact', head: true }).eq('job_id', jobId).eq('status', 'failed')
+  ]);
+
+  return res.status(200).json({
+    success: true,
+    jobId: job.id,
+    status: job.status,
+    siteDomain: job.site_domain,
+    startUrl: job.start_url,
+    currentBatch: Number(job.current_batch || 0),
+    totalDiscovered: Number(job.total_discovered || 0),
+    totalCrawled: Number(job.total_crawled || 0),
+    totalSaved: Number(job.total_saved || 0),
+    queuedCount: Number(queuedResult.count || 0),
+    processingCount: Number(processingResult.count || 0),
+    doneCount: Number(doneResult.count || 0),
+    failedCount: Number(failedResult.count || 0),
+    finishedAt: job.finished_at || null,
+    createdAt: job.created_at || null
+  });
+}
+
+// ========================================
+// CRAWL STATUS - END
+// ========================================
+
 
 // ========================================
 // CRAWL SITE - START
@@ -1747,6 +1920,10 @@ export default async function handler(req, res) {
     
     if (action === 'crawl-run-batch') {
      return await handleCrawlRunBatch(req, res, body);
+    }
+
+    if (action === 'crawl-status') {
+     return await handleCrawlStatus(req, res, body);
     }
 
     if (action === 'crawl-site') {
