@@ -815,12 +815,23 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     bubbleShortLabelEl = bubble.querySelector(".sitemind-bubble-short");
     bubbleFullLabelEl = bubble.querySelector(".sitemind-bubble-full");
 
-    panel = document.createElement("div");
-    panel.style.position = "fixed";
-    panel.style.zIndex = "999999";
-    panel.style.background = "#ffffff";
-    panel.style.overflow = "hidden";
+panel = document.createElement("div");
+panel.style.position = "fixed";
+panel.style.zIndex = "999999";
+panel.style.background = "#ffffff";
+panel.style.overflow = "hidden";
+panel.style.opacity = "0";
+panel.style.pointerEvents = "none";
+panel.style.transition = "none";
 
+if (isDesktop()) {
+  panel.style.transform = position === "bottom-left"
+    ? "translateX(-100%)"
+    : "translateX(100%)";
+} else {
+  panel.style.transform = "translateY(18px)";
+}
+    
     iframe = document.createElement("iframe");
     iframe.src =
       BASE_URL +
@@ -841,7 +852,9 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     styleBubble();
     updateBubbleByScroll();
     applyPanelLayout();
-
+    requestAnimationFrame(function () {
+  panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
+});
     bubble.addEventListener("click", togglePanel);
 
     iframe.addEventListener("load", function () {
