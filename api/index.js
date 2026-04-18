@@ -361,7 +361,7 @@ function normalizeCrawlResultToRows(crawlResult, agentId) {
       return {
         agent_id: agentId,
         url: normalizeUrlValue(page?.url),
-        content: String(page?.content || ''),
+        content: String(page?.content || '').trim().slice(0, 25000),
         page_title: String(page?.page_title || page?.pageTitle || ''),
         meta_description: String(page?.meta_description || page?.metaDescription || ''),
         h1: String(page?.h1 || ''),
