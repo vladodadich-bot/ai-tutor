@@ -1,11 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
-import { crawlSinglePage } from '../lib/crawl.js';
+import { crawlSinglePage, normalizeUrl } from '../lib/crawl.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 );
-
+function normalizeUrl(value) {
+  try {
+    const u = new URL(String(value || '').trim());
+    u.hash = '';
+    if (u.pathname !== '/') {
+      u.pathname = u.pathname.replace(/\/+$/, '');
+    }
+    return u.toString();
+  } catch {
+    return '';
+  }
+}
 // ========================================
 // AUTH HELPERS - START
 // ========================================
@@ -376,6 +387,96 @@ function normalizeCrawlResultToRows(crawlResult, agentId) {
 }
 // ========================================
 // CRAWL HELPERS - END
+// ========================================
+
+// ========================================
+// CRAWL START - START
+// ========================================
+
+async function handleCrawlStart(req, res, body) {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
+  const agentId = String(body.agentId || body.agent_id || '').trim();
+
+  if (!agentId) {
+    return res.status(400).json({ error: 'Missing agentId' });
+  }
+
+  const { data: existingAgent, error: existingError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id, site_domain')
+    .eq('agent_id', agentId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (existingError || !existingAgent) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
+  const startUrl = String(existingAgent.site_domain || '').trim();
+
+  if (!startUrl) {
+    return res.status(400).json({ error: 'Agent has no site_domain' });
+  }
+
+  const normalizedStartUrl = normalizeUrl(startUrl);
+
+  if (!normalizedStartUrl) {
+    return res.status(400).json({ error: 'Invalid start URL' });
+  }
+
+  const { data: job, error: jobError } = await supabase
+    .from('crawl_jobs')
+    .insert({
+      agent_id: existingAgent.agent_id,
+      site_domain: existingAgent.site_domain,
+      start_url: normalizedStartUrl,
+      status: 'pending',
+      total_discovered: 1,
+      total_crawled: 0,
+      total_saved: 0,
+      current_batch: 0
+    })
+    .select()
+    .single();
+
+  if (jobError || !job) {
+    return res.status(500).json({
+      error: 'Failed to create crawl job',
+      details: jobError?.message || 'Unknown job insert error'
+    });
+  }
+
+  const { error: queueError } = await supabase
+    .from('crawl_queue')
+    .insert({
+      job_id: job.id,
+      url: normalizedStartUrl,
+      normalized_url: normalizedStartUrl,
+      status: 'queued',
+      depth: 0,
+      priority: 100,
+      discovered_from: null
+    });
+
+  if (queueError) {
+    return res.status(500).json({
+      error: 'Failed to seed crawl queue',
+      details: queueError?.message || 'Unknown queue insert error'
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    jobId: job.id,
+    status: job.status,
+    startUrl: normalizedStartUrl
+  });
+}
+
+// ========================================
+// CRAWL START - END
 // ========================================
 
 // ========================================
@@ -1432,6 +1533,10 @@ export default async function handler(req, res) {
 
     if (action === 'delete-agent') {
       return await handleDeleteAgent(req, res, body);
+    }
+
+    if (action === 'crawl-start') {
+  return await handleCrawlStart(req, res, body);
     }
 
     if (action === 'crawl-site') {
