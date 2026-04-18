@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { crawlSinglePage, crawlBatchPages, normalizeUrl } from '../lib/crawl.js';
+import { crawlSinglePage, crawlBatchPages, normalizeUrl, classifyUrl } from '../lib/crawl.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -598,10 +598,25 @@ if (rowsToInsert.length) {
 
   for (const page of successPages) {
     const links = Array.isArray(page.internal_links) ? page.internal_links : [];
+    const currentDepth = Number(
+      queuedRows.find((row) => String(row.normalized_url || row.url || '').trim() === String(page.url || '').trim())?.depth || 0
+    );
+
+    let discoveryAddedForPage = 0;
 
     for (const link of links) {
       const href = normalizeUrl(link && link.href ? link.href : '');
       if (!href) continue;
+
+      const kind = classifyUrl(href);
+      if (kind === 'blocked' || kind === 'unknown') continue;
+
+      if (kind === 'discovery') {
+        if (currentDepth >= 1) continue;
+        if (discoveryAddedForPage >= 3) continue;
+      }
+
+      if (kind === 'content' && currentDepth >= 3) continue;
 
       const dedupeKey = jobId + '::' + href;
       if (seenDiscovered.has(dedupeKey)) continue;
@@ -612,11 +627,15 @@ if (rowsToInsert.length) {
         url: href,
         normalized_url: href,
         status: 'queued',
-        depth: 1,
-        priority: 0,
+        depth: currentDepth + 1,
+        priority: kind === 'content' ? 20 : 5,
         discovered_from: page.url || null,
         page_title: String(link && link.text ? link.text : '').trim()
       });
+
+      if (kind === 'discovery') {
+        discoveryAddedForPage += 1;
+      }
     }
   }
 
@@ -683,7 +702,7 @@ if (rowsToInsert.length) {
   }
 
   const newTotalCrawled = Number(job.total_crawled || 0) + queuedRows.length;
-  const newTotalSaved = Number(job.total_saved || 0) + successPages.length;
+  const newTotalSaved = Number(job.total_saved || 0) + rowsToInsert.length;
   const newTotalDiscovered = Number(job.total_discovered || 0) + insertedQueueRowsCount;
 
   await supabase
@@ -702,6 +721,7 @@ if (rowsToInsert.length) {
     status: 'running',
     batchSize: queuedRows.length,
     crawledNow: successPages.length,
+    savedNow: rowsToInsert.length,
     failedNow: failedPages.length,
     discoveredNow: insertedQueueRowsCount,
     totalCrawled: newTotalCrawled,
