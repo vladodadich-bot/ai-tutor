@@ -369,6 +369,75 @@ function buildSiteContentRowFromBatchPage(page, agentId) {
   };
 }
 
+
+function normalizeBatchCrawlPagesResult(crawlResult) {
+  if (Array.isArray(crawlResult)) return crawlResult.filter(Boolean);
+  if (Array.isArray(crawlResult?.pages)) return crawlResult.pages.filter(Boolean);
+  if (crawlResult && typeof crawlResult === 'object') return [crawlResult];
+  return [];
+}
+
+async function saveSiteContentRows(rows) {
+  const safeRows = Array.isArray(rows) ? rows.filter((row) => row && row.agent_id && row.url) : [];
+  if (!safeRows.length) {
+    return { success: true, saved: 0 };
+  }
+
+  const upsertResult = await supabase
+    .from('site_content')
+    .upsert(safeRows, {
+      onConflict: 'agent_id,url'
+    });
+
+  if (!upsertResult.error) {
+    return { success: true, saved: safeRows.length };
+  }
+
+  console.error('SITE_CONTENT UPSERT FAILED, FALLING BACK TO MANUAL SAVE:', upsertResult.error);
+
+  for (const row of safeRows) {
+    const { data: existingRow, error: existingError } = await supabase
+      .from('site_content')
+      .select('id')
+      .eq('agent_id', row.agent_id)
+      .eq('url', row.url)
+      .maybeSingle();
+
+    if (existingError) {
+      return { success: false, error: existingError };
+    }
+
+    if (existingRow?.id) {
+      const { error: updateError } = await supabase
+        .from('site_content')
+        .update({
+          content: row.content,
+          page_title: row.page_title,
+          meta_description: row.meta_description,
+          h1: row.h1,
+          headings: row.headings,
+          internal_links: row.internal_links,
+          text_preview: row.text_preview
+        })
+        .eq('id', existingRow.id);
+
+      if (updateError) {
+        return { success: false, error: updateError };
+      }
+    } else {
+      const { error: insertError } = await supabase
+        .from('site_content')
+        .insert(row);
+
+      if (insertError) {
+        return { success: false, error: insertError };
+      }
+    }
+  }
+
+  return { success: true, saved: safeRows.length, fallback: true };
+}
+
 function normalizeCrawlResultToRows(crawlResult, agentId) {
   let pages = [];
 
@@ -607,7 +676,8 @@ async function handleCrawlRunBatch(req, res, body) {
   let crawledPages = [];
 
   try {
-    crawledPages = await crawlBatchPages(urlsToCrawl, rootOrigin);
+    const batchResult = await crawlBatchPages(urlsToCrawl, rootOrigin);
+    crawledPages = normalizeBatchCrawlPagesResult(batchResult);
   } catch (err) {
     await supabase
       .from('crawl_queue')
@@ -630,15 +700,11 @@ async function handleCrawlRunBatch(req, res, body) {
     .filter((row) => row.url);
 
   if (rowsToInsert.length) {
-    const upsertContent = await supabase
-      .from('site_content')
-      .upsert(rowsToInsert, {
-        onConflict: 'agent_id,url'
-      });
+    const saveResult = await saveSiteContentRows(rowsToInsert);
 
-    if (upsertContent.error) {
-      console.error('SITE_CONTENT UPSERT ERROR:', upsertContent.error);
-      return res.status(500).json({ error: upsertContent.error.message });
+    if (!saveResult.success) {
+      console.error('SITE_CONTENT SAVE ERROR:', saveResult.error);
+      return res.status(500).json({ error: saveResult.error?.message || 'Failed to save site_content rows' });
     }
   }
 
@@ -780,6 +846,7 @@ async function handleCrawlRunBatch(req, res, body) {
     status: nextStatus,
     batchSize: queuedRows.length,
     crawledNow: successPages.length,
+    savedNow: rowsToInsert.length,
     failedNow: failedPages.length,
     discoveredNow: discoveredQueueRows.length,
     remainingQueued,
