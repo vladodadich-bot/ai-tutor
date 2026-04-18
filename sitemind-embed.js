@@ -2,18 +2,19 @@
 // 🔥 ANALYTICS: TRACK VISIT
 // ============================
 function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle) {
+  const title = getPageTitle() || "Untitled Page";
+  if (!agentId) return;
+
   try {
     fetch(BASE_URL + "/api/index", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "track_visit",
         agent_id: agentId,
         page_url: window.location.href,
-        page_title: getPageTitle(),
-        referrer: document.referrer || null
+        page_title: title,
+        referrer: document.referrer || ""
       })
     });
   } catch (e) {}
