@@ -5,18 +5,7 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 );
-function normalizeUrl(value) {
-  try {
-    const u = new URL(String(value || '').trim());
-    u.hash = '';
-    if (u.pathname !== '/') {
-      u.pathname = u.pathname.replace(/\/+$/, '');
-    }
-    return u.toString();
-  } catch {
-    return '';
-  }
-}
+
 // ========================================
 // AUTH HELPERS - START
 // ========================================
