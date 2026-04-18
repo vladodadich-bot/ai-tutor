@@ -561,19 +561,24 @@ async function handleCrawlRunBatch(req, res, body) {
   const successPages = crawledPages.filter((page) => !page.error);
   const failedPages = crawledPages.filter((page) => page.error);
 
- const rowsToInsert = successPages.map((page) => ({
-  agent_id: job.agent_id,
-  url: String(page.url || '').trim(),
-  content: '',
-  page_title: String(page.page_title || '').trim(),
-  meta_description: String(page.meta_description || '').trim(),
-  h1: String(page.h1 || '').trim(),
-  headings: Array.isArray(page.headings)
-    ? page.headings.map((item) => String(item || '').trim()).filter(Boolean)
-    : [],
-  internal_links: [],
-  text_preview: String(page.text_preview || '').trim()
-})).filter((row) => row.url);
+ const rowsToInsert = successPages
+  .filter((page) => String(page.page_kind || '') === 'content')
+  .map((page) => ({
+    agent_id: job.agent_id,
+    url: String(page.url || '').trim(),
+    content: String(page.content || '').trim().slice(0, 25000),
+    page_title: String(page.page_title || '').trim(),
+    meta_description: String(page.meta_description || '').trim(),
+    h1: String(page.h1 || '').trim(),
+    headings: Array.isArray(page.headings)
+      ? page.headings.map((item) => String(item || '').trim()).filter(Boolean)
+      : [],
+    internal_links: Array.isArray(page.internal_links)
+      ? page.internal_links
+      : [],
+    text_preview: String(page.text_preview || '').trim()
+  }))
+  .filter((row) => row.url);
   
 if (rowsToInsert.length) {
   const upsertContent = await supabase
