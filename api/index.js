@@ -326,118 +326,6 @@ function normalizeUrlValue(value) {
   return String(value || '').trim();
 }
 
-function normalizeLinkItems(links) {
-  return (Array.isArray(links) ? links : [])
-    .map((link) => ({
-      text: String(link?.text || '').trim(),
-      href: String(link?.href || '').trim()
-    }))
-    .filter((link) => link.href);
-}
-
-function normalizeHeadingItems(headings) {
-  return (Array.isArray(headings) ? headings : [])
-    .map((item) => String(item || '').trim())
-    .filter(Boolean);
-}
-
-function getQueueRowLookup(rows) {
-  const map = new Map();
-
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const normalized = String(row?.normalized_url || '').trim();
-    const raw = String(row?.url || '').trim();
-
-    if (normalized) map.set(normalized, row);
-    if (raw) map.set(raw, row);
-  }
-
-  return map;
-}
-
-function buildSiteContentRowFromBatchPage(page, agentId) {
-  return {
-    agent_id: agentId,
-    url: String(page?.url || '').trim(),
-    content: String(page?.content || '').trim(),
-    page_title: String(page?.page_title || page?.pageTitle || '').trim(),
-    meta_description: String(page?.meta_description || page?.metaDescription || '').trim(),
-    h1: String(page?.h1 || '').trim(),
-    headings: normalizeHeadingItems(page?.headings),
-    internal_links: normalizeLinkItems(page?.internal_links || page?.internalLinks),
-    text_preview: String(page?.text_preview || page?.textPreview || '').trim()
-  };
-}
-
-
-function normalizeBatchCrawlPagesResult(crawlResult) {
-  if (Array.isArray(crawlResult)) return crawlResult.filter(Boolean);
-  if (Array.isArray(crawlResult?.pages)) return crawlResult.pages.filter(Boolean);
-  if (crawlResult && typeof crawlResult === 'object') return [crawlResult];
-  return [];
-}
-
-async function saveSiteContentRows(rows) {
-  const safeRows = Array.isArray(rows) ? rows.filter((row) => row && row.agent_id && row.url) : [];
-  if (!safeRows.length) {
-    return { success: true, saved: 0 };
-  }
-
-  const upsertResult = await supabase
-    .from('site_content')
-    .upsert(safeRows, {
-      onConflict: 'agent_id,url'
-    });
-
-  if (!upsertResult.error) {
-    return { success: true, saved: safeRows.length };
-  }
-
-  console.error('SITE_CONTENT UPSERT FAILED, FALLING BACK TO MANUAL SAVE:', upsertResult.error);
-
-  for (const row of safeRows) {
-    const { data: existingRow, error: existingError } = await supabase
-      .from('site_content')
-      .select('id')
-      .eq('agent_id', row.agent_id)
-      .eq('url', row.url)
-      .maybeSingle();
-
-    if (existingError) {
-      return { success: false, error: existingError };
-    }
-
-    if (existingRow?.id) {
-      const { error: updateError } = await supabase
-        .from('site_content')
-        .update({
-          content: row.content,
-          page_title: row.page_title,
-          meta_description: row.meta_description,
-          h1: row.h1,
-          headings: row.headings,
-          internal_links: row.internal_links,
-          text_preview: row.text_preview
-        })
-        .eq('id', existingRow.id);
-
-      if (updateError) {
-        return { success: false, error: updateError };
-      }
-    } else {
-      const { error: insertError } = await supabase
-        .from('site_content')
-        .insert(row);
-
-      if (insertError) {
-        return { success: false, error: insertError };
-      }
-    }
-  }
-
-  return { success: true, saved: safeRows.length, fallback: true };
-}
-
 function normalizeCrawlResultToRows(crawlResult, agentId) {
   let pages = [];
 
@@ -452,8 +340,23 @@ function normalizeCrawlResultToRows(crawlResult, agentId) {
   const normalizedRows = pages
     .filter(Boolean)
     .map((page) => {
-      const safeHeadings = normalizeHeadingItems(page?.headings);
-      const safeInternalLinks = normalizeLinkItems(page?.internal_links || page?.internalLinks);
+      const headings = Array.isArray(page?.headings) ? page.headings : [];
+      const internalLinks = Array.isArray(page?.internal_links)
+        ? page.internal_links
+        : Array.isArray(page?.internalLinks)
+          ? page.internalLinks
+          : [];
+
+      const safeHeadings = headings
+        .map((item) => String(item || '').trim())
+        .filter(Boolean);
+
+      const safeInternalLinks = internalLinks
+        .map((link) => ({
+          text: String(link?.text || '').trim(),
+          href: String(link?.href || '').trim()
+        }))
+        .filter((link) => link.href);
 
       return {
         agent_id: agentId,
@@ -574,10 +477,7 @@ async function handleCrawlRunBatch(req, res, body) {
   if (!user) return;
 
   const jobId = String(body.jobId || body.job_id || '').trim();
-  const requestedBatchSize = Number(body.batchSize || body.batch_size || 40);
-  const BATCH_SIZE = Number.isFinite(requestedBatchSize)
-    ? Math.max(1, Math.min(60, Math.floor(requestedBatchSize)))
-    : 40;
+  const BATCH_SIZE = 12;
 
   if (!jobId) {
     return res.status(400).json({ error: 'Missing jobId' });
@@ -630,19 +530,11 @@ async function handleCrawlRunBatch(req, res, body) {
       success: true,
       jobId,
       status: 'completed',
-      message: 'No more queued URLs',
-      batchSize: 0,
-      crawledNow: 0,
-      failedNow: 0,
-      discoveredNow: 0,
-      totalCrawled: Number(job.total_crawled || 0),
-      totalSaved: Number(job.total_saved || 0),
-      totalDiscovered: Number(job.total_discovered || 0)
+      message: 'No more queued URLs'
     });
   }
 
   const queueIds = queuedRows.map((row) => row.id);
-  const queueRowLookup = getQueueRowLookup(queuedRows);
 
   const markProcessing = await supabase
     .from('crawl_queue')
@@ -661,75 +553,50 @@ async function handleCrawlRunBatch(req, res, body) {
     })
     .eq('id', jobId);
 
-  let rootOrigin = '';
+  const rootOrigin = new URL(job.start_url || job.site_domain).origin;
+  const urlsToCrawl = queuedRows.map((row) => row.normalized_url || row.url).filter(Boolean);
 
-  try {
-    rootOrigin = new URL(job.start_url || job.site_domain).origin;
-  } catch (err) {
-    return res.status(400).json({ error: 'Invalid job start_url/site_domain' });
-  }
+  const crawledPages = await crawlBatchPages(urlsToCrawl, rootOrigin);
 
-  const urlsToCrawl = queuedRows
-    .map((row) => String(row.normalized_url || row.url || '').trim())
-    .filter(Boolean);
+  const successPages = crawledPages.filter((page) => !page.error);
+  const failedPages = crawledPages.filter((page) => page.error);
 
-  let crawledPages = [];
-
-  try {
-    const batchResult = await crawlBatchPages(urlsToCrawl, rootOrigin);
-    crawledPages = normalizeBatchCrawlPagesResult(batchResult);
-  } catch (err) {
-    await supabase
-      .from('crawl_queue')
-      .update({
-        status: 'failed',
-        last_error: err?.message || 'crawlBatchPages failed'
-      })
-      .in('id', queueIds);
-
-    return res.status(500).json({
-      error: err?.message || 'crawlBatchPages failed'
+ const rowsToInsert = successPages.map((page) => ({
+  agent_id: job.agent_id,
+  url: String(page.url || '').trim(),
+  content: '',
+  page_title: String(page.page_title || '').trim(),
+  meta_description: String(page.meta_description || '').trim(),
+  h1: String(page.h1 || '').trim(),
+  headings: Array.isArray(page.headings)
+    ? page.headings.map((item) => String(item || '').trim()).filter(Boolean)
+    : [],
+  internal_links: [],
+  text_preview: String(page.text_preview || '').trim()
+})).filter((row) => row.url);
+  
+if (rowsToInsert.length) {
+  const upsertContent = await supabase
+    .from('site_content')
+    .upsert(rowsToInsert, {
+      onConflict: 'agent_id,url'
     });
+
+  if (upsertContent.error) {
+    console.error('SITE_CONTENT UPSERT ERROR:', upsertContent.error);
+    return res.status(500).json({ error: upsertContent.error.message });
   }
-
-  const successPages = crawledPages.filter((page) => page && !page.error && page.url);
-  const failedPages = crawledPages.filter((page) => page && page.error);
-
-  const rowsToInsert = successPages
-    .map((page) => buildSiteContentRowFromBatchPage(page, job.agent_id))
-    .filter((row) => row.url);
-
-  if (rowsToInsert.length) {
-    const saveResult = await saveSiteContentRows(rowsToInsert);
-
-    if (!saveResult.success) {
-      console.error('SITE_CONTENT SAVE ERROR:', saveResult.error);
-      return res.status(500).json({ error: saveResult.error?.message || 'Failed to save site_content rows' });
-    }
-  }
+}
 
   const discoveredQueueRows = [];
   const seenDiscovered = new Set();
 
   for (const page of successPages) {
-    const pageUrl = normalizeUrl(page?.url || '');
-    const sourceQueueRow = queueRowLookup.get(pageUrl) || null;
-    const nextDepth = Number(sourceQueueRow?.depth || 0) + 1;
-    const links = normalizeLinkItems(page?.internal_links || page?.internalLinks);
+    const links = Array.isArray(page.internal_links) ? page.internal_links : [];
 
     for (const link of links) {
-      const href = normalizeUrl(link.href);
+      const href = normalizeUrl(link && link.href ? link.href : '');
       if (!href) continue;
-
-      let hrefOrigin = '';
-      try {
-        hrefOrigin = new URL(href).origin;
-      } catch {
-        continue;
-      }
-
-      if (hrefOrigin !== rootOrigin) continue;
-      if (href === pageUrl) continue;
 
       const dedupeKey = jobId + '::' + href;
       if (seenDiscovered.has(dedupeKey)) continue;
@@ -740,125 +607,108 @@ async function handleCrawlRunBatch(req, res, body) {
         url: href,
         normalized_url: href,
         status: 'queued',
-        depth: nextDepth,
-        priority: Math.max(0, 100 - nextDepth),
-        discovered_from: pageUrl || null,
-        page_title: String(link.text || '').trim()
+        depth: 1,
+        priority: 0,
+        discovered_from: page.url || null,
+        page_title: String(link && link.text ? link.text : '').trim()
       });
     }
   }
+
+  let insertedQueueRowsCount = 0;
 
   if (discoveredQueueRows.length) {
-    const upsertQueue = await supabase
+    const discoveredUrls = discoveredQueueRows.map((row) => row.normalized_url).filter(Boolean);
+
+    const { data: existingQueueRows, error: existingQueueError } = await supabase
       .from('crawl_queue')
-      .upsert(discoveredQueueRows, {
-        onConflict: 'job_id,normalized_url'
-      });
-
-    if (upsertQueue.error) {
-      return res.status(500).json({ error: upsertQueue.error.message });
-    }
-  }
-
-  const successNormalizedUrls = successPages
-    .map((page) => normalizeUrl(page?.url || ''))
-    .filter(Boolean);
-
-  const failedNormalizedUrls = failedPages
-    .map((page) => normalizeUrl(page?.url || ''))
-    .filter(Boolean);
-
-  if (successNormalizedUrls.length) {
-    const successUpdate = await supabase
-      .from('crawl_queue')
-      .update({
-        status: 'done',
-        last_error: null
-      })
+      .select('normalized_url')
       .eq('job_id', jobId)
-      .in('normalized_url', successNormalizedUrls);
+      .in('normalized_url', discoveredUrls);
 
-    if (successUpdate.error) {
-      return res.status(500).json({ error: successUpdate.error.message });
+    if (existingQueueError) {
+      return res.status(500).json({ error: existingQueueError.message });
+    }
+
+    const existingQueueSet = new Set(
+      (existingQueueRows || [])
+        .map((row) => String(row.normalized_url || '').trim())
+        .filter(Boolean)
+    );
+
+    const newQueueRows = discoveredQueueRows.filter((row) => !existingQueueSet.has(row.normalized_url));
+
+    if (newQueueRows.length) {
+      const insertQueue = await supabase
+        .from('crawl_queue')
+        .insert(newQueueRows);
+
+      if (insertQueue.error) {
+        return res.status(500).json({ error: insertQueue.error.message });
+      }
+
+      insertedQueueRowsCount = newQueueRows.length;
     }
   }
 
-  if (failedNormalizedUrls.length) {
-    for (const page of failedPages) {
-      const failedUrl = normalizeUrl(page?.url || '');
-      if (!failedUrl) continue;
+  if (successPages.length) {
+    for (const page of successPages) {
+      await supabase
+        .from('crawl_queue')
+        .update({
+          status: 'done',
+          last_error: null
+        })
+        .eq('job_id', jobId)
+        .eq('normalized_url', page.url);
+    }
+  }
 
-      const failedUpdate = await supabase
+  if (failedPages.length) {
+    for (const page of failedPages) {
+      await supabase
         .from('crawl_queue')
         .update({
           status: 'failed',
           last_error: page.error || 'Failed to crawl page'
         })
         .eq('job_id', jobId)
-        .eq('normalized_url', failedUrl);
-
-      if (failedUpdate.error) {
-        return res.status(500).json({ error: failedUpdate.error.message });
-      }
+        .eq('normalized_url', page.url);
     }
   }
 
   const newTotalCrawled = Number(job.total_crawled || 0) + queuedRows.length;
   const newTotalSaved = Number(job.total_saved || 0) + successPages.length;
-
-  const queueStats = await supabase
-    .from('crawl_queue')
-    .select('id', { count: 'exact', head: true })
-    .eq('job_id', jobId);
-
-  const totalDiscoveredCount = Number(queueStats.count || 0);
-
-  const queuedCountResult = await supabase
-    .from('crawl_queue')
-    .select('id', { count: 'exact', head: true })
-    .eq('job_id', jobId)
-    .eq('status', 'queued');
-
-  const processingCountResult = await supabase
-    .from('crawl_queue')
-    .select('id', { count: 'exact', head: true })
-    .eq('job_id', jobId)
-    .eq('status', 'processing');
-
-  const remainingQueued = Number(queuedCountResult.count || 0);
-  const processingCount = Number(processingCountResult.count || 0);
-  const nextStatus = remainingQueued === 0 && processingCount === 0 ? 'completed' : 'running';
+  const newTotalDiscovered = Number(job.total_discovered || 0) + insertedQueueRowsCount;
 
   await supabase
     .from('crawl_jobs')
     .update({
       total_crawled: newTotalCrawled,
       total_saved: newTotalSaved,
-      total_discovered: totalDiscoveredCount,
-      status: nextStatus,
-      finished_at: nextStatus === 'completed' ? new Date().toISOString() : null
+      total_discovered: newTotalDiscovered,
+      status: 'running'
     })
     .eq('id', jobId);
 
   return res.status(200).json({
     success: true,
     jobId,
-    status: nextStatus,
+    status: 'running',
     batchSize: queuedRows.length,
     crawledNow: successPages.length,
-    savedNow: rowsToInsert.length,
     failedNow: failedPages.length,
-    discoveredNow: discoveredQueueRows.length,
-    remainingQueued,
+    discoveredNow: insertedQueueRowsCount,
     totalCrawled: newTotalCrawled,
     totalSaved: newTotalSaved,
-    totalDiscovered: totalDiscoveredCount
+    totalDiscovered: newTotalDiscovered
   });
 }
 
 // ========================================
 // CRAWL RUN BATCH - END
 // ========================================
+
 // ========================================
 // CRAWL STATUS - START
 // ========================================
@@ -875,7 +725,7 @@ async function handleCrawlStatus(req, res, body) {
 
   const { data: job, error: jobError } = await supabase
     .from('crawl_jobs')
-    .select('id, agent_id, site_domain, start_url, status, total_discovered, total_crawled, total_saved, current_batch, finished_at, created_at')
+    .select('id, agent_id, status, total_discovered, total_crawled, total_saved, current_batch, finished_at')
     .eq('id', jobId)
     .single();
 
@@ -894,36 +744,48 @@ async function handleCrawlStatus(req, res, body) {
     return res.status(403).json({ error: 'Access denied for this crawl job' });
   }
 
-  const [queuedResult, processingResult, doneResult, failedResult] = await Promise.all([
-    supabase.from('crawl_queue').select('id', { count: 'exact', head: true }).eq('job_id', jobId).eq('status', 'queued'),
-    supabase.from('crawl_queue').select('id', { count: 'exact', head: true }).eq('job_id', jobId).eq('status', 'processing'),
-    supabase.from('crawl_queue').select('id', { count: 'exact', head: true }).eq('job_id', jobId).eq('status', 'done'),
-    supabase.from('crawl_queue').select('id', { count: 'exact', head: true }).eq('job_id', jobId).eq('status', 'failed')
-  ]);
+  const { count: queuedCount, error: queuedError } = await supabase
+    .from('crawl_queue')
+    .select('*', { count: 'exact', head: true })
+    .eq('job_id', jobId)
+    .eq('status', 'queued');
+
+  if (queuedError) {
+    return res.status(500).json({ error: queuedError.message });
+  }
+
+  const { count: processingCount, error: processingError } = await supabase
+    .from('crawl_queue')
+    .select('*', { count: 'exact', head: true })
+    .eq('job_id', jobId)
+    .eq('status', 'processing');
+
+  if (processingError) {
+    return res.status(500).json({ error: processingError.message });
+  }
+
+  const effectiveStatus =
+    Number(queuedCount || 0) === 0 && Number(processingCount || 0) === 0
+      ? 'completed'
+      : String(job.status || 'running');
 
   return res.status(200).json({
     success: true,
     jobId: job.id,
-    status: job.status,
-    siteDomain: job.site_domain,
-    startUrl: job.start_url,
-    currentBatch: Number(job.current_batch || 0),
+    status: effectiveStatus,
     totalDiscovered: Number(job.total_discovered || 0),
     totalCrawled: Number(job.total_crawled || 0),
     totalSaved: Number(job.total_saved || 0),
-    queuedCount: Number(queuedResult.count || 0),
-    processingCount: Number(processingResult.count || 0),
-    doneCount: Number(doneResult.count || 0),
-    failedCount: Number(failedResult.count || 0),
-    finishedAt: job.finished_at || null,
-    createdAt: job.created_at || null
+    currentBatch: Number(job.current_batch || 0),
+    remainingQueued: Number(queuedCount || 0),
+    processingCount: Number(processingCount || 0),
+    finishedAt: job.finished_at || null
   });
 }
 
 // ========================================
 // CRAWL STATUS - END
 // ========================================
-
 
 // ========================================
 // CRAWL SITE - START
