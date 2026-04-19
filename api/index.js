@@ -478,6 +478,9 @@ async function handleCrawlRunBatch(req, res, body) {
 
   const jobId = String(body.jobId || body.job_id || '').trim();
   const BATCH_SIZE = 12;
+  const MAX_DISCOVERY_DEPTH = 8;
+  const MAX_CONTENT_DEPTH = 12;
+  const MAX_DISCOVERY_LINKS_PER_PAGE = 25;
 
   if (!jobId) {
     return res.status(400).json({ error: 'Missing jobId' });
@@ -555,43 +558,45 @@ async function handleCrawlRunBatch(req, res, body) {
 
   const rootOrigin = new URL(job.start_url || job.site_domain).origin;
   const urlsToCrawl = queuedRows.map((row) => row.normalized_url || row.url).filter(Boolean);
-
   const crawledPages = await crawlBatchPages(urlsToCrawl, rootOrigin);
 
   const successPages = crawledPages.filter((page) => !page.error);
   const failedPages = crawledPages.filter((page) => page.error);
 
- const rowsToInsert = successPages
-  .filter((page) => String(page.page_kind || '') === 'content')
-  .map((page) => ({
-    agent_id: job.agent_id,
-    url: String(page.url || '').trim(),
-    content: String(page.content || '').trim().slice(0, 25000),
-    page_title: String(page.page_title || '').trim(),
-    meta_description: String(page.meta_description || '').trim(),
-    h1: String(page.h1 || '').trim(),
-    headings: Array.isArray(page.headings)
-      ? page.headings.map((item) => String(item || '').trim()).filter(Boolean)
-      : [],
-    internal_links: Array.isArray(page.internal_links)
-      ? page.internal_links
-      : [],
-    text_preview: String(page.text_preview || '').trim()
-  }))
-  .filter((row) => row.url);
-  
-if (rowsToInsert.length) {
-  const upsertContent = await supabase
-    .from('site_content')
-    .upsert(rowsToInsert, {
-      onConflict: 'agent_id,url'
-    });
+  const rowsToInsert = successPages
+    .filter((page) => String(page.page_kind || '') === 'content')
+    .map((page) => ({
+      agent_id: job.agent_id,
+      url: String(page.url || '').trim(),
+      content: String(page.content || '').trim().slice(0, 25000),
+      page_title: String(page.page_title || '').trim(),
+      meta_description: String(page.meta_description || '').trim(),
+      h1: String(page.h1 || '').trim(),
+      headings: Array.isArray(page.headings)
+        ? page.headings.map((item) => String(item || '').trim()).filter(Boolean)
+        : [],
+      internal_links: Array.isArray(page.internal_links)
+        ? page.internal_links.map((link) => ({
+            text: String(link?.text || '').trim(),
+            href: String(link?.href || '').trim()
+          })).filter((link) => link.href)
+        : [],
+      text_preview: String(page.text_preview || '').trim()
+    }))
+    .filter((row) => row.url);
 
-  if (upsertContent.error) {
-    console.error('SITE_CONTENT UPSERT ERROR:', upsertContent.error);
-    return res.status(500).json({ error: upsertContent.error.message });
+  if (rowsToInsert.length) {
+    const upsertContent = await supabase
+      .from('site_content')
+      .upsert(rowsToInsert, {
+        onConflict: 'agent_id,url'
+      });
+
+    if (upsertContent.error) {
+      console.error('SITE_CONTENT UPSERT ERROR:', upsertContent.error);
+      return res.status(500).json({ error: upsertContent.error.message });
+    }
   }
-}
 
   const discoveredQueueRows = [];
   const seenDiscovered = new Set();
@@ -604,10 +609,8 @@ if (rowsToInsert.length) {
 
   for (const page of successPages) {
     const links = Array.isArray(page.internal_links) ? page.internal_links : [];
-    const currentDepth = Number(
-      queuedRowDepthMap.get(String(page.url || '').trim()) || 0
-    );
-
+    const pageUrl = String(page.url || '').trim();
+    const currentDepth = Number(queuedRowDepthMap.get(pageUrl) || 0);
     let discoveryAddedForPage = 0;
 
     for (const link of links) {
@@ -617,16 +620,20 @@ if (rowsToInsert.length) {
       const kind = classifyUrl(href);
       if (kind === 'blocked' || kind === 'unknown') continue;
 
-      if (kind === 'discovery') {
-        if (currentDepth >= 1) continue;
-        if (discoveryAddedForPage >= 4) continue;
-      }
-
-      if (kind === 'content' && currentDepth >= 3) continue;
+      if (kind === 'discovery' && currentDepth >= MAX_DISCOVERY_DEPTH) continue;
+      if (kind === 'content' && currentDepth >= MAX_CONTENT_DEPTH) continue;
+      if (kind === 'discovery' && discoveryAddedForPage >= MAX_DISCOVERY_LINKS_PER_PAGE) continue;
 
       const dedupeKey = jobId + '::' + href;
       if (seenDiscovered.has(dedupeKey)) continue;
       seenDiscovered.add(dedupeKey);
+
+      const linkPriority = Number(link && link.priority);
+      const priority = Number.isFinite(linkPriority)
+        ? linkPriority
+        : kind === 'content'
+          ? 30
+          : 12;
 
       discoveredQueueRows.push({
         job_id: jobId,
@@ -634,7 +641,7 @@ if (rowsToInsert.length) {
         normalized_url: href,
         status: 'queued',
         depth: currentDepth + 1,
-        priority: kind === 'content' ? 20 : 5,
+        priority,
         discovered_from: page.url || null,
         page_title: String(link && link.text ? link.text : '').trim()
       });
@@ -683,6 +690,9 @@ if (rowsToInsert.length) {
 
   if (successPages.length) {
     for (const page of successPages) {
+      const finalUrl = String(page.url || '').trim();
+      const requestedUrl = String(page.requested_url || '').trim();
+
       await supabase
         .from('crawl_queue')
         .update({
@@ -690,7 +700,7 @@ if (rowsToInsert.length) {
           last_error: null
         })
         .eq('job_id', jobId)
-        .eq('normalized_url', page.url);
+        .in('normalized_url', [finalUrl, requestedUrl].filter(Boolean));
     }
   }
 
@@ -703,7 +713,7 @@ if (rowsToInsert.length) {
           last_error: page.error || 'Failed to crawl page'
         })
         .eq('job_id', jobId)
-        .eq('normalized_url', page.url);
+        .eq('normalized_url', String(page.url || '').trim());
     }
   }
 
