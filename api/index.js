@@ -477,7 +477,7 @@ async function handleCrawlRunBatch(req, res, body) {
   if (!user) return;
 
   const jobId = String(body.jobId || body.job_id || '').trim();
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 8;
 
   if (!jobId) {
     return res.status(400).json({ error: 'Missing jobId' });
