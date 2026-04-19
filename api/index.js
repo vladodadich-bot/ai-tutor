@@ -478,6 +478,7 @@ async function handleCrawlRunBatch(req, res, body) {
 
   const jobId = String(body.jobId || body.job_id || '').trim();
   const BATCH_SIZE = 8;
+  const MAX_TOTAL_PAGES = 500;
 
   if (!jobId) {
     return res.status(400).json({ error: 'Missing jobId' });
@@ -504,6 +505,36 @@ async function handleCrawlRunBatch(req, res, body) {
     return res.status(403).json({ error: 'Access denied for this crawl job' });
   }
 
+  const currentTotalCrawled = Number(job.total_crawled || 0);
+  const remainingSlots = Math.max(0, MAX_TOTAL_PAGES - currentTotalCrawled);
+
+  if (remainingSlots <= 0) {
+    await supabase
+      .from('crawl_jobs')
+      .update({
+        status: 'completed',
+        finished_at: new Date().toISOString()
+      })
+      .eq('id', jobId);
+
+    await supabase
+      .from('crawl_queue')
+      .update({ status: 'skipped', last_error: 'Maximum crawl limit reached' })
+      .eq('job_id', jobId)
+      .eq('status', 'queued');
+
+    return res.status(200).json({
+      success: true,
+      jobId,
+      status: 'completed',
+      message: 'Maximum crawl limit reached',
+      totalCrawled: currentTotalCrawled,
+      maxTotalPages: MAX_TOTAL_PAGES
+    });
+  }
+
+  const effectiveBatchSize = Math.min(BATCH_SIZE, remainingSlots);
+
   const { data: queuedRows, error: queueFetchError } = await supabase
     .from('crawl_queue')
     .select('id, url, normalized_url, depth, priority')
@@ -511,7 +542,7 @@ async function handleCrawlRunBatch(req, res, body) {
     .eq('status', 'queued')
     .order('priority', { ascending: false })
     .order('created_at', { ascending: true })
-    .limit(BATCH_SIZE);
+    .limit(effectiveBatchSize);
 
   if (queueFetchError) {
     return res.status(500).json({ error: queueFetchError.message });
@@ -530,7 +561,9 @@ async function handleCrawlRunBatch(req, res, body) {
       success: true,
       jobId,
       status: 'completed',
-      message: 'No more queued URLs'
+      message: 'No more queued URLs',
+      totalCrawled: currentTotalCrawled,
+      maxTotalPages: MAX_TOTAL_PAGES
     });
   }
 
@@ -636,8 +669,10 @@ async function handleCrawlRunBatch(req, res, body) {
   }
 
   let insertedQueueRowsCount = 0;
+  const projectedTotalCrawled = currentTotalCrawled + queuedRows.length;
+  const shouldInsertMoreQueueRows = projectedTotalCrawled < MAX_TOTAL_PAGES;
 
-  if (discoveredQueueRows.length) {
+  if (discoveredQueueRows.length && shouldInsertMoreQueueRows) {
     const discoveredUrls = discoveredQueueRows
       .map((row) => row.normalized_url)
       .filter(Boolean);
@@ -707,9 +742,10 @@ async function handleCrawlRunBatch(req, res, body) {
     }
   }
 
-  const newTotalCrawled = Number(job.total_crawled || 0) + queuedRows.length;
+  const newTotalCrawled = projectedTotalCrawled;
   const newTotalSaved = Number(job.total_saved || 0) + rowsToInsert.length;
   const newTotalDiscovered = Number(job.total_discovered || 0) + insertedQueueRowsCount;
+  const reachedMaxLimit = newTotalCrawled >= MAX_TOTAL_PAGES;
 
   await supabase
     .from('crawl_jobs')
@@ -717,14 +753,24 @@ async function handleCrawlRunBatch(req, res, body) {
       total_crawled: newTotalCrawled,
       total_saved: newTotalSaved,
       total_discovered: newTotalDiscovered,
-      status: 'running'
+      status: reachedMaxLimit ? 'completed' : 'running',
+      finished_at: reachedMaxLimit ? new Date().toISOString() : null
     })
     .eq('id', jobId);
+
+  if (reachedMaxLimit) {
+    await supabase
+      .from('crawl_queue')
+      .update({ status: 'skipped', last_error: 'Maximum crawl limit reached' })
+      .eq('job_id', jobId)
+      .eq('status', 'queued');
+  }
 
   return res.status(200).json({
     success: true,
     jobId,
-    status: 'running',
+    status: reachedMaxLimit ? 'completed' : 'running',
+    message: reachedMaxLimit ? 'Maximum crawl limit reached' : undefined,
     batchSize: queuedRows.length,
     crawledNow: successPages.length,
     savedNow: rowsToInsert.length,
@@ -732,9 +778,11 @@ async function handleCrawlRunBatch(req, res, body) {
     discoveredNow: insertedQueueRowsCount,
     totalCrawled: newTotalCrawled,
     totalSaved: newTotalSaved,
-    totalDiscovered: newTotalDiscovered
+    totalDiscovered: newTotalDiscovered,
+    maxTotalPages: MAX_TOTAL_PAGES
   });
 }
+
 // ========================================
 // CRAWL RUN BATCH - END
 // ========================================
