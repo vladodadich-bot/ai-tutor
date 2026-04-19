@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { crawlSinglePage, crawlBatchPages, normalizeUrl, classifyUrl } from '../lib/crawl.js';
+import { crawlSinglePage, crawlBatchPages, normalizeUrl } from '../lib/crawl.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -339,10 +339,6 @@ function normalizeCrawlResultToRows(crawlResult, agentId) {
 
   const normalizedRows = pages
     .filter(Boolean)
-    .filter((page) => {
-      const kind = String(page?.page_kind || '').trim().toLowerCase();
-      return !kind || kind === 'content';
-    })
     .map((page) => {
       const headings = Array.isArray(page?.headings) ? page.headings : [];
       const internalLinks = Array.isArray(page?.internal_links)
@@ -481,7 +477,7 @@ async function handleCrawlRunBatch(req, res, body) {
   if (!user) return;
 
   const jobId = String(body.jobId || body.job_id || '').trim();
-  const BATCH_SIZE = 12;
+  const BATCH_SIZE = 20;
 
   if (!jobId) {
     return res.status(400).json({ error: 'Missing jobId' });
@@ -558,73 +554,73 @@ async function handleCrawlRunBatch(req, res, body) {
     .eq('id', jobId);
 
   const rootOrigin = new URL(job.start_url || job.site_domain).origin;
-  const urlsToCrawl = queuedRows.map((row) => row.normalized_url || row.url).filter(Boolean);
+  const urlsToCrawl = queuedRows
+    .map((row) => normalizeUrl(row.normalized_url || row.url))
+    .filter(Boolean);
 
-  const crawledPages = await crawlBatchPages(urlsToCrawl, rootOrigin);
+  const crawledPages = await crawlBatchPages(urlsToCrawl, rootOrigin, 6);
 
-  const successPages = crawledPages.filter((page) => !page.error);
+  const successPages = crawledPages.filter((page) => !page.error && page.url);
   const failedPages = crawledPages.filter((page) => page.error);
 
- const rowsToInsert = successPages
-  .filter((page) => String(page.page_kind || '') === 'content')
-  .map((page) => ({
-    agent_id: job.agent_id,
-    url: String(page.url || '').trim(),
-    content: String(page.content || '').trim().slice(0, 25000),
-    page_title: String(page.page_title || '').trim(),
-    meta_description: String(page.meta_description || '').trim(),
-    h1: String(page.h1 || '').trim(),
-    headings: Array.isArray(page.headings)
-      ? page.headings.map((item) => String(item || '').trim()).filter(Boolean)
-      : [],
-    internal_links: Array.isArray(page.internal_links)
-      ? page.internal_links
-      : [],
-    text_preview: String(page.text_preview || '').trim()
-  }))
-  .filter((row) => row.url);
-  
-if (rowsToInsert.length) {
-  const upsertContent = await supabase
-    .from('site_content')
-    .upsert(rowsToInsert, {
-      onConflict: 'agent_id,url'
-    });
+  const rowsToInsert = successPages
+    .map((page) => ({
+      agent_id: job.agent_id,
+      url: String(page.url || '').trim(),
+      content: String(page.content || '').trim().slice(0, 25000),
+      page_title: String(page.page_title || '').trim(),
+      meta_description: String(page.meta_description || '').trim(),
+      h1: String(page.h1 || '').trim(),
+      headings: Array.isArray(page.headings)
+        ? page.headings.map((item) => String(item || '').trim()).filter(Boolean)
+        : [],
+      internal_links: Array.isArray(page.internal_links)
+        ? page.internal_links
+            .map((link) => ({
+              text: String(link && link.text ? link.text : '').trim(),
+              href: String(link && link.href ? link.href : '').trim(),
+              priority: Number(link && link.priority ? link.priority : 0)
+            }))
+            .filter((link) => link.href)
+        : [],
+      text_preview: String(page.text_preview || '').trim()
+    }))
+    .filter((row) => row.url);
 
-  if (upsertContent.error) {
-    console.error('SITE_CONTENT UPSERT ERROR:', upsertContent.error);
-    return res.status(500).json({ error: upsertContent.error.message });
+  if (rowsToInsert.length) {
+    const upsertContent = await supabase
+      .from('site_content')
+      .upsert(rowsToInsert, {
+        onConflict: 'agent_id,url'
+      });
+
+    if (upsertContent.error) {
+      console.error('SITE_CONTENT UPSERT ERROR:', upsertContent.error);
+      return res.status(500).json({ error: upsertContent.error.message });
+    }
   }
-}
 
   const discoveredQueueRows = [];
   const seenDiscovered = new Set();
   const queuedRowDepthMap = new Map(
     queuedRows.map((row) => [
-      String(row.normalized_url || row.url || '').trim(),
+      String(normalizeUrl(row.normalized_url || row.url) || '').trim(),
       Number(row.depth || 0)
     ])
   );
 
   for (const page of successPages) {
     const links = Array.isArray(page.internal_links) ? page.internal_links : [];
-    const lookupUrl = String(page.requested_url || page.url || '').trim();
-    const currentDepth = Number(queuedRowDepthMap.get(lookupUrl) || queuedRowDepthMap.get(String(page.url || '').trim()) || 0);
+    const pageKey = String(normalizeUrl(page.requested_url || page.url) || normalizeUrl(page.url) || '').trim();
+    const currentDepth = Number(queuedRowDepthMap.get(pageKey) || 0);
 
     for (const link of links) {
       const href = normalizeUrl(link && link.href ? link.href : '');
       if (!href) continue;
 
-      const kind = classifyUrl(href);
-      if (kind !== 'content') continue;
-      if (currentDepth >= 4) continue;
-
       const dedupeKey = jobId + '::' + href;
       if (seenDiscovered.has(dedupeKey)) continue;
       seenDiscovered.add(dedupeKey);
-
-      const rawPriority = Number(link && link.priority ? link.priority : 0);
-      const safePriority = Number.isFinite(rawPriority) ? rawPriority : 0;
 
       discoveredQueueRows.push({
         job_id: jobId,
@@ -632,7 +628,7 @@ if (rowsToInsert.length) {
         normalized_url: href,
         status: 'queued',
         depth: currentDepth + 1,
-        priority: 20 + safePriority,
+        priority: Number(link && link.priority ? link.priority : 0),
         discovered_from: page.url || null,
         page_title: String(link && link.text ? link.text : '').trim()
       });
@@ -642,7 +638,9 @@ if (rowsToInsert.length) {
   let insertedQueueRowsCount = 0;
 
   if (discoveredQueueRows.length) {
-    const discoveredUrls = discoveredQueueRows.map((row) => row.normalized_url).filter(Boolean);
+    const discoveredUrls = discoveredQueueRows
+      .map((row) => row.normalized_url)
+      .filter(Boolean);
 
     const { data: existingQueueRows, error: existingQueueError } = await supabase
       .from('crawl_queue')
@@ -660,7 +658,9 @@ if (rowsToInsert.length) {
         .filter(Boolean)
     );
 
-    const newQueueRows = discoveredQueueRows.filter((row) => !existingQueueSet.has(row.normalized_url));
+    const newQueueRows = discoveredQueueRows.filter(
+      (row) => !existingQueueSet.has(row.normalized_url)
+    );
 
     if (newQueueRows.length) {
       const insertQueue = await supabase
@@ -677,7 +677,9 @@ if (rowsToInsert.length) {
 
   if (successPages.length) {
     for (const page of successPages) {
-      const targetUrl = String(page.requested_url || page.url || '').trim();
+      const pageQueueKey = normalizeUrl(page.requested_url || page.url) || normalizeUrl(page.url);
+      if (!pageQueueKey) continue;
+
       await supabase
         .from('crawl_queue')
         .update({
@@ -685,13 +687,15 @@ if (rowsToInsert.length) {
           last_error: null
         })
         .eq('job_id', jobId)
-        .eq('normalized_url', targetUrl);
+        .eq('normalized_url', pageQueueKey);
     }
   }
 
   if (failedPages.length) {
     for (const page of failedPages) {
-      const targetUrl = String(page.requested_url || page.url || '').trim();
+      const pageQueueKey = normalizeUrl(page.requested_url || page.url) || normalizeUrl(page.url);
+      if (!pageQueueKey) continue;
+
       await supabase
         .from('crawl_queue')
         .update({
@@ -699,7 +703,7 @@ if (rowsToInsert.length) {
           last_error: page.error || 'Failed to crawl page'
         })
         .eq('job_id', jobId)
-        .eq('normalized_url', targetUrl);
+        .eq('normalized_url', pageQueueKey);
     }
   }
 
@@ -731,7 +735,6 @@ if (rowsToInsert.length) {
     totalDiscovered: newTotalDiscovered
   });
 }
-
 // ========================================
 // CRAWL RUN BATCH - END
 // ========================================
