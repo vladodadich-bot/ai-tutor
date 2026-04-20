@@ -1,43 +1,81 @@
 // ============================
-// 🔥 ANALYTICS: TRACK VISIT
+// 🔥 ANALYTICS HELPERS
 // ============================
-function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle) {
-  const title = getPageTitle() || "Untitled Page";
-  if (!agentId) return;
+var __sitemindVisitStart = Date.now();
+
+function __sitemindCanTrack(agentId) {
+  return !!agentId && agentId !== "demo-agent";
+}
+
+function __sitemindGetSessionId() {
+  var key = "__sitemind_session_id";
+  try {
+    var existing = sessionStorage.getItem(key);
+    if (existing) return existing;
+
+    var created =
+      "sm_" +
+      Math.random().toString(36).slice(2) +
+      "_" +
+      Date.now().toString(36);
+
+    sessionStorage.setItem(key, created);
+    return created;
+  } catch (e) {
+    return "sm_fallback_" + Date.now().toString(36);
+  }
+}
+
+function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle, detectPageLanguage) {
+  if (!__sitemindCanTrack(agentId) || !BASE_URL) return;
+
+  var title = (typeof getPageTitle === "function" ? getPageTitle() : "") || "Untitled Page";
+  var language = typeof detectPageLanguage === "function" ? detectPageLanguage() : "en";
 
   try {
     fetch(BASE_URL + "/api/index", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      keepalive: true,
       body: JSON.stringify({
         action: "track_visit",
         agent_id: agentId,
+        session_id: __sitemindGetSessionId(),
         page_url: window.location.href,
         page_title: title,
-        referrer: document.referrer || ""
+        page_path: window.location.pathname || "/",
+        referrer: document.referrer || "",
+        language: language,
+        user_agent: navigator.userAgent || ""
       })
-    });
+    }).catch(function () {});
   } catch (e) {}
 }
 
 // ============================
 // ⏱ TIME TRACKING
 // ============================
-var __sitemindVisitStart = Date.now();
-
 function __sitemindTrackTime(BASE_URL, agentId) {
+  if (!__sitemindCanTrack(agentId) || !BASE_URL) return;
+
   try {
     var duration = Math.floor((Date.now() - __sitemindVisitStart) / 1000);
 
-    navigator.sendBeacon(
-      BASE_URL + "/api/index",
-      JSON.stringify({
+    fetch(BASE_URL + "/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
         action: "track_time",
         agent_id: agentId,
+        session_id: __sitemindGetSessionId(),
         page_url: window.location.href,
-        duration: duration
+        page_path: window.location.pathname || "/",
+        duration: duration,
+        page_title: document.title || "",
+        user_agent: navigator.userAgent || ""
       })
-    );
+    }).catch(function () {});
   } catch (e) {}
 }
 
@@ -86,10 +124,6 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   var isBubbleExpanded = false;
   var scrollExpandThreshold = 60;
 
-  var originalBodyPaddingRight = "";
-  var originalBodyPaddingLeft = "";
-  var originalHtmlOverflowX = "";
-  var originalBodyOverflowX = "";
 
   var initialVisitTracked = false;
   var lastTrackedTitle = "";
@@ -478,7 +512,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     if (initialVisitTracked) return;
     initialVisitTracked = true;
     lastTrackedTitle = getPageTitle();
-    __sitemindTrackVisit(BASE_URL, agentId, getPageTitle);
+    __sitemindTrackVisit(BASE_URL, agentId, getPageTitle, detectPageLanguage);
   }
 
   function scheduleInitialVisitTracking() {
@@ -665,19 +699,8 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     applyBubbleExpandedState(shouldExpand);
   }
 
-  function getViewportHeight() {
-    if (window.visualViewport && window.visualViewport.height) {
-      return Math.round(window.visualViewport.height);
-    }
-
-    return window.innerHeight || document.documentElement.clientHeight || screen.height || 0;
-  }
-
   function applyPanelLayout() {
   if (!panel || !bubble || !iframe) return;
-
-  var viewportHeight = getViewportHeight();
-  var isNarrowMobile = window.innerWidth < 520;
 
   panel.style.left = "";
   panel.style.right = "";
@@ -716,36 +739,30 @@ function __sitemindTrackTime(BASE_URL, agentId) {
       panel.style.left = "0";
       panel.style.borderRight = "1px solid rgba(37,99,235,0.10)";
       panel.style.boxShadow = "12px 0 36px rgba(15,23,42,0.12)";
-      panel.style.transform = isOpen ? "translateX(0)" : "translateX(-100%)";
+      panel.style.transform = isOpen ? "translateX(0)" : "translateX(calc(-100% - 40px))";
     } else {
       panel.style.right = "0";
       panel.style.borderLeft = "1px solid rgba(37,99,235,0.10)";
       panel.style.boxShadow = "-12px 0 36px rgba(15,23,42,0.12)";
-      panel.style.transform = isOpen ? "translateX(0)" : "translateX(100%)";
+      panel.style.transform = isOpen ? "translateX(0)" : "translateX(calc(100% + 40px))";
     }
 
     panel.style.opacity = isOpen ? "1" : "0";
     panel.style.pointerEvents = isOpen ? "auto" : "none";
   } else {
-    var mobileSideGap = isNarrowMobile ? 8 : 12;
-    var mobileBottomGap = isOpen ? 8 : 92;
-    var mobileMaxHeight = Math.max(320, viewportHeight - mobileBottomGap - 8);
-    var mobilePreferredHeight = isNarrowMobile ? Math.min(620, Math.round(viewportHeight * 0.82)) : 620;
-    var mobileHeight = Math.min(mobilePreferredHeight, mobileMaxHeight);
-
-    panel.style.width = isNarrowMobile ? "calc(100vw - 16px)" : "380px";
+    panel.style.width = window.innerWidth < 520 ? "calc(100vw - 16px)" : "380px";
     panel.style.maxWidth = "calc(100vw - 24px)";
-    panel.style.height = mobileHeight + "px";
-    panel.style.maxHeight = mobileMaxHeight + "px";
+    panel.style.height = window.innerWidth < 520 ? "min(78vh, 620px)" : "620px";
+    panel.style.maxHeight = "calc(100vh - 90px)";
     panel.style.borderRadius = "18px";
     panel.style.border = "1px solid rgba(37,99,235,0.10)";
 
     if (position === "bottom-left") {
-      panel.style.left = mobileSideGap + "px";
-      panel.style.bottom = mobileBottomGap + "px";
+      panel.style.left = "16px";
+      panel.style.bottom = "92px";
     } else {
-      panel.style.right = mobileSideGap + "px";
-      panel.style.bottom = mobileBottomGap + "px";
+      panel.style.right = "16px";
+      panel.style.bottom = "92px";
     }
 
     panel.style.transform = isOpen ? "translateY(0)" : "translateY(18px)";
@@ -756,25 +773,16 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   bubble.style.display = isOpen ? "none" : "inline-flex";
 }
 
-  function applyPageShrink() {
-    return;
-  }
-
-  function resetPageShrink() {
-    return;
-  }
 
   function openPanel() {
     isOpen = true;
     applyPanelLayout();
-    applyPageShrink();
     sendPageContext(true);
   }
 
   function closePanel() {
     isOpen = false;
     applyPanelLayout();
-    resetPageShrink();
     updateBubbleByScroll();
   }
 
@@ -816,8 +824,8 @@ panel.style.transition = "none";
 
 if (isDesktop()) {
   panel.style.transform = position === "bottom-left"
-    ? "translateX(-100%)"
-    : "translateX(100%)";
+    ? "translateX(calc(-100% - 40px))"
+    : "translateX(calc(100% + 40px))";
 } else {
   panel.style.transform = "translateY(18px)";
 }
@@ -879,28 +887,13 @@ if (isDesktop()) {
 
     if (isOpen) {
       if (isDesktop()) {
-        applyPageShrink();
-      } else {
-        resetPageShrink();
-      }
+          } else {
+          }
     } else {
-      resetPageShrink();
-    }
+      }
 
     sendPageContext(true);
   });
-
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener("resize", function () {
-      if (!panel) return;
-      applyPanelLayout();
-    });
-
-    window.visualViewport.addEventListener("scroll", function () {
-      if (!panel) return;
-      applyPanelLayout();
-    });
-  }
 
   window.addEventListener("scroll", function () {
     updateBubbleByScroll();
