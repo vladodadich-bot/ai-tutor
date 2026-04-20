@@ -87,6 +87,11 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   var isBubbleExpanded = false;
   var scrollExpandThreshold = 60;
 
+  var originalBodyPaddingRight = "";
+  var originalBodyPaddingLeft = "";
+  var originalHtmlOverflowX = "";
+  var originalBodyOverflowX = "";
+
   var initialVisitTracked = false;
   var lastTrackedTitle = "";
   var lastSentContextSignature = "";
@@ -123,10 +128,22 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   }
 
   function getDefaultFullBubbleText(lang) {
-    if (lang === "hr") return "Trebaš pomoć?<br>Pitaj AI asistenta";
-    if (lang === "de") return "Brauchst du Hilfe?<br>Frag den KI-Assistenten";
-    if (lang === "it") return "Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
-    if (lang === "fr") return "Besoin d’aide ?<br>Demandez à l’assistant IA";
+    if (lang === "hr") {
+      return "Trebaš pomoć?<br>Pitaj AI asistenta";
+    }
+
+    if (lang === "de") {
+      return "Brauchst du Hilfe?<br>Frag den KI-Assistenten";
+    }
+
+    if (lang === "it") {
+      return "Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
+    }
+
+    if (lang === "fr") {
+      return "Besoin d’aide ?<br>Demandez à l’assistant IA";
+    }
+
     return "Need help?<br>Ask the AI assistant";
   }
 
@@ -236,9 +253,9 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     return headings;
   }
 
-  function removeNodes(rootNode, selectors) {
+  function removeNodes(root, selectors) {
     for (var i = 0; i < selectors.length; i++) {
-      var nodes = rootNode.querySelectorAll(selectors[i]);
+      var nodes = root.querySelectorAll(selectors[i]);
       for (var j = 0; j < nodes.length; j++) {
         if (nodes[j] && nodes[j].remove) {
           nodes[j].remove();
@@ -276,10 +293,10 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   }
 
   function getMainContentText() {
-    var contentRoot = getBestContentRoot();
-    if (!contentRoot) return "";
+    var root = getBestContentRoot();
+    if (!root) return "";
 
-    var clone = contentRoot.cloneNode(true);
+    var clone = root.cloneNode(true);
 
     removeNodes(clone, [
       "script",
@@ -515,12 +532,12 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     var delays = [120, 600, 1600, 3200];
 
     for (var i = 0; i < delays.length; i++) {
-      (function (delay, index) {
+      (function (delay) {
         var timer = setTimeout(function () {
-          sendPageContext(index === delays.length - 1);
+          sendPageContext(i === delays.length - 1);
         }, delay);
         contextRetryTimers.push(timer);
-      })(delays[i], i);
+      })(delays[i]);
     }
   }
 
@@ -529,12 +546,12 @@ function __sitemindTrackTime(BASE_URL, agentId) {
 
     bubble.style.left = "";
     bubble.style.right = "";
-    bubble.style.bottom = isDesktop() ? "18px" : "16px";
+    bubble.style.bottom = "18px";
 
     if (position === "bottom-left") {
-      bubble.style.left = isDesktop() ? "18px" : "16px";
+      bubble.style.left = "18px";
     } else {
-      bubble.style.right = isDesktop() ? "18px" : "16px";
+      bubble.style.right = "18px";
     }
   }
 
@@ -551,7 +568,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     var shadowGlow = rgbaFromHex(bubbleHighlight, 0.18);
 
     bubble.style.position = "fixed";
-    bubble.style.zIndex = "2147483001";
+    bubble.style.zIndex = "999999";
     bubble.style.border = "1px solid " + borderGlow;
     bubble.style.borderRadius = "999px";
     bubble.style.background =
@@ -561,19 +578,15 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     bubble.style.whiteSpace = "normal";
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
-    bubble.style.transition = "transform 0.26s ease, box-shadow 0.26s ease, opacity 0.22s ease, border-color 0.26s ease, filter 0.26s ease, padding 0.20s ease";
-    bubble.style.display = isOpen ? "none" : "inline-flex";
+    bubble.style.transition =
+  "transform 0.26s ease, box-shadow 0.26s ease, opacity 0.22s ease, border-color 0.26s ease, filter 0.26s ease, padding 0.20s ease";
+    bubble.style.display = "inline-flex";
     bubble.style.alignItems = "center";
     bubble.style.justifyContent = "center";
     bubble.style.gap = "10px";
     bubble.style.textAlign = "center";
     bubble.style.boxShadow =
       "0 18px 34px " + shadowOuter + ", 0 10px 26px " + shadowSoft + ", 0 0 0 1px rgba(255,255,255,0.06), 0 0 18px " + shadowGlow;
-    bubble.style.pointerEvents = "auto";
-    bubble.style.appearance = "none";
-    bubble.style.webkitAppearance = "none";
-    bubble.style.outline = "none";
-    bubble.style.margin = "0";
 
     if (bubbleIconEl) {
       bubbleIconEl.style.display = "inline-flex";
@@ -607,7 +620,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
       bubble.style.transform = "translateY(-2px)";
       bubble.style.borderColor = rgbaFromHex(bubbleHighlight, 0.34);
       bubble.style.boxShadow =
-        "0 22px 40px rgba(0,0,0,0.30), 0 14px 30px " + rgbaFromHex(bubbleBase, 0.28) + ", 0 0 0 1px rgba(255,255,255,0.08), 0 0 22px " + rgbaFromHex(bubbleHighlight, 0.22);
+        "0 22px 40px " + rgbaFromHex("#000000", 0.30) + ", 0 14px 30px " + rgbaFromHex(bubbleBase, 0.28) + ", 0 0 0 1px rgba(255,255,255,0.08), 0 0 22px " + rgbaFromHex(bubbleHighlight, 0.22);
       bubble.style.filter = "brightness(1.04)";
     };
 
@@ -653,70 +666,67 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     applyBubbleExpandedState(shouldExpand);
   }
 
-  function applyRootLayout() {
-    if (!root) return;
-
-    root.style.position = "fixed";
-    root.style.left = "0";
-    root.style.top = "0";
-    root.style.width = "0";
-    root.style.height = "0";
-    root.style.zIndex = "2147483000";
-    root.style.pointerEvents = "none";
-    root.style.contain = "layout style paint";
-  }
-
   function applyPanelLayout() {
     if (!panel || !bubble || !iframe) return;
 
-    var horizontalOffset = isDesktop() ? 18 : 12;
-    var bottomOffset = isDesktop() ? 84 : 82;
-    var desktopWidth = 420;
-    var desktopHeight = 700;
-    var mobileWidth = window.innerWidth < 520 ? Math.max(280, window.innerWidth - 16) : 380;
-    var mobileHeight = window.innerWidth < 520 ? Math.min(620, Math.max(420, window.innerHeight - 110)) : 620;
-
-    panel.style.position = "fixed";
-    panel.style.zIndex = "2147483001";
-    panel.style.background = "#ffffff";
-    panel.style.overflow = "hidden";
-    panel.style.border = "1px solid rgba(37,99,235,0.10)";
-    panel.style.boxShadow = "0 18px 50px rgba(15,23,42,0.16)";
-    panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
-    panel.style.willChange = "transform, opacity";
-    panel.style.pointerEvents = isOpen ? "auto" : "none";
-    panel.style.opacity = isOpen ? "1" : "0";
-    panel.style.display = "block";
     panel.style.left = "";
     panel.style.right = "";
     panel.style.top = "";
-    panel.style.bottom = bottomOffset + "px";
-    panel.style.maxWidth = "calc(100vw - 16px)";
-    panel.style.maxHeight = "calc(100vh - 100px)";
-    panel.style.borderRadius = isDesktop() ? "22px" : "18px";
+    panel.style.bottom = "";
+    panel.style.width = "";
+    panel.style.height = "";
+    panel.style.maxWidth = "";
+    panel.style.maxHeight = "";
+    panel.style.borderRadius = "";
+    panel.style.borderLeft = "";
+    panel.style.borderRight = "";
+    panel.style.border = "1px solid rgba(37,99,235,0.10)";
+    panel.style.background = "#ffffff";
+    panel.style.overflow = "hidden";
+    panel.style.boxShadow = "0 18px 50px rgba(15,23,42,0.16)";
+    panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
+    panel.style.willChange = "transform, opacity";
+    panel.style.display = "block";
+    panel.style.position = "fixed";
+    panel.style.zIndex = "999999";
     panel.style.pointerEvents = isOpen ? "auto" : "none";
-
-    if (position === "bottom-left") {
-      panel.style.left = horizontalOffset + "px";
-    } else {
-      panel.style.right = horizontalOffset + "px";
-    }
-
-    if (isDesktop()) {
-      panel.style.width = desktopWidth + "px";
-      panel.style.height = "min(" + desktopHeight + "px, calc(100vh - 100px))";
-    } else {
-      panel.style.width = mobileWidth + "px";
-      panel.style.height = mobileHeight + "px";
-    }
-
-    panel.style.transform = isOpen ? "translateY(0) scale(1)" : "translateY(18px) scale(0.985)";
 
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "0";
     iframe.style.background = "#ffffff";
-    iframe.style.display = "block";
+
+    if (isDesktop()) {
+      panel.style.width = "420px";
+      panel.style.maxWidth = "calc(100vw - 24px)";
+      panel.style.height = "min(700px, calc(100vh - 96px))";
+      panel.style.maxHeight = "calc(100vh - 96px)";
+      panel.style.bottom = "86px";
+      panel.style.borderRadius = "20px";
+
+      if (position === "bottom-left") {
+        panel.style.left = "18px";
+      } else {
+        panel.style.right = "18px";
+      }
+    } else {
+      panel.style.width = window.innerWidth < 520 ? "calc(100vw - 16px)" : "380px";
+      panel.style.maxWidth = "calc(100vw - 24px)";
+      panel.style.height = window.innerWidth < 520 ? "min(78vh, 620px)" : "620px";
+      panel.style.maxHeight = "calc(100vh - 90px)";
+      panel.style.borderRadius = "18px";
+
+      if (position === "bottom-left") {
+        panel.style.left = "8px";
+        panel.style.bottom = "82px";
+      } else {
+        panel.style.right = "8px";
+        panel.style.bottom = "82px";
+      }
+    }
+
+    panel.style.transform = isOpen ? "translateY(0)" : "translateY(18px)";
+    panel.style.opacity = isOpen ? "1" : "0";
 
     bubble.style.display = isOpen ? "none" : "inline-flex";
   }
@@ -752,12 +762,18 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   }
 
   function createWidget() {
-    if (!document.body) return;
     if (document.getElementById("sitemind-widget-root")) return;
 
     root = document.createElement("div");
     root.id = "sitemind-widget-root";
-    applyRootLayout();
+    root.style.position = "fixed";
+    root.style.left = "0";
+    root.style.top = "0";
+    root.style.width = "100%";
+    root.style.height = "100%";
+    root.style.pointerEvents = "none";
+    root.style.zIndex = "999998";
+    root.style.background = "transparent";
     document.body.appendChild(root);
 
     bubble = document.createElement("button");
@@ -772,9 +788,16 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     bubbleShortLabelEl = bubble.querySelector(".sitemind-bubble-short");
     bubbleFullLabelEl = bubble.querySelector(".sitemind-bubble-full");
 
-    panel = document.createElement("div");
-    panel.setAttribute("aria-hidden", "true");
-
+panel = document.createElement("div");
+panel.style.position = "fixed";
+panel.style.zIndex = "999999";
+panel.style.background = "#ffffff";
+panel.style.overflow = "hidden";
+panel.style.opacity = "0";
+panel.style.pointerEvents = "none";
+panel.style.transition = "none";
+panel.style.transform = "translateY(18px)";
+    
     iframe = document.createElement("iframe");
     iframe.src =
       BASE_URL +
@@ -782,10 +805,10 @@ function __sitemindTrackTime(BASE_URL, agentId) {
       encodeURIComponent(agentId) +
       "&lang=" +
       encodeURIComponent(detectedLang);
+    iframe.style.width = "100%";
+    iframe.style.height = "100%";
+    iframe.style.border = "0";
     iframe.setAttribute("title", "SiteMind AI Chat");
-    iframe.setAttribute("loading", "eager");
-    iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
-    iframe.setAttribute("allow", "clipboard-write");
 
     panel.appendChild(iframe);
     root.appendChild(panel);
@@ -795,13 +818,11 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     styleBubble();
     updateBubbleByScroll();
     applyPanelLayout();
-
     requestAnimationFrame(function () {
-      if (panel) {
-        panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
-      }
-    });
-
+  panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
+});
+    bubble.style.pointerEvents = "auto";
+    panel.style.pointerEvents = "none";
     bubble.addEventListener("click", togglePanel);
 
     iframe.addEventListener("load", function () {
@@ -829,11 +850,21 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   });
 
   window.addEventListener("resize", function () {
-    applyRootLayout();
     applyBubblePosition();
     styleBubble();
     updateBubbleByScroll();
     applyPanelLayout();
+
+    if (isOpen) {
+      if (isDesktop()) {
+        applyPageShrink();
+      } else {
+        resetPageShrink();
+      }
+    } else {
+      resetPageShrink();
+    }
+
     sendPageContext(true);
   });
 
