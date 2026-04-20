@@ -318,24 +318,25 @@ async function handleDeleteAgent(req, res, body) {
 // DELETE AGENT - END
 // ========================================
 
-
 // ========================================
 // ANALYTICS HELPERS - START
 // ========================================
 
 function getClientIp(req) {
   const forwardedFor =
-    req.headers['x-forwarded-for'] ||
-    req.headers['X-Forwarded-For'] ||
+    req.headers?.['x-forwarded-for'] ||
+    req.headers?.['X-Forwarded-For'] ||
     '';
+
   if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
     return forwardedFor.split(',')[0].trim();
   }
 
   const realIp =
-    req.headers['x-real-ip'] ||
-    req.headers['X-Real-IP'] ||
+    req.headers?.['x-real-ip'] ||
+    req.headers?.['X-Real-IP'] ||
     '';
+
   if (typeof realIp === 'string' && realIp.trim()) {
     return realIp.trim();
   }
@@ -360,14 +361,77 @@ async function ensureAgentExists(agentId) {
   return true;
 }
 
+async function insertAnalyticsEvent(eventType, payload) {
+  const eventRow = {
+    event_type: eventType,
+    agent_id: payload.agent_id,
+    page_url: payload.page_url || null,
+    page_title: payload.page_title || null,
+    referrer: payload.referrer || null,
+    duration: Number.isFinite(payload.duration) ? payload.duration : null,
+    metadata: payload.metadata || {}
+  };
+
+  const { error } = await supabase
+    .from('analytics_events')
+    .insert(eventRow);
+
+  return error || null;
+}
+
+async function upsertAnalyticsSession(payload) {
+  if (!payload.session_id) return null;
+
+  const row = {
+    session_id: payload.session_id,
+    agent_id: payload.agent_id,
+    entry_page_url: payload.entry_page_url || null,
+    entry_page_title: payload.entry_page_title || null,
+    started_at: payload.started_at || new Date().toISOString(),
+    last_seen_at: payload.last_seen_at || new Date().toISOString(),
+    country: payload.country || null,
+    city: payload.city || null,
+    user_agent: payload.user_agent || null
+  };
+
+  const { error } = await supabase
+    .from('analytics_session')
+    .upsert(row, { onConflict: 'session_id' });
+
+  return error || null;
+}
+
+async function touchAnalyticsSession(sessionId, updates) {
+  if (!sessionId) return null;
+
+  const patch = {
+    last_seen_at: updates.last_seen_at || new Date().toISOString()
+  };
+
+  if (updates.entry_page_url !== undefined) patch.entry_page_url = updates.entry_page_url || null;
+  if (updates.entry_page_title !== undefined) patch.entry_page_title = updates.entry_page_title || null;
+  if (updates.country !== undefined) patch.country = updates.country || null;
+  if (updates.city !== undefined) patch.city = updates.city || null;
+  if (updates.user_agent !== undefined) patch.user_agent = updates.user_agent || null;
+
+  const { error } = await supabase
+    .from('analytics_session')
+    .update(patch)
+    .eq('session_id', sessionId);
+
+  return error || null;
+}
+
 async function handleTrackVisit(req, res, body) {
   const agentId = normalizeAnalyticsText(body.agentId || body.agent_id, 100);
   const pageUrl = normalizeAnalyticsText(body.pageUrl || body.page_url, 1500);
   const pageTitle = normalizeAnalyticsText(body.pageTitle || body.page_title || 'Untitled Page', 500);
   const referrer = normalizeAnalyticsText(body.referrer || '', 1500);
   const sessionId = normalizeAnalyticsText(body.sessionId || body.session_id, 120);
-  const userAgent = normalizeAnalyticsText(req.headers['user-agent'] || '', 500);
-  const ipAddress = normalizeAnalyticsText(getClientIp(req), 100);
+  const country = normalizeAnalyticsText(body.country || '', 120);
+  const city = normalizeAnalyticsText(body.city || '', 120);
+  const userAgent = normalizeAnalyticsText(req.headers?.['user-agent'] || body.userAgent || body.user_agent || '', 500);
+  const ipAddress = normalizeAnalyticsText(getClientIp(req), 120);
 
   if (!agentId) {
     return res.status(400).json({ error: 'Missing agentId' });
@@ -378,36 +442,56 @@ async function handleTrackVisit(req, res, body) {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
-  const payload = {
-    agent_id: agentId,
-    page_url: pageUrl || null,
-    page_title: pageTitle || 'Untitled Page',
-    referrer: referrer || null,
-    session_id: sessionId || null,
-    user_agent: userAgent || null,
-    ip_address: ipAddress || null,
-    event_type: 'visit'
-  };
+  const nowIso = new Date().toISOString();
 
   try {
-    const { error } = await supabase
-      .from('analytics_events')
-      .insert(payload);
+    const eventError = await insertAnalyticsEvent('visit', {
+      agent_id: agentId,
+      page_url: pageUrl || null,
+      page_title: pageTitle || 'Untitled Page',
+      referrer: referrer || null,
+      duration: null,
+      metadata: {
+        session_id: sessionId || null,
+        country: country || null,
+        city: city || null,
+        user_agent: userAgent || null,
+        ip_address: ipAddress || null
+      }
+    });
 
-    if (error) {
-      const message = String(error.message || '').toLowerCase();
-      const missingTable =
-        message.includes('relation') && message.includes('does not exist');
+    if (eventError) {
+      return res.status(500).json({ error: eventError.message });
+    }
 
-      if (missingTable) {
-        return res.status(200).json({
-          success: true,
-          stored: false,
-          fallback: 'analytics_events table missing'
-        });
+    if (sessionId) {
+      let sessionError = await upsertAnalyticsSession({
+        session_id: sessionId,
+        agent_id: agentId,
+        entry_page_url: pageUrl || null,
+        entry_page_title: pageTitle || 'Untitled Page',
+        started_at: nowIso,
+        last_seen_at: nowIso,
+        country: country || null,
+        city: city || null,
+        user_agent: userAgent || null
+      });
+
+      if (sessionError) {
+        const duplicate = String(sessionError.message || '').toLowerCase().includes('duplicate');
+        if (duplicate) {
+          sessionError = await touchAnalyticsSession(sessionId, {
+            last_seen_at: nowIso,
+            country: country || null,
+            city: city || null,
+            user_agent: userAgent || null
+          });
+        }
       }
 
-      return res.status(500).json({ error: error.message });
+      if (sessionError) {
+        return res.status(500).json({ error: sessionError.message });
+      }
     }
 
     return res.status(200).json({
@@ -424,7 +508,12 @@ async function handleTrackVisit(req, res, body) {
 async function handleTrackTime(req, res, body) {
   const agentId = normalizeAnalyticsText(body.agentId || body.agent_id, 100);
   const pageUrl = normalizeAnalyticsText(body.pageUrl || body.page_url, 1500);
+  const pageTitle = normalizeAnalyticsText(body.pageTitle || body.page_title || '', 500);
+  const referrer = normalizeAnalyticsText(body.referrer || '', 1500);
   const sessionId = normalizeAnalyticsText(body.sessionId || body.session_id, 120);
+  const country = normalizeAnalyticsText(body.country || '', 120);
+  const city = normalizeAnalyticsText(body.city || '', 120);
+  const userAgent = normalizeAnalyticsText(req.headers?.['user-agent'] || body.userAgent || body.user_agent || '', 500);
   const duration = Number(body.duration || 0);
 
   if (!agentId) {
@@ -438,33 +527,38 @@ async function handleTrackTime(req, res, body) {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
-  const payload = {
-    agent_id: agentId,
-    page_url: pageUrl || null,
-    session_id: sessionId || null,
-    duration_seconds: safeDuration,
-    event_type: 'time'
-  };
+  const nowIso = new Date().toISOString();
 
   try {
-    const { error } = await supabase
-      .from('analytics_events')
-      .insert(payload);
-
-    if (error) {
-      const message = String(error.message || '').toLowerCase();
-      const missingTable =
-        message.includes('relation') && message.includes('does not exist');
-
-      if (missingTable) {
-        return res.status(200).json({
-          success: true,
-          stored: false,
-          fallback: 'analytics_events table missing'
-        });
+    const eventError = await insertAnalyticsEvent('time', {
+      agent_id: agentId,
+      page_url: pageUrl || null,
+      page_title: pageTitle || null,
+      referrer: referrer || null,
+      duration: safeDuration,
+      metadata: {
+        session_id: sessionId || null,
+        country: country || null,
+        city: city || null,
+        user_agent: userAgent || null
       }
+    });
 
-      return res.status(500).json({ error: error.message });
+    if (eventError) {
+      return res.status(500).json({ error: eventError.message });
+    }
+
+    if (sessionId) {
+      const sessionError = await touchAnalyticsSession(sessionId, {
+        last_seen_at: nowIso,
+        country: country || null,
+        city: city || null,
+        user_agent: userAgent || null
+      });
+
+      if (sessionError) {
+        return res.status(500).json({ error: sessionError.message });
+      }
     }
 
     return res.status(200).json({
@@ -2085,6 +2179,14 @@ export default async function handler(req, res) {
       return await handleDeleteAgent(req, res, body);
     }
 
+    if (action === 'track_visit') {
+      return await handleTrackVisit(req, res, body);
+    }
+
+    if (action === 'track_time') {
+      return await handleTrackTime(req, res, body);
+    }
+
     if (action === 'crawl-start') {
      return await handleCrawlStart(req, res, body);
     }
@@ -2103,14 +2205,6 @@ export default async function handler(req, res) {
 
     if (action === 'agent-config') {
       return await handleAgentConfig(req, res, body);
-    }
-
-    if (action === 'track_visit') {
-      return await handleTrackVisit(req, res, body);
-    }
-
-    if (action === 'track_time') {
-      return await handleTrackTime(req, res, body);
     }
 
     if (action === 'chat') {
