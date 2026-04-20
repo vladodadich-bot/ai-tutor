@@ -865,7 +865,4 @@ if (isDesktop()) {
 
   scheduleInitialVisitTracking();
 
-  window.addEventListener("beforeunload", function () {
-    __sitemindTrackTime(BASE_URL, agentId);
-  });
 })();
