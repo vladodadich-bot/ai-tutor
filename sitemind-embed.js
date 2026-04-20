@@ -685,7 +685,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   panel.style.background = "#ffffff";
   panel.style.overflow = "hidden";
   panel.style.boxShadow = "0 18px 50px rgba(15,23,42,0.16)";
-  panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
+  panel.style.transition = "transform 1.00s ease, opacity 0.60s ease, box-shadow 0.60s ease";
   panel.style.willChange = "transform, opacity";
   panel.style.display = "block";
 
@@ -831,7 +831,7 @@ if (isDesktop()) {
     updateBubbleByScroll();
     applyPanelLayout();
     requestAnimationFrame(function () {
-     panel.style.transition = "transform 0.70s ease, opacity 0.52s ease, box-shadow 0.52s ease";
+     panel.style.transition = "transform 1.00s ease, opacity 0.60s ease, box-shadow 0.60s ease";
 });
     bubble.addEventListener("click", togglePanel);
 
