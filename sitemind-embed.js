@@ -4,22 +4,79 @@
 var __sitemindVisitStart = Date.now();
 
 function __sitemindCanTrack(agentId) {
-  return false;
+  return !!agentId && agentId !== "demo-agent";
 }
 
 function __sitemindGetSessionId() {
-  return "";
+  var key = "__sitemind_session_id";
+  try {
+    var existing = sessionStorage.getItem(key);
+    if (existing) return existing;
+
+    var created =
+      "sm_" +
+      Math.random().toString(36).slice(2) +
+      "_" +
+      Date.now().toString(36);
+
+    sessionStorage.setItem(key, created);
+    return created;
+  } catch (e) {
+    return "sm_fallback_" + Date.now().toString(36);
+  }
 }
 
 function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle, detectPageLanguage) {
-  return;
+  if (!__sitemindCanTrack(agentId) || !BASE_URL) return;
+
+  var title = (typeof getPageTitle === "function" ? getPageTitle() : "") || "Untitled Page";
+  var language = typeof detectPageLanguage === "function" ? detectPageLanguage() : "en";
+
+  try {
+    fetch(BASE_URL + "/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        action: "track_visit",
+        agent_id: agentId,
+        session_id: __sitemindGetSessionId(),
+        page_url: window.location.href,
+        page_title: title,
+        page_path: window.location.pathname || "/",
+        referrer: document.referrer || "",
+        language: language,
+        user_agent: navigator.userAgent || ""
+      })
+    }).catch(function () {});
+  } catch (e) {}
 }
 
 // ============================
 // ⏱ TIME TRACKING
 // ============================
 function __sitemindTrackTime(BASE_URL, agentId) {
-  return;
+  if (!__sitemindCanTrack(agentId) || !BASE_URL) return;
+
+  try {
+    var duration = Math.floor((Date.now() - __sitemindVisitStart) / 1000);
+
+    fetch(BASE_URL + "/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        action: "track_time",
+        agent_id: agentId,
+        session_id: __sitemindGetSessionId(),
+        page_url: window.location.href,
+        page_path: window.location.pathname || "/",
+        duration: duration,
+        page_title: document.title || "",
+        user_agent: navigator.userAgent || ""
+      })
+    }).catch(function () {});
+  } catch (e) {}
 }
 
 (function () {
@@ -865,4 +922,7 @@ if (isDesktop()) {
 
   scheduleInitialVisitTracking();
 
+  window.addEventListener("beforeunload", function () {
+    __sitemindTrackTime(BASE_URL, agentId);
+  });
 })();
