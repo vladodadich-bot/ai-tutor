@@ -1,81 +1,43 @@
 // ============================
-// 🔥 ANALYTICS HELPERS
+// 🔥 ANALYTICS: TRACK VISIT
 // ============================
-var __sitemindVisitStart = Date.now();
-
-function __sitemindCanTrack(agentId) {
-  return !!agentId && agentId !== "demo-agent";
-}
-
-function __sitemindGetSessionId() {
-  var key = "__sitemind_session_id";
-  try {
-    var existing = sessionStorage.getItem(key);
-    if (existing) return existing;
-
-    var created =
-      "sm_" +
-      Math.random().toString(36).slice(2) +
-      "_" +
-      Date.now().toString(36);
-
-    sessionStorage.setItem(key, created);
-    return created;
-  } catch (e) {
-    return "sm_fallback_" + Date.now().toString(36);
-  }
-}
-
-function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle, detectPageLanguage) {
-  if (!__sitemindCanTrack(agentId) || !BASE_URL) return;
-
-  var title = (typeof getPageTitle === "function" ? getPageTitle() : "") || "Untitled Page";
-  var language = typeof detectPageLanguage === "function" ? detectPageLanguage() : "en";
+function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle) {
+  const title = getPageTitle() || "Untitled Page";
+  if (!agentId) return;
 
   try {
     fetch(BASE_URL + "/api/index", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      keepalive: true,
       body: JSON.stringify({
         action: "track_visit",
         agent_id: agentId,
-        session_id: __sitemindGetSessionId(),
         page_url: window.location.href,
         page_title: title,
-        page_path: window.location.pathname || "/",
-        referrer: document.referrer || "",
-        language: language,
-        user_agent: navigator.userAgent || ""
+        referrer: document.referrer || ""
       })
-    }).catch(function () {});
+    });
   } catch (e) {}
 }
 
 // ============================
 // ⏱ TIME TRACKING
 // ============================
-function __sitemindTrackTime(BASE_URL, agentId) {
-  if (!__sitemindCanTrack(agentId) || !BASE_URL) return;
+var __sitemindVisitStart = Date.now();
 
+function __sitemindTrackTime(BASE_URL, agentId) {
   try {
     var duration = Math.floor((Date.now() - __sitemindVisitStart) / 1000);
 
-    fetch(BASE_URL + "/api/index", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      keepalive: true,
-      body: JSON.stringify({
+    navigator.sendBeacon(
+      BASE_URL + "/api/index",
+      JSON.stringify({
         action: "track_time",
         agent_id: agentId,
-        session_id: __sitemindGetSessionId(),
         page_url: window.location.href,
-        page_path: window.location.pathname || "/",
-        duration: duration,
-        page_title: document.title || "",
-        user_agent: navigator.userAgent || ""
+        duration: duration
       })
-    }).catch(function () {});
+    );
   } catch (e) {}
 }
 
@@ -124,6 +86,10 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   var isBubbleExpanded = false;
   var scrollExpandThreshold = 60;
 
+  var originalBodyPaddingRight = "";
+  var originalBodyPaddingLeft = "";
+  var originalHtmlOverflowX = "";
+  var originalBodyOverflowX = "";
 
   var initialVisitTracked = false;
   var lastTrackedTitle = "";
@@ -512,7 +478,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     if (initialVisitTracked) return;
     initialVisitTracked = true;
     lastTrackedTitle = getPageTitle();
-    __sitemindTrackVisit(BASE_URL, agentId, getPageTitle, detectPageLanguage);
+    __sitemindTrackVisit(BASE_URL, agentId, getPageTitle);
   }
 
   function scheduleInitialVisitTracking() {
@@ -612,7 +578,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-        "transform 0.26s ease, box-shadow 0.26s ease, opacity 0.22s ease, border-color 0.26s ease, filter 0.26s ease, padding 0.20s ease";
+  "transform 0.26s ease, box-shadow 0.26s ease, opacity 0.22s ease, border-color 0.26s ease, filter 0.26s ease, padding 0.20s ease";
     bubble.style.display = "inline-flex";
     bubble.style.alignItems = "center";
     bubble.style.justifyContent = "center";
@@ -702,6 +668,8 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   function applyPanelLayout() {
   if (!panel || !bubble || !iframe) return;
 
+  var isNarrowMobile = window.innerWidth < 520;
+
   panel.style.left = "";
   panel.style.right = "";
   panel.style.top = "";
@@ -717,7 +685,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   panel.style.background = "#ffffff";
   panel.style.overflow = "hidden";
   panel.style.boxShadow = "0 18px 50px rgba(15,23,42,0.16)";
-  panel.style.transition = "transform 0.75s ease, opacity 0.50s ease, box-shadow 0.50s ease";
+  panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
   panel.style.willChange = "transform, opacity";
   panel.style.display = "block";
 
@@ -739,30 +707,33 @@ function __sitemindTrackTime(BASE_URL, agentId) {
       panel.style.left = "0";
       panel.style.borderRight = "1px solid rgba(37,99,235,0.10)";
       panel.style.boxShadow = "12px 0 36px rgba(15,23,42,0.12)";
-      panel.style.transform = isOpen ? "translateX(0)" : "translateX(calc(-100% - 40px))";
+      panel.style.transform = isOpen ? "translateX(0)" : "translateX(-100%)";
     } else {
       panel.style.right = "0";
       panel.style.borderLeft = "1px solid rgba(37,99,235,0.10)";
       panel.style.boxShadow = "-12px 0 36px rgba(15,23,42,0.12)";
-      panel.style.transform = isOpen ? "translateX(0)" : "translateX(calc(100% + 40px))";
+      panel.style.transform = isOpen ? "translateX(0)" : "translateX(100%)";
     }
 
     panel.style.opacity = isOpen ? "1" : "0";
     panel.style.pointerEvents = isOpen ? "auto" : "none";
   } else {
-    panel.style.width = window.innerWidth < 520 ? "calc(100vw - 16px)" : "380px";
+    var mobileSideGap = isNarrowMobile ? 8 : 12;
+    var mobileBottomGap = isOpen ? 8 : 92;
+
+    panel.style.width = isNarrowMobile ? "calc(100vw - 16px)" : "380px";
     panel.style.maxWidth = "calc(100vw - 24px)";
-    panel.style.height = window.innerWidth < 520 ? "min(78vh, 620px)" : "620px";
-    panel.style.maxHeight = "calc(100vh - 90px)";
+    panel.style.height = isNarrowMobile ? "min(620px, calc(100vh - 16px))" : "620px";
+    panel.style.maxHeight = isNarrowMobile ? "calc(100vh - 16px)" : "calc(100vh - 24px)";
     panel.style.borderRadius = "18px";
     panel.style.border = "1px solid rgba(37,99,235,0.10)";
 
     if (position === "bottom-left") {
-      panel.style.left = "16px";
-      panel.style.bottom = "92px";
+      panel.style.left = mobileSideGap + "px";
+      panel.style.bottom = mobileBottomGap + "px";
     } else {
-      panel.style.right = "16px";
-      panel.style.bottom = "92px";
+      panel.style.right = mobileSideGap + "px";
+      panel.style.bottom = mobileBottomGap + "px";
     }
 
     panel.style.transform = isOpen ? "translateY(0)" : "translateY(18px)";
@@ -773,16 +744,25 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   bubble.style.display = isOpen ? "none" : "inline-flex";
 }
 
+  function applyPageShrink() {
+    return;
+  }
+
+  function resetPageShrink() {
+    return;
+  }
 
   function openPanel() {
     isOpen = true;
     applyPanelLayout();
+    applyPageShrink();
     sendPageContext(true);
   }
 
   function closePanel() {
     isOpen = false;
     applyPanelLayout();
+    resetPageShrink();
     updateBubbleByScroll();
   }
 
@@ -824,8 +804,8 @@ panel.style.transition = "none";
 
 if (isDesktop()) {
   panel.style.transform = position === "bottom-left"
-    ? "translateX(calc(-100% - 40px))"
-    : "translateX(calc(100% + 40px))";
+    ? "translateX(-100%)"
+    : "translateX(100%)";
 } else {
   panel.style.transform = "translateY(18px)";
 }
@@ -887,13 +867,28 @@ if (isDesktop()) {
 
     if (isOpen) {
       if (isDesktop()) {
-          } else {
-          }
-    } else {
+        applyPageShrink();
+      } else {
+        resetPageShrink();
       }
+    } else {
+      resetPageShrink();
+    }
 
     sendPageContext(true);
   });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", function () {
+      if (!panel) return;
+      applyPanelLayout();
+    });
+
+    window.visualViewport.addEventListener("scroll", function () {
+      if (!panel) return;
+      applyPanelLayout();
+    });
+  }
 
   window.addEventListener("scroll", function () {
     updateBubbleByScroll();
