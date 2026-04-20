@@ -1,9 +1,13 @@
 // ============================
 // 🔥 ANALYTICS: TRACK VISIT
 // ============================
+function __sitemindCanTrack(agentId) {
+  return !!agentId && agentId !== "demo-agent";
+}
+
 function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle) {
   const title = getPageTitle() || "Untitled Page";
-  if (!agentId) return;
+  if (!__sitemindCanTrack(agentId)) return;
 
   try {
     fetch(BASE_URL + "/api/index", {
@@ -16,7 +20,7 @@ function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle) {
         page_title: title,
         referrer: document.referrer || ""
       })
-    });
+    }).catch(function () {});
   } catch (e) {}
 }
 
@@ -26,18 +30,22 @@ function __sitemindTrackVisit(BASE_URL, agentId, getPageTitle) {
 var __sitemindVisitStart = Date.now();
 
 function __sitemindTrackTime(BASE_URL, agentId) {
+  if (!__sitemindCanTrack(agentId)) return;
+
   try {
     var duration = Math.floor((Date.now() - __sitemindVisitStart) / 1000);
 
-    navigator.sendBeacon(
-      BASE_URL + "/api/index",
-      JSON.stringify({
+    fetch(BASE_URL + "/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
         action: "track_time",
         agent_id: agentId,
         page_url: window.location.href,
         duration: duration
       })
-    );
+    }).catch(function () {});
   } catch (e) {}
 }
 
@@ -85,11 +93,6 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   var bubbleIconEl = null;
   var isBubbleExpanded = false;
   var scrollExpandThreshold = 60;
-
-  var originalBodyPaddingRight = "";
-  var originalBodyPaddingLeft = "";
-  var originalHtmlOverflowX = "";
-  var originalBodyOverflowX = "";
 
   var initialVisitTracked = false;
   var lastTrackedTitle = "";
@@ -482,6 +485,8 @@ function __sitemindTrackTime(BASE_URL, agentId) {
   }
 
   function scheduleInitialVisitTracking() {
+    if (!__sitemindCanTrack(agentId)) return;
+
     if (document.readyState === "complete" || document.readyState === "interactive") {
       setTimeout(trackInitialVisitOnce, 350);
     } else {
@@ -531,12 +536,12 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     var delays = [120, 600, 1600, 3200];
 
     for (var i = 0; i < delays.length; i++) {
-      (function (delay) {
+      (function (delay, isLast) {
         var timer = setTimeout(function () {
-          sendPageContext(i === delays.length - 1);
+          sendPageContext(isLast);
         }, delay);
         contextRetryTimers.push(timer);
-      })(delays[i]);
+      })(delays[i], i === delays.length - 1);
     }
   }
 
@@ -578,7 +583,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     bubble.style.backdropFilter = "blur(10px)";
     bubble.style.webkitBackdropFilter = "blur(10px)";
     bubble.style.transition =
-  "transform 0.26s ease, box-shadow 0.26s ease, opacity 0.22s ease, border-color 0.26s ease, filter 0.26s ease, padding 0.20s ease";
+      "transform 0.26s ease, box-shadow 0.26s ease, opacity 0.22s ease, border-color 0.26s ease, filter 0.26s ease, padding 0.20s ease";
     bubble.style.display = "inline-flex";
     bubble.style.alignItems = "center";
     bubble.style.justifyContent = "center";
@@ -665,116 +670,101 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     applyBubbleExpandedState(shouldExpand);
   }
 
-  function getViewportHeight() {
+  function getMobileViewportHeight() {
     if (window.visualViewport && window.visualViewport.height) {
       return Math.round(window.visualViewport.height);
     }
-
-    return window.innerHeight || document.documentElement.clientHeight || screen.height || 0;
+    return window.innerHeight || document.documentElement.clientHeight || 700;
   }
 
   function applyPanelLayout() {
-  if (!panel || !bubble || !iframe) return;
+    if (!panel || !bubble || !iframe) return;
 
-  var viewportHeight = getViewportHeight();
-  var isNarrowMobile = window.innerWidth < 520;
+    panel.style.left = "";
+    panel.style.right = "";
+    panel.style.top = "";
+    panel.style.bottom = "";
+    panel.style.width = "";
+    panel.style.height = "";
+    panel.style.maxWidth = "";
+    panel.style.maxHeight = "";
+    panel.style.borderRadius = "";
+    panel.style.borderLeft = "";
+    panel.style.borderRight = "";
+    panel.style.border = "";
+    panel.style.background = "#ffffff";
+    panel.style.overflow = "hidden";
+    panel.style.boxShadow = "0 18px 50px rgba(15,23,42,0.16)";
+    panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
+    panel.style.willChange = "transform, opacity";
+    panel.style.display = "block";
+    panel.style.position = "fixed";
+    panel.style.zIndex = "999999";
 
-  panel.style.left = "";
-  panel.style.right = "";
-  panel.style.top = "";
-  panel.style.bottom = "";
-  panel.style.width = "";
-  panel.style.height = "";
-  panel.style.maxWidth = "";
-  panel.style.maxHeight = "";
-  panel.style.borderRadius = "";
-  panel.style.borderLeft = "";
-  panel.style.borderRight = "";
-  panel.style.border = "";
-  panel.style.background = "#ffffff";
-  panel.style.overflow = "hidden";
-  panel.style.boxShadow = "0 18px 50px rgba(15,23,42,0.16)";
-  panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
-  panel.style.willChange = "transform, opacity";
-  panel.style.display = "block";
+    iframe.style.width = "100%";
+    iframe.style.height = "100%";
+    iframe.style.border = "0";
+    iframe.style.background = "#ffffff";
 
-  iframe.style.width = "100%";
-  iframe.style.height = "100%";
-  iframe.style.border = "0";
-  iframe.style.background = "#ffffff";
+    if (isDesktop()) {
+      panel.style.width = "450px";
+      panel.style.height = "100vh";
+      panel.style.maxWidth = "450px";
+      panel.style.maxHeight = "100vh";
+      panel.style.top = "0";
+      panel.style.bottom = "0";
+      panel.style.borderRadius = "0";
 
-  if (isDesktop()) {
-    panel.style.width = "450px";
-    panel.style.height = "100vh";
-    panel.style.maxWidth = "450px";
-    panel.style.maxHeight = "100vh";
-    panel.style.top = "0";
-    panel.style.bottom = "0";
-    panel.style.borderRadius = "0";
+      if (position === "bottom-left") {
+        panel.style.left = "0";
+        panel.style.borderRight = "1px solid rgba(37,99,235,0.10)";
+        panel.style.boxShadow = "12px 0 36px rgba(15,23,42,0.12)";
+        panel.style.transform = isOpen ? "translateX(0)" : "translateX(-100%)";
+      } else {
+        panel.style.right = "0";
+        panel.style.borderLeft = "1px solid rgba(37,99,235,0.10)";
+        panel.style.boxShadow = "-12px 0 36px rgba(15,23,42,0.12)";
+        panel.style.transform = isOpen ? "translateX(0)" : "translateX(100%)";
+      }
 
-    if (position === "bottom-left") {
-      panel.style.left = "0";
-      panel.style.borderRight = "1px solid rgba(37,99,235,0.10)";
-      panel.style.boxShadow = "12px 0 36px rgba(15,23,42,0.12)";
-      panel.style.transform = isOpen ? "translateX(0)" : "translateX(-100%)";
+      panel.style.opacity = isOpen ? "1" : "0";
+      panel.style.pointerEvents = isOpen ? "auto" : "none";
     } else {
-      panel.style.right = "0";
-      panel.style.borderLeft = "1px solid rgba(37,99,235,0.10)";
-      panel.style.boxShadow = "-12px 0 36px rgba(15,23,42,0.12)";
-      panel.style.transform = isOpen ? "translateX(0)" : "translateX(100%)";
+      var vvHeight = getMobileViewportHeight();
+      var panelHeight = Math.min(Math.max(vvHeight - 16, 320), 620);
+
+      panel.style.width = window.innerWidth < 520 ? "calc(100vw - 16px)" : "380px";
+      panel.style.maxWidth = "calc(100vw - 24px)";
+      panel.style.height = panelHeight + "px";
+      panel.style.maxHeight = panelHeight + "px";
+      panel.style.borderRadius = "18px";
+      panel.style.border = "1px solid rgba(37,99,235,0.10)";
+
+      if (position === "bottom-left") {
+        panel.style.left = "8px";
+        panel.style.bottom = "8px";
+      } else {
+        panel.style.right = "8px";
+        panel.style.bottom = "8px";
+      }
+
+      panel.style.transform = isOpen ? "translateY(0)" : "translateY(18px)";
+      panel.style.opacity = isOpen ? "1" : "0";
+      panel.style.pointerEvents = isOpen ? "auto" : "none";
     }
 
-    panel.style.opacity = isOpen ? "1" : "0";
-    panel.style.pointerEvents = isOpen ? "auto" : "none";
-  } else {
-    var mobileSideGap = isNarrowMobile ? 8 : 12;
-    var mobileBottomGap = isOpen ? 8 : 92;
-    var mobileMaxHeight = Math.max(320, viewportHeight - mobileBottomGap - 8);
-    var mobilePreferredHeight = isNarrowMobile ? Math.min(620, Math.round(viewportHeight * 0.82)) : 620;
-    var mobileHeight = Math.min(mobilePreferredHeight, mobileMaxHeight);
-
-    panel.style.width = isNarrowMobile ? "calc(100vw - 16px)" : "380px";
-    panel.style.maxWidth = "calc(100vw - 24px)";
-    panel.style.height = mobileHeight + "px";
-    panel.style.maxHeight = mobileMaxHeight + "px";
-    panel.style.borderRadius = "18px";
-    panel.style.border = "1px solid rgba(37,99,235,0.10)";
-
-    if (position === "bottom-left") {
-      panel.style.left = mobileSideGap + "px";
-      panel.style.bottom = mobileBottomGap + "px";
-    } else {
-      panel.style.right = mobileSideGap + "px";
-      panel.style.bottom = mobileBottomGap + "px";
-    }
-
-    panel.style.transform = isOpen ? "translateY(0)" : "translateY(18px)";
-    panel.style.opacity = isOpen ? "1" : "0";
-    panel.style.pointerEvents = isOpen ? "auto" : "none";
-  }
-
-  bubble.style.display = isOpen ? "none" : "inline-flex";
-}
-
-  function applyPageShrink() {
-    return;
-  }
-
-  function resetPageShrink() {
-    return;
+    bubble.style.display = isOpen ? "none" : "inline-flex";
   }
 
   function openPanel() {
     isOpen = true;
     applyPanelLayout();
-    applyPageShrink();
     sendPageContext(true);
   }
 
   function closePanel() {
     isOpen = false;
     applyPanelLayout();
-    resetPageShrink();
     updateBubbleByScroll();
   }
 
@@ -805,23 +795,23 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     bubbleShortLabelEl = bubble.querySelector(".sitemind-bubble-short");
     bubbleFullLabelEl = bubble.querySelector(".sitemind-bubble-full");
 
-panel = document.createElement("div");
-panel.style.position = "fixed";
-panel.style.zIndex = "999999";
-panel.style.background = "#ffffff";
-panel.style.overflow = "hidden";
-panel.style.opacity = "0";
-panel.style.pointerEvents = "none";
-panel.style.transition = "none";
+    panel = document.createElement("div");
+    panel.style.position = "fixed";
+    panel.style.zIndex = "999999";
+    panel.style.background = "#ffffff";
+    panel.style.overflow = "hidden";
+    panel.style.opacity = "0";
+    panel.style.pointerEvents = "none";
+    panel.style.transition = "none";
 
-if (isDesktop()) {
-  panel.style.transform = position === "bottom-left"
-    ? "translateX(-100%)"
-    : "translateX(100%)";
-} else {
-  panel.style.transform = "translateY(18px)";
-}
-    
+    if (isDesktop()) {
+      panel.style.transform = position === "bottom-left"
+        ? "translateX(-100%)"
+        : "translateX(100%)";
+    } else {
+      panel.style.transform = "translateY(18px)";
+    }
+
     iframe = document.createElement("iframe");
     iframe.src =
       BASE_URL +
@@ -842,9 +832,11 @@ if (isDesktop()) {
     styleBubble();
     updateBubbleByScroll();
     applyPanelLayout();
+
     requestAnimationFrame(function () {
-  panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
-});
+      panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
+    });
+
     bubble.addEventListener("click", togglePanel);
 
     iframe.addEventListener("load", function () {
@@ -876,29 +868,20 @@ if (isDesktop()) {
     styleBubble();
     updateBubbleByScroll();
     applyPanelLayout();
-
-    if (isOpen) {
-      if (isDesktop()) {
-        applyPageShrink();
-      } else {
-        resetPageShrink();
-      }
-    } else {
-      resetPageShrink();
-    }
-
     sendPageContext(true);
   });
 
   if (window.visualViewport) {
     window.visualViewport.addEventListener("resize", function () {
-      if (!panel) return;
-      applyPanelLayout();
+      if (isOpen) {
+        applyPanelLayout();
+      }
     });
 
     window.visualViewport.addEventListener("scroll", function () {
-      if (!panel) return;
-      applyPanelLayout();
+      if (isOpen) {
+        applyPanelLayout();
+      }
     });
   }
 
