@@ -831,7 +831,7 @@ if (isDesktop()) {
     updateBubbleByScroll();
     applyPanelLayout();
     requestAnimationFrame(function () {
-  panel.style.transition = "transform 0.34s ease, opacity 0.28s ease, box-shadow 0.28s ease";
+     panel.style.transition = "transform 0.70s ease, opacity 0.52s ease, box-shadow 0.52s ease";
 });
     bubble.addEventListener("click", togglePanel);
 
