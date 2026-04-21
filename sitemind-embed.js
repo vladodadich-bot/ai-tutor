@@ -128,7 +128,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
 
   function getDefaultFullBubbleText(lang) {
     if (lang === "hr") {
-      return "Trebaš pomoć?<br>Pitaj AI asistenta";
+      return "Trebaš pomoć?<br>Pitaj me";
     }
 
     if (lang === "de") {
@@ -136,14 +136,14 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     }
 
     if (lang === "it") {
-      return "Hai bisogno di aiuto?<br>Chiedi all'assistente AI";
+      return "Hai bisogno di aiuto?<br>chiedi a me";
     }
 
     if (lang === "fr") {
-      return "Besoin d’aide ?<br>Demandez à l’assistant IA";
+      return "Besoin d’aide ?<br>demandez-moi";
     }
 
-    return "Need help?<br>Ask the AI assistant";
+    return "Need help?<br>Ask me";
   }
 
   var detectedLang = detectPageLanguage();
