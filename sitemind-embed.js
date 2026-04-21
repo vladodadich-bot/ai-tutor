@@ -132,7 +132,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
     }
 
     if (lang === "de") {
-      return "Brauchst du Hilfe?<br>Frag den KI-Assistenten";
+      return "Brauchst du Hilfe?<br>fragen Sie mich";
     }
 
     if (lang === "it") {
