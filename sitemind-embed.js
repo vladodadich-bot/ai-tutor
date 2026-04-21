@@ -143,7 +143,7 @@ function __sitemindTrackTime(BASE_URL, agentId) {
       return "Besoin d’aide ?<br>demandez-moi";
     }
 
-    return "Need help?<br>Ask me";
+    return "You need help?<br>Ask me";
   }
 
   var detectedLang = detectPageLanguage();
