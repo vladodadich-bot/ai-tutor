@@ -1312,6 +1312,7 @@ PRAVILA:
 - Piši kratke i jasne odgovore, idealno do 150 riječi.
 - Za specifične informacije o ovoj stranici ili poslovanju koristi samo potvrđene podatke iz dostupnog sadržaja stranice i crawla.
 - Ako postoji relevantna ili srodna stranica unutar sajta, možeš ponuditi 1 do 3 najrelevantnije poveznice sa kratkim objašnjenjem.
+- Ako odgovor daješ na temelju druge relevantne stranice sa sajta, spomeni tu poveznicu prirodno u odgovoru.
 - Ne daj generičke savjete poput odlaska drugdje ili traženja po internetu osim ako to korisnik izričito zatraži.
 - Odgovaraj na istom jeziku kojim se korisnik obraća.
 - Ako korisnik ponovi isto pitanje, odgovori kratko i korisno bez nepotrebnog ponavljanja.
@@ -1392,6 +1393,9 @@ ${currentPageContent}
 
 Matched current page in crawl:
 ${payload.currentPageMatched ? 'yes' : 'no'}
+
+Suggested relevant link:
+${payload.suggestedLink || 'N/A'}
 
 Relevant crawled website context:
 ${payload.crawlContext || 'N/A'}
@@ -2058,6 +2062,108 @@ function getPreviousHistoryMessages(history) {
 }
 
 
+
+function sanitizeTopicLabel(value) {
+  const raw = cleanText(value || '');
+  if (!raw) return '';
+
+  let cleaned = raw
+    .replace(/\s*->\s*/g, ' ')
+    .replace(/(user|assistant|system):/gi, ' ')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const parts = cleaned
+    .split(/\s{2,}|\s*\|\s*|\s*->\s*/)
+    .map((part) => cleanText(part))
+    .filter(Boolean);
+
+  if (parts.length) {
+    cleaned = parts[parts.length - 1];
+  }
+
+  return limitText(cleaned, 180);
+}
+
+function extractStandaloneNamedTopic(message) {
+  const raw = String(message || '').trim();
+  if (!raw) return '';
+
+  const quotedMatch = raw.match(/["“”'„]([^"“”'„]{3,120})["“”'„]/u);
+  if (quotedMatch && quotedMatch[1]) {
+    return sanitizeTopicLabel(quotedMatch[1]);
+  }
+
+  const titleLikeMatch = raw.match(/([A-ZČĆŽŠĐ][\p{L}šđžčćŠĐŽČĆ\-]+(?:\s+[A-ZČĆŽŠĐa-zčćžšđ][\p{L}šđžčćŠĐŽČĆ\-]+){1,6})/u);
+  if (titleLikeMatch && titleLikeMatch[1]) {
+    return sanitizeTopicLabel(titleLikeMatch[1]);
+  }
+
+  const normalized = normalizeStringForTopic(raw);
+  const stopPatterns = [
+    /^koji su\s+/,
+    /^tko su\s+/,
+    /^what are\s+/,
+    /^who are\s+/,
+    /^glavni likovi(?: djela)?\s+/,
+    /^sporedni likovi(?: djela)?\s+/,
+    /^likovi(?: djela)?\s+/,
+    /^tema(?: djela)?\s+/,
+    /^analiza(?: djela)?\s+/
+  ];
+
+  let stripped = normalized;
+  for (const pattern of stopPatterns) {
+    stripped = stripped.replace(pattern, '');
+  }
+
+  const tokens = filterSignificantTokens(uniqueItems(tokenizeTopic(stripped)));
+  if (tokens.length >= 2) {
+    return sanitizeTopicLabel(tokens.join(' '));
+  }
+
+  return '';
+}
+
+function shouldTreatAsStandaloneQuestion(message, pageTitle, h1, headings) {
+  const msg = normalizeStringForTopic(message || '');
+  if (!msg) return false;
+
+  if (detectCrossPageIntent(message, pageTitle, h1, headings)) return true;
+
+  const namedTopic = extractStandaloneNamedTopic(message);
+  if (!namedTopic) return false;
+
+  const normalizedNamedTopic = normalizeStringForTopic(namedTopic);
+  const currentSignals = [
+    normalizeStringForTopic(pageTitle || ''),
+    normalizeStringForTopic(h1 || ''),
+    normalizeStringForTopic(Array.isArray(headings) ? headings.join(' | ') : (headings || ''))
+  ].filter(Boolean);
+
+  const isCurrent = currentSignals.some((signal) => signal && (signal.includes(normalizedNamedTopic) || normalizedNamedTopic.includes(signal)));
+  return !isCurrent;
+}
+
+function findBestSecondaryContextLink(rows, currentPageMatch) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const currentUrl = currentPageMatch && currentPageMatch.row ? String(currentPageMatch.row.url || '').trim() : '';
+
+  for (const row of safeRows) {
+    const rowUrl = String(row && row.url ? row.url : '').trim();
+    if (!rowUrl) continue;
+    if (currentUrl && rowUrl === currentUrl) continue;
+
+    return {
+      title: limitText(String(row.page_title || row.h1 || row.url || '').trim(), 180),
+      url: limitText(rowUrl, 500)
+    };
+  }
+
+  return null;
+}
+
 function looksLikeCurrentPageQuestion(message, pageTitle, h1, headings) {
   const msg = normalizeStringForTopic(message || '');
   if (!msg) return false;
@@ -2232,12 +2338,24 @@ async function handleChat(req, res, body) {
     crawledRows = [];
   }
 
-  const computedActiveTopic = providedActiveTopic || getActiveTopicFromHistory(history, message);
-  const computedResolvedQuery = providedResolvedQuery || buildResolvedQuery(computedActiveTopic, message);
-  const computedIsShortFollowUp = providedIsShortFollowUp || isShortFollowUpQuestion(message);
+  const standaloneQuestion = shouldTreatAsStandaloneQuestion(message, pageTitle, h1, headings);
+  const extractedStandaloneTopic = extractStandaloneNamedTopic(message);
+  const historyActiveTopic = getActiveTopicFromHistory(history, message);
+
+  const computedActiveTopic = sanitizeTopicLabel(
+    providedActiveTopic ||
+    (standaloneQuestion ? (extractedStandaloneTopic || message) : historyActiveTopic)
+  );
+
+  const computedResolvedQuery = sanitizeTopicLabel(
+    providedResolvedQuery ||
+    (standaloneQuestion ? message : buildResolvedQuery(computedActiveTopic, message))
+  ) || cleanText(message);
+
+  const computedIsShortFollowUp = !standaloneQuestion && (providedIsShortFollowUp || isShortFollowUpQuestion(message));
   const previousMessages = getPreviousHistoryMessages(history);
-  const previousUserMessage = providedPreviousUserMessage || previousMessages.previousUserMessage;
-  const previousAssistantMessage = providedPreviousAssistantMessage || previousMessages.previousAssistantMessage;
+  const previousUserMessage = standaloneQuestion ? '' : (providedPreviousUserMessage || previousMessages.previousUserMessage);
+  const previousAssistantMessage = standaloneQuestion ? '' : (providedPreviousAssistantMessage || previousMessages.previousAssistantMessage);
 
   const rankedContext = pickRelevantCrawledPages(crawledRows, computedResolvedQuery || message, history, 3);
   let relevantPages = Array.isArray(rankedContext.pages) ? rankedContext.pages : [];
@@ -2295,6 +2413,10 @@ async function handleChat(req, res, body) {
     : findRelevantLinkCandidates(crawledRows, computedResolvedQuery || message, history, 3);
 
   const linkCandidates = linkCandidateData.candidates || [];
+  const suggestedLinkObject = currentPageOnlyMode ? null : findBestSecondaryContextLink(pagesForPrompt, currentPageMatch);
+  const suggestedLink = suggestedLinkObject
+    ? `${suggestedLinkObject.title} – ${suggestedLinkObject.url}`
+    : '';
 
   if (!hasStrongCurrentPageContent && !hasStrongMatchedCurrentPage && !hasStrongRelevantContent && linkCandidates.length > 0) {
     return res.status(200).json({
@@ -2341,6 +2463,7 @@ async function handleChat(req, res, body) {
     activeTopic: computedActiveTopic,
     resolvedQuery: computedResolvedQuery,
     isShortFollowUp: computedIsShortFollowUp,
+    standaloneQuestion,
     includeCurrentPageContent,
     currentPageOnlyMode,
     crossPageIntent: detectCrossPageIntent(message, pageTitle, h1, headings),
@@ -2353,6 +2476,7 @@ async function handleChat(req, res, body) {
       h1: currentPageMatch.row && currentPageMatch.row.h1 ? currentPageMatch.row.h1 : ''
     } : null,
     crawlRowsUsed: currentPageOnlyMode ? 0 : (Array.isArray(pagesForPrompt) ? pagesForPrompt.length : 0),
+    suggestedLink,
     topMatches: relevantPages.slice(0, 3).map((row) => ({
       score: row._score || 0,
       url: row.url || '',
@@ -2387,7 +2511,8 @@ async function handleChat(req, res, body) {
     pageTypeHint,
     history,
     includeCurrentPageContent,
-    currentPageMatched: !!currentPageMatch
+    currentPageMatched: !!currentPageMatch,
+    suggestedLink
   });
 
   try {
