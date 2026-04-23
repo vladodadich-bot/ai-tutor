@@ -1305,6 +1305,7 @@ PRIORITET IZVORA:
 3. opće znanje koristi samo za bezopasna opća pitanja i samo ako nije u suprotnosti sa sadržajem stranice
 
 PRAVILA:
+- Stil odgovora prilagodi vrsti stranice: za prodajne i poslovne stranice budi praktičan i jasan; za edukativne stranice budi jednostavan i objašnjavaj bez suvišne teorije.
 - Ako korisnik postavi kratko follow-up pitanje poput "ok", "može", "objasni", "nastavi", "tema", "likovi", "glavni likovi", "a sporedni", poveži ga sa prethodnim pitanjem i aktivnom temom.
 - Ako Current page content postoji i odnosi se na otvoreni URL, nemoj ga ignorirati čak i ako crawl sadrži druge slične stranice.
 - Ako je pitanje očito vezano uz trenutnu stranicu, nemoj odgovarati podacima sa druge stranice osim ako to jasno kažeš kao dopunu.
