@@ -1296,33 +1296,29 @@ function getLanguageLabel(language) {
 
 function buildAdaptiveSystemPrompt(languageLabel) {
   return `
-  
+
 Identitet: Ti si ljubazan i stručan asistent za web stranicu. Piši jednostavno, prirodno i prijateljski i ne haluciniraj.
 
-ZA ODGOVOR KORISTI:
-- podatke iz crawla
-- cijeli sadržaj trenutne stranice 
-- svoje opće znanje samo u slucaju opcih pitanja
+PRIORITET IZVORA:
+1. prvo koristi trenutnu otvorenu stranicu (Page URL, Page title, Main H1, Headings, Current page content)
+2. zatim koristi relevantni crawl kontekst samo kao dopunu ili fallback
+3. opće znanje koristi samo za bezopasna opća pitanja i samo ako nije u suprotnosti sa sadržajem stranice
 
 PRAVILA:
-- Stil :  Postavi se prema korisniku ljubazno i odgovaraj jednostavnim stilom bez filozofiranja i uzmi u obzir predhodno pitanje ako je pitanje nejasno trazi da pojasni.
-
-- Piši kratke i jasne odgovore, idealno do 150 riječi, i po potrebi predloži smislen sljedeći korak ili link do artikla o kojem se radi, ako nisi siguran predlozi relevantan link.
-- Za specifične informacije o ovoj stranici ili poslovanju (cijene, usluge, kontakt, pravila, radno vrijeme, proizvodi, uvjeti i slično) koristi samo potvrđene podatke iz dostupnog sadržaja stranice i crawla. Ne nagađaj i ne izmišljaj.
-- Za opća pitanja, objašnjenja i sažetke možeš kombinirati dostupni sadržaj stranice i opće znanje, ali prvo koristi najrelevantniji sadržaj sa stranice i crawla.
-- Ako traženi podatak nije potvrđen u dostupnim podacima sa stranice ili crawla, jasno reci da ga nemaš potvrđenog.
-- Ako postoji relevantna ili srodna stranica unutar ovog web sajta, ponudi 1 do 3 najrelevantnije poveznice sa kratkim objašnjenjem.
-- Ne izmišljaj informacije, linkove, tvrdnje, proizvode, pravila ni sadržaj koji nije potvrđen.
-- Ne daj generičke savjete poput odlaska drugdje, traženja po internetu ili provjere u knjižnici, osim ako to korisnik izričito zatraži.
-- Ako korisnik postavi kratko follow-up pitanje poput "ok", "može", "objasni", "nastavi" ili slično, poveži ga sa prethodnom temom razgovora i nastavi smisleno.
+- Ako korisnik postavi kratko follow-up pitanje poput "ok", "može", "objasni", "nastavi", "tema", "likovi", "glavni likovi", "a sporedni", poveži ga sa prethodnim pitanjem i aktivnom temom.
+- Ako Current page content postoji i odnosi se na otvoreni URL, nemoj ga ignorirati čak i ako crawl sadrži druge slične stranice.
+- Ako je pitanje očito vezano uz trenutnu stranicu, nemoj odgovarati podacima sa druge stranice osim ako to jasno kažeš kao dopunu.
+- Ako traženi podatak nije potvrđen u trenutnoj stranici ni u crawl podacima, jasno reci da ga nemaš potvrđenog. Ne izmišljaj.
+- Piši kratke i jasne odgovore, idealno do 150 riječi.
+- Za specifične informacije o ovoj stranici ili poslovanju koristi samo potvrđene podatke iz dostupnog sadržaja stranice i crawla.
+- Ako postoji relevantna ili srodna stranica unutar sajta, možeš ponuditi 1 do 3 najrelevantnije poveznice sa kratkim objašnjenjem.
+- Ne daj generičke savjete poput odlaska drugdje ili traženja po internetu osim ako to korisnik izričito zatraži.
 - Odgovaraj na istom jeziku kojim se korisnik obraća.
-- Ako korisnik ponovi isto pitanje, ljubazno odgovori kratko i po mogućnosti usmjeri razgovor dalje bez nepotrebnog ponavljanja.
-- Ako pitanje nije povezano sa sadržajem stranice, a ipak je opće i bezopasno, odgovori korisno i kratko.
-- Svaki odgovor završi blagim pozivom na akciju (CTA) koji je relevantan za temu npr. 'Želite li da vam pomognem s rezervacijom?' ili Više detalja možete pronaći na linku ispod.
+- Ako korisnik ponovi isto pitanje, odgovori kratko i korisno bez nepotrebnog ponavljanja.
+- Svaki odgovor završi blagim relevantnim CTA-om.
+- Ograničenja: Ne odgovaraj na pitanja o programiranju, hakiranju ili tehničkim zloupotrebama.
 
-- Ogranicenja : Ne odgovaraj na pitanja o programiranju, hakiranju ili tehničkim zloupotrebama.
-
-- Answer in ${languageLabel}
+Answer in ${languageLabel}
 `.trim();
 }
 
@@ -1330,7 +1326,7 @@ function buildUserPrompt(payload) {
   const headingsText = Array.isArray(payload.headings) ? payload.headings.join(' | ') : '';
   const historyText = Array.isArray(payload.history) && payload.history.length
     ? payload.history
-        .slice(-4)
+        .slice(-6)
         .map((item) => `${item.role}: ${item.content}`)
         .join('\n')
     : 'N/A';
@@ -1349,6 +1345,15 @@ ${payload.resolvedQuery || payload.message || 'N/A'}
 Active topic:
 ${payload.activeTopic || 'N/A'}
 
+Is short follow up:
+${payload.isShortFollowUp ? 'yes' : 'no'}
+
+Previous user message:
+${payload.previousUserMessage || 'N/A'}
+
+Previous assistant message:
+${payload.previousAssistantMessage || 'N/A'}
+
 Page language:
 ${payload.language || 'en'}
 
@@ -1364,17 +1369,32 @@ ${headingsText || 'N/A'}
 Main H1:
 ${payload.h1 || 'N/A'}
 
-Current page content:
-${currentPageContent}
-
-Relevant crawled website context:
-${payload.crawlContext || 'N/A'}
-
 Page URL:
 ${payload.pageUrl || 'N/A'}
 
+Canonical URL:
+${payload.canonicalUrl || 'N/A'}
+
 Page type hint:
 ${payload.pageTypeHint || 'general'}
+
+Current page context ready:
+${payload.pageContextReady ? 'yes' : 'no'}
+
+Current page text length:
+${payload.pageTextLength || 0}
+
+Current page preview:
+${payload.pageTextPreview || 'N/A'}
+
+Current page content:
+${currentPageContent}
+
+Matched current page in crawl:
+${payload.currentPageMatched ? 'yes' : 'no'}
+
+Relevant crawled website context:
+${payload.crawlContext || 'N/A'}
 
 Recent conversation:
 ${historyText}
@@ -1928,6 +1948,115 @@ async function getAgentWithAccess(agentId) {
     reason: null
   };
 }
+
+function normalizeComparableUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    const url = new URL(raw);
+    const pathname = (url.pathname || '/').replace(/\/+$/, '') || '/';
+    return (url.origin + pathname).toLowerCase();
+  } catch (err) {
+    return raw
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/[?#].*$/, '')
+      .replace(/\/+$/, '')
+      .toLowerCase();
+  }
+}
+
+function findCurrentPageRow(rows, pageUrl, pageTitle, h1) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const normalizedPageUrl = normalizeComparableUrl(pageUrl);
+  const normalizedTitle = normalizeStringForTopic(pageTitle);
+  const normalizedH1 = normalizeStringForTopic(h1);
+
+  let bestRow = null;
+  let bestScore = -1;
+
+  for (const row of safeRows) {
+    let score = 0;
+    const rowUrl = normalizeComparableUrl(row && row.url ? row.url : '');
+    const rowTitle = normalizeStringForTopic(row && row.page_title ? row.page_title : '');
+    const rowH1 = normalizeStringForTopic(row && row.h1 ? row.h1 : '');
+
+    if (normalizedPageUrl && rowUrl) {
+      if (rowUrl === normalizedPageUrl) score += 1000;
+      else if (rowUrl.includes(normalizedPageUrl) || normalizedPageUrl.includes(rowUrl)) score += 320;
+    }
+
+    if (normalizedTitle && rowTitle) {
+      if (rowTitle === normalizedTitle) score += 220;
+      else if (rowTitle.includes(normalizedTitle) || normalizedTitle.includes(rowTitle)) score += 120;
+    }
+
+    if (normalizedH1 && rowH1) {
+      if (rowH1 === normalizedH1) score += 180;
+      else if (rowH1.includes(normalizedH1) || normalizedH1.includes(rowH1)) score += 90;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestRow = row;
+    }
+  }
+
+  if (bestScore < 120) return null;
+  return { row: bestRow, score: bestScore };
+}
+
+function mergeCurrentPageIntoRelevantPages(relevantPages, currentPageMatch) {
+  const rows = Array.isArray(relevantPages) ? relevantPages.slice() : [];
+
+  if (!currentPageMatch || !currentPageMatch.row) {
+    return rows;
+  }
+
+  const matchedUrl = String(currentPageMatch.row.url || '').trim();
+  const exists = rows.some((row) => String(row && row.url ? row.url : '').trim() === matchedUrl);
+
+  const boostedRow = {
+    ...currentPageMatch.row,
+    _score: Math.max(Number(currentPageMatch.row._score || 0), Number(currentPageMatch.score || 0))
+  };
+
+  if (exists) {
+    return rows
+      .map((row) => (
+        String(row && row.url ? row.url : '').trim() === matchedUrl
+          ? { ...row, _score: Math.max(Number(row._score || 0), boostedRow._score) }
+          : row
+      ))
+      .sort((a, b) => Number(b._score || 0) - Number(a._score || 0));
+  }
+
+  return [boostedRow].concat(rows).sort((a, b) => Number(b._score || 0) - Number(a._score || 0));
+}
+
+function getPreviousHistoryMessages(history) {
+  const safeHistory = Array.isArray(history) ? history : [];
+  let previousUserMessage = '';
+  let previousAssistantMessage = '';
+
+  for (let i = safeHistory.length - 1; i >= 0; i -= 1) {
+    const item = safeHistory[i];
+    if (!previousAssistantMessage && item && item.role === 'assistant' && item.content) {
+      previousAssistantMessage = item.content;
+    }
+    if (!previousUserMessage && item && item.role === 'user' && item.content) {
+      previousUserMessage = item.content;
+    }
+    if (previousUserMessage && previousAssistantMessage) break;
+  }
+
+  return {
+    previousUserMessage: limitText(previousUserMessage, 600),
+    previousAssistantMessage: limitText(previousAssistantMessage, 600)
+  };
+}
+
 async function handleChat(req, res, body) {
   const agentId = String(body.agentId || body.agent_id || '').trim();
   const message = String(body.message || '').trim();
@@ -1938,16 +2067,25 @@ async function handleChat(req, res, body) {
   const pageTitle = limitText(body.pageTitle || '', 300);
   const pageDescription = limitText(body.pageDescription || '', 500);
   const pageUrl = limitText(body.pageUrl || '', 500);
+  const canonicalUrl = limitText(body.canonicalUrl || pageUrl || '', 500);
   const h1 = limitText(body.h1 || '', 300);
 
   const pageContext = limitText(body.pageContext || '', 5000);
   const pageText = limitText(body.pageText || body.pageContext || '', 7000);
+  const pageTextPreview = limitText(body.pageTextPreview || pageText || pageContext || '', 1200);
+  const pageTextLength = Number(body.pageTextLength || pageText.length || pageContext.length || 0);
+  const pageContextReady = body.pageContextReady === true || body.pageContextReady === 'true' || pageTextLength > 180;
 
   const headings = Array.isArray(body.headings)
     ? body.headings.map((item) => limitText(item, 200)).filter(Boolean).slice(0, 12)
     : [];
 
   const history = normalizeHistoryItems(body.history, 8);
+  const providedResolvedQuery = limitText(body.resolvedQuery || '', 300);
+  const providedActiveTopic = limitText(body.activeTopic || '', 200);
+  const providedPreviousUserMessage = limitText(body.previousUserMessage || '', 600);
+  const providedPreviousAssistantMessage = limitText(body.previousAssistantMessage || '', 600);
+  const providedIsShortFollowUp = body.isShortFollowUp === true || body.isShortFollowUp === 'true';
 
   if (!agentId || !message) {
     return res.status(400).json({ error: 'Missing agentId or message' });
@@ -1988,18 +2126,46 @@ async function handleChat(req, res, body) {
     crawledRows = [];
   }
 
-  const rankedContext = pickRelevantCrawledPages(crawledRows, message, history, 3);
-  const relevantPages = rankedContext.pages || [];
-  const linkCandidateData = findRelevantLinkCandidates(crawledRows, message, history, 3);
+  const computedActiveTopic = providedActiveTopic || getActiveTopicFromHistory(history, message);
+  const computedResolvedQuery = providedResolvedQuery || buildResolvedQuery(computedActiveTopic, message);
+  const computedIsShortFollowUp = providedIsShortFollowUp || isShortFollowUpQuestion(message);
+  const previousMessages = getPreviousHistoryMessages(history);
+  const previousUserMessage = providedPreviousUserMessage || previousMessages.previousUserMessage;
+  const previousAssistantMessage = providedPreviousAssistantMessage || previousMessages.previousAssistantMessage;
+
+  const rankedContext = pickRelevantCrawledPages(crawledRows, computedResolvedQuery || message, history, 3);
+  let relevantPages = Array.isArray(rankedContext.pages) ? rankedContext.pages : [];
+
+  const currentPageMatch =
+    findCurrentPageRow(crawledRows, canonicalUrl || pageUrl, pageTitle, h1) ||
+    findCurrentPageRow(crawledRows, pageUrl, pageTitle, h1);
+
+  relevantPages = mergeCurrentPageIntoRelevantPages(relevantPages, currentPageMatch);
+
+  const linkCandidateData = findRelevantLinkCandidates(crawledRows, computedResolvedQuery || message, history, 3);
   const linkCandidates = linkCandidateData.candidates || [];
 
-  const hasStrongCurrentPageContent = pageText.length > 180 || pageContext.length > 180;
+  const hasStrongCurrentPageContent =
+    pageContextReady &&
+    (
+      pageText.length > 180 ||
+      pageContext.length > 180 ||
+      pageTextPreview.length > 180 ||
+      pageTextLength > 180
+    );
+
+  const currentPageRowContent = currentPageMatch && currentPageMatch.row
+    ? String(currentPageMatch.row.content || currentPageMatch.row.text_preview || '')
+    : '';
+
+  const hasStrongMatchedCurrentPage = currentPageMatch && currentPageRowContent.trim().length > 180;
+
   const hasStrongRelevantContent = Array.isArray(relevantPages) && relevantPages.some((row) => {
     const content = String(row.content || row.text_preview || '');
     return content.trim().length > 180 && Number(row._score || 0) >= 20;
   });
 
-  if (!hasStrongCurrentPageContent && !hasStrongRelevantContent && linkCandidates.length > 0) {
+  if (!hasStrongCurrentPageContent && !hasStrongMatchedCurrentPage && !hasStrongRelevantContent && linkCandidates.length > 0) {
     return res.status(200).json({
       reply: buildLinkSuggestionReply(language, linkCandidates)
     });
@@ -2008,9 +2174,13 @@ async function handleChat(req, res, body) {
   let crawlContext = '';
 
   try {
-    const rowsToUse = Array.isArray(relevantPages) && relevantPages.length
-      ? relevantPages
+    let rowsToUse = Array.isArray(relevantPages) && relevantPages.length
+      ? relevantPages.slice(0, 3)
       : crawledRows.slice(0, 3);
+
+    if (currentPageMatch && currentPageMatch.row) {
+      rowsToUse = mergeCurrentPageIntoRelevantPages(rowsToUse, currentPageMatch).slice(0, 3);
+    }
 
     if (rowsToUse.length > 0) {
       const shortRows = rowsToUse.map((row) => {
@@ -2023,7 +2193,8 @@ async function handleChat(req, res, body) {
           h1: row.h1 || '',
           headings: headingsValue.slice(0, 8),
           text_preview: limitText(row.text_preview || '', 1000),
-          content: limitText(row.content || '', 2500)
+          content: limitText(row.content || '', 2500),
+          score: Number(row._score || 0)
         };
       });
 
@@ -2033,14 +2204,23 @@ async function handleChat(req, res, body) {
     crawlContext = '';
   }
 
-  const includeCurrentPageContent = !hasStrongRelevantContent;
+  const includeCurrentPageContent = hasStrongCurrentPageContent || !hasStrongRelevantContent || !!currentPageMatch;
 
   console.log('CHAT CONTEXT DEBUG:', {
     agentId,
     message,
-    activeTopic: rankedContext.activeTopic,
-    resolvedQuery: rankedContext.resolvedQuery,
+    activeTopic: computedActiveTopic,
+    resolvedQuery: computedResolvedQuery,
+    isShortFollowUp: computedIsShortFollowUp,
     includeCurrentPageContent,
+    pageContextReady,
+    pageTextLength,
+    currentPageMatch: currentPageMatch ? {
+      score: currentPageMatch.score,
+      url: currentPageMatch.row && currentPageMatch.row.url ? currentPageMatch.row.url : '',
+      title: currentPageMatch.row && currentPageMatch.row.page_title ? currentPageMatch.row.page_title : '',
+      h1: currentPageMatch.row && currentPageMatch.row.h1 ? currentPageMatch.row.h1 : ''
+    } : null,
     topMatches: relevantPages.slice(0, 3).map((row) => ({
       score: row._score || 0,
       url: row.url || '',
@@ -2053,22 +2233,30 @@ async function handleChat(req, res, body) {
   const systemPrompt = buildAdaptiveSystemPrompt(languageLabel);
 
   const userPrompt = buildUserPrompt({
-  message,
-  resolvedQuery: rankedContext.resolvedQuery,
-  activeTopic: rankedContext.activeTopic,
-  language,
-  pageTitle,
-  pageDescription,
-  headings,
-  h1,
-  pageContext,
-  pageText,
-  crawlContext,
-  pageUrl,
-  pageTypeHint,
-  history,
-  includeCurrentPageContent
-});
+    message,
+    resolvedQuery: computedResolvedQuery,
+    activeTopic: computedActiveTopic,
+    isShortFollowUp: computedIsShortFollowUp,
+    previousUserMessage,
+    previousAssistantMessage,
+    language,
+    pageTitle,
+    pageDescription,
+    headings,
+    h1,
+    pageContext,
+    pageText,
+    pageTextPreview,
+    pageTextLength,
+    pageContextReady,
+    crawlContext,
+    pageUrl,
+    canonicalUrl,
+    pageTypeHint,
+    history,
+    includeCurrentPageContent,
+    currentPageMatched: !!currentPageMatch
+  });
 
   try {
     const openaiRes = await fetch('https://api.openai.com/v1/responses', {
@@ -2078,7 +2266,7 @@ async function handleChat(req, res, body) {
         'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY
       },
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
+        model: 'gpt-4.1-mini',
         stream: true,
         input: [
           {
