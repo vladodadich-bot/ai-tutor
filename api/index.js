@@ -1311,6 +1311,7 @@ PRAVILA:
 - Ako traženi podatak nije potvrđen u trenutnoj stranici ni u crawl podacima, jasno reci da ga nemaš potvrđenog. Ne izmišljaj.
 - Piši kratke i jasne odgovore, idealno do 150 riječi.
 - Za specifične informacije o ovoj stranici ili poslovanju koristi samo potvrđene podatke iz dostupnog sadržaja stranice i crawla.
+- Ako odgovor temeljiš na drugoj relevantnoj stranici iz crawla, predloži jednu najrelevantniju poveznicu s kratkim objašnjenjem.
 - Ako postoji relevantna ili srodna stranica unutar sajta, možeš ponuditi 1 do 3 najrelevantnije poveznice sa kratkim objašnjenjem.
 - Ne daj generičke savjete poput odlaska drugdje ili traženja po internetu osim ako to korisnik izričito zatraži.
 - Odgovaraj na istom jeziku kojim se korisnik obraća.
@@ -1328,7 +1329,8 @@ function buildUserPrompt(payload) {
     ? payload.history
         .slice(-6)
         .map((item) => `${item.role}: ${item.content}`)
-        .join('\n')
+        .join('
+')
     : 'N/A';
 
   const currentPageContent = payload.includeCurrentPageContent
@@ -1395,6 +1397,9 @@ ${payload.currentPageMatched ? 'yes' : 'no'}
 
 Relevant crawled website context:
 ${payload.crawlContext || 'N/A'}
+
+Suggested relevant page link:
+${payload.suggestedRelevantLink || 'N/A'}
 
 Recent conversation:
 ${historyText}
@@ -1499,31 +1504,41 @@ function filterSignificantTokens(tokens) {
 }
 
 function isShortFollowUpQuestion(message) {
-  const text = normalizeStringForTopic(message);
+  const original = String(message || '').trim();
+  const text = normalizeStringForTopic(original);
   if (!text) return false;
 
   const genericFollowUps = new Set([
     'ok', 'okej', 'okey', 'da', 'ne', 'moze', 'može', 'hvala',
     'nastavi', 'continue', 'thanks', 'thank you', 'yes', 'no',
-    'detaljnije', 'detail', 'details', 'more', 'mehr', 'grazie', 'danke'
+    'detaljnije', 'detail', 'details', 'more', 'mehr', 'grazie', 'danke',
+    'objasni', 'pojasni'
   ]);
 
   if (genericFollowUps.has(text)) return true;
 
-  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  const followUpPhrases = new Set([
+    'glavni likovi', 'sporedni likovi', 'likovi', 'tema', 'tema djela', 'pouka',
+    'analiza', 'kratki sadrzaj', 'kratki sadržaj', 'redoslijed događaja',
+    'redoslijed dogadanja', 'opis likova', 'osobine likova', 'a sporedni'
+  ]);
 
-  if (text.length <= 18) return true;
+  if (followUpPhrases.has(text)) return true;
+
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  const hasNamedEntitySignal = /[A-ZČĆŽŠĐ][\p{L}\-]+(?:\s+[A-ZČĆŽŠĐ][\p{L}\-]+){0,5}/u.test(original);
+
+  if (hasNamedEntitySignal && wordCount >= 3) return false;
   if (wordCount <= 2) return true;
 
-  if (/^(what|who|where|when|why|how)\b/.test(text)) return true;
-  if (/^(sto|šta|sta|tko|ko|gdje|gde|kada|kad|zasto|zašto|kako)\b/.test(text)) return true;
-  if (/^(was|wer|wo|wann|warum|wie)\b/.test(text)) return true;
-  if (/^(che|chi|dove|quando|perche|perché|come)\b/.test(text)) return true;
-  if (/^(quel|quale|quali)\b/.test(text)) return true;
+  if (wordCount <= 3 && /^(what|who|where|when|why|how)/.test(text)) return true;
+  if (wordCount <= 3 && /^(sto|šta|sta|tko|ko|gdje|gde|kada|kad|zasto|zašto|kako)/.test(text)) return true;
+  if (wordCount <= 3 && /^(was|wer|wo|wann|warum|wie)/.test(text)) return true;
+  if (wordCount <= 3 && /^(che|chi|dove|quando|perche|perché|come)/.test(text)) return true;
+  if (wordCount <= 3 && /^(quel|quale|quali)/.test(text)) return true;
 
   return false;
 }
-
 function extractTopicFromText(text) {
   const raw = String(text || '').trim();
   if (!raw) return '';
@@ -1535,45 +1550,59 @@ function extractTopicFromText(text) {
     .replace(/^(bitte|erklar|erklär|erklaere|erkläre|sag mir)\s+/i, '')
     .replace(/^(per favore|spiega|dimmi|parlami di)\s+/i, '')
     .replace(/^(what is|who is|where is|tell me about|explain)\s+/i, '')
-    .replace(/^(tema|analiza|opis|details|detail|info|information|about)\s+/i, '')
+    .replace(/^(koji su|koji je|koje su|tko je|tko su|ko je|ko su)\s+/i, '')
+    .replace(/^(glavni likovi(?: djela)?|sporedni likovi(?: djela)?|likovi(?: djela)?|tema(?: djela)?|analiza(?: djela)?|opis likova(?: djela)?|kratki sadrzaj(?: djela)?|kratki sadržaj(?: djela)?|redoslijed događaja(?: djela)?|redoslijed dogadanja(?: djela)?)\s+/i, '')
+    .replace(/^(details|detail|info|information|about)\s+/i, '')
     .replace(/\?+$/g, '')
     .trim();
 
   if (cleaned.length < 3) return '';
   if (isShortFollowUpQuestion(cleaned)) return '';
 
-  return cleaned;
+  return limitText(cleaned, 140);
 }
-
 function getActiveTopicFromHistory(history, currentMessage) {
   const current = String(currentMessage || '').trim();
   const safeHistory = Array.isArray(history) ? history : [];
+  const directCurrentTopic = extractTopicFromText(current);
+
+  if (directCurrentTopic) {
+    return directCurrentTopic;
+  }
 
   if (!isShortFollowUpQuestion(current)) {
-    const direct = extractTopicFromText(current);
-    if (direct && direct.length > 3) return direct;
+    return limitText(current, 140);
   }
 
   for (let i = safeHistory.length - 1; i >= 0; i -= 1) {
     const item = safeHistory[i];
     if (!item || item.role !== 'user') continue;
     const topic = extractTopicFromText(item.content || '');
-    if (topic && topic.length > 3) return topic;
+    if (topic && topic.length > 2) return limitText(topic, 140);
   }
 
-  return extractTopicFromText(current);
+  return '';
 }
-
 function buildResolvedQuery(activeTopic, userMessage) {
-  const topic = String(activeTopic || '').trim();
-  const message = String(userMessage || '').trim();
+  const topic = cleanText(activeTopic || '');
+  const message = cleanText(userMessage || '');
 
-  if (!topic) return message;
-  if (!message) return topic;
-  if (isShortFollowUpQuestion(message)) return topic + ' ' + message;
-  return message;
+  if (!topic) return limitText(message, 220);
+  if (!message) return limitText(topic, 220);
+
+  const normalizedTopic = normalizeStringForTopic(topic);
+  const normalizedMessage = normalizeStringForTopic(message);
+
+  if (normalizedTopic && normalizedMessage.includes(normalizedTopic)) {
+    return limitText(message, 220);
+  }
+
+  if (isShortFollowUpQuestion(message)) {
+    return limitText(topic + ' -> ' + message, 220);
+  }
+
+  return limitText(message, 220);
 }
-
 function compactUrlPath(value) {
   return normalizeStringForTopic(String(value || '').replace(/^https?:\/\//i, '').replace(/^www\./i, ''));
 }
@@ -1737,6 +1766,24 @@ function findRelevantLinkCandidates(rows, message, history, limit = 3) {
     resolvedQuery: rankedData.resolvedQuery,
     candidates: deduped
   };
+}
+
+function buildSuggestedRelevantLink(currentPageMatch, pagesForPrompt) {
+  const currentUrl = normalizeComparableUrl(currentPageMatch && currentPageMatch.row ? currentPageMatch.row.url : '');
+  const candidates = Array.isArray(pagesForPrompt) ? pagesForPrompt : [];
+
+  for (const row of candidates) {
+    const rowUrl = normalizeComparableUrl(row && row.url ? row.url : '');
+    if (!rowUrl) continue;
+    if (currentUrl && rowUrl === currentUrl) continue;
+
+    const title = cleanText(row && (row.page_title || row.h1 || row.url) ? (row.page_title || row.h1 || row.url) : '');
+    if (!title) continue;
+
+    return `${title} – ${row.url}`;
+  }
+
+  return '';
 }
 
 function createUtf8StreamWriter(res) {
@@ -2035,19 +2082,29 @@ function mergeCurrentPageIntoRelevantPages(relevantPages, currentPageMatch) {
   return [boostedRow].concat(rows).sort((a, b) => Number(b._score || 0) - Number(a._score || 0));
 }
 
-function getPreviousHistoryMessages(history) {
+function getPreviousHistoryMessages(history, currentMessage = '') {
   const safeHistory = Array.isArray(history) ? history : [];
+  const normalizedCurrent = normalizeStringForTopic(currentMessage || '');
   let previousUserMessage = '';
   let previousAssistantMessage = '';
 
   for (let i = safeHistory.length - 1; i >= 0; i -= 1) {
     const item = safeHistory[i];
-    if (!previousAssistantMessage && item && item.role === 'assistant' && item.content) {
+    if (!item || !item.content) continue;
+
+    if (!previousAssistantMessage && item.role === 'assistant') {
       previousAssistantMessage = item.content;
+      continue;
     }
-    if (!previousUserMessage && item && item.role === 'user' && item.content) {
+
+    if (!previousUserMessage && item.role === 'user') {
+      const normalizedCandidate = normalizeStringForTopic(item.content);
+      if (normalizedCandidate && normalizedCandidate === normalizedCurrent) {
+        continue;
+      }
       previousUserMessage = item.content;
     }
+
     if (previousUserMessage && previousAssistantMessage) break;
   }
 
@@ -2056,7 +2113,6 @@ function getPreviousHistoryMessages(history) {
     previousAssistantMessage: limitText(previousAssistantMessage, 600)
   };
 }
-
 
 function looksLikeCurrentPageQuestion(message, pageTitle, h1, headings) {
   const msg = normalizeStringForTopic(message || '');
@@ -2187,11 +2243,6 @@ async function handleChat(req, res, body) {
     : [];
 
   const history = normalizeHistoryItems(body.history, 8);
-  const providedResolvedQuery = limitText(body.resolvedQuery || '', 300);
-  const providedActiveTopic = limitText(body.activeTopic || '', 200);
-  const providedPreviousUserMessage = limitText(body.previousUserMessage || '', 600);
-  const providedPreviousAssistantMessage = limitText(body.previousAssistantMessage || '', 600);
-  const providedIsShortFollowUp = body.isShortFollowUp === true || body.isShortFollowUp === 'true';
 
   if (!agentId || !message) {
     return res.status(400).json({ error: 'Missing agentId or message' });
@@ -2232,12 +2283,13 @@ async function handleChat(req, res, body) {
     crawledRows = [];
   }
 
-  const computedActiveTopic = providedActiveTopic || getActiveTopicFromHistory(history, message);
-  const computedResolvedQuery = providedResolvedQuery || buildResolvedQuery(computedActiveTopic, message);
-  const computedIsShortFollowUp = providedIsShortFollowUp || isShortFollowUpQuestion(message);
-  const previousMessages = getPreviousHistoryMessages(history);
-  const previousUserMessage = providedPreviousUserMessage || previousMessages.previousUserMessage;
-  const previousAssistantMessage = providedPreviousAssistantMessage || previousMessages.previousAssistantMessage;
+  const crossPageIntentNow = detectCrossPageIntent(message, pageTitle, h1, headings);
+  const computedActiveTopic = getActiveTopicFromHistory(history, message);
+  const computedResolvedQuery = buildResolvedQuery(computedActiveTopic, message);
+  const computedIsShortFollowUp = !crossPageIntentNow && isShortFollowUpQuestion(message);
+  const previousMessages = getPreviousHistoryMessages(history, message);
+  const previousUserMessage = previousMessages.previousUserMessage;
+  const previousAssistantMessage = previousMessages.previousAssistantMessage;
 
   const rankedContext = pickRelevantCrawledPages(crawledRows, computedResolvedQuery || message, history, 3);
   let relevantPages = Array.isArray(rankedContext.pages) ? rankedContext.pages : [];
@@ -2246,7 +2298,9 @@ async function handleChat(req, res, body) {
     findCurrentPageRow(crawledRows, canonicalUrl || pageUrl, pageTitle, h1) ||
     findCurrentPageRow(crawledRows, pageUrl, pageTitle, h1);
 
-  relevantPages = mergeCurrentPageIntoRelevantPages(relevantPages, currentPageMatch);
+  if (!crossPageIntentNow) {
+    relevantPages = mergeCurrentPageIntoRelevantPages(relevantPages, currentPageMatch);
+  }
 
   const hasStrongCurrentPageContent =
     pageContextReady &&
@@ -2295,6 +2349,7 @@ async function handleChat(req, res, body) {
     : findRelevantLinkCandidates(crawledRows, computedResolvedQuery || message, history, 3);
 
   const linkCandidates = linkCandidateData.candidates || [];
+  const suggestedRelevantLink = buildSuggestedRelevantLink(currentPageMatch, pagesForPrompt);
 
   if (!hasStrongCurrentPageContent && !hasStrongMatchedCurrentPage && !hasStrongRelevantContent && linkCandidates.length > 0) {
     return res.status(200).json({
@@ -2343,7 +2398,7 @@ async function handleChat(req, res, body) {
     isShortFollowUp: computedIsShortFollowUp,
     includeCurrentPageContent,
     currentPageOnlyMode,
-    crossPageIntent: detectCrossPageIntent(message, pageTitle, h1, headings),
+    crossPageIntent: crossPageIntentNow,
     pageContextReady,
     pageTextLength,
     currentPageMatch: currentPageMatch ? {
@@ -2382,6 +2437,7 @@ async function handleChat(req, res, body) {
     pageTextLength,
     pageContextReady,
     crawlContext,
+    suggestedRelevantLink,
     pageUrl,
     canonicalUrl,
     pageTypeHint,
