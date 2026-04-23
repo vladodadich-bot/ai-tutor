@@ -522,6 +522,10 @@
   var REQUEST_TIMEOUT = 30000;
   var MAX_HISTORY_ITEMS = 10;
   var HISTORY_EXPIRY_MS = 45 * 60 * 1000;
+  var FOLLOW_UP_EXPIRY_MS = 20 * 60 * 1000;
+  var SHORT_QUERY_MAX_WORDS = 6;
+  var SHORT_QUERY_MAX_LENGTH = 80;
+  var CONTEXT_READY_MIN_LENGTH = 220;
 
   var PRESENCE_API = "https://ai-tutor-rouge-theta.vercel.app/api/presence";
   var SESSION_API = "https://ai-tutor-rouge-theta.vercel.app/api/session";
@@ -569,6 +573,10 @@
     return text.slice(0, max);
   }
 
+  function getNow() {
+    return Date.now();
+  }
+
   var initialLang = normalizeLang(
     params.get("lang") ||
     document.documentElement.getAttribute("lang") ||
@@ -579,8 +587,12 @@
     pageTitle: "",
     pageDescription: "",
     pageUrl: "",
+    canonicalUrl: "",
     pageContext: "",
     pageText: "",
+    pageTextPreview: "",
+    pageTextLength: 0,
+    pageContextReady: false,
     h1: "",
     headings: [],
     language: initialLang,
@@ -592,6 +604,15 @@
     agentName: "SiteMind AI",
     welcomeMessage: "",
     themeColor: "#081F39"
+  };
+
+  var lastConversationMeta = {
+    lastUserMessage: "",
+    lastAssistantMessage: "",
+    lastResolvedQuery: "",
+    lastActiveTopic: "",
+    lastPageUrl: "",
+    updatedAt: 0
   };
 
   var isSending = false;
@@ -694,12 +715,16 @@
     return "sitemind_history_payload_" + agentId;
   }
 
+  function getConversationMetaKey() {
+    return "sitemind_conversation_meta_" + agentId;
+  }
+
   function escapeHtml(str) {
     return String(str || "")
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
+      .replace(/\"/g, "&quot;")
       .replace(/'/g, "&#039;");
   }
 
@@ -778,12 +803,24 @@
   }
 
   function hasUsablePageUrl() {
-    var url = cleanText(pageData.pageUrl);
+    var url = cleanText(pageData.pageUrl || pageData.canonicalUrl);
     return /^https?:\/\//i.test(url);
   }
 
   function hasUsablePageTitle() {
     return !isWidgetTitle(pageData.pageTitle);
+  }
+
+  function hasUsablePageContext() {
+    return !!cleanText(pageData.pageText || pageData.pageContext || pageData.pageTextPreview).length;
+  }
+
+  function isContextReadyForAnswering() {
+    if (pageData.pageContextReady) return true;
+    var fullText = cleanText(pageData.pageText || pageData.pageContext);
+    if (fullText.length >= CONTEXT_READY_MIN_LENGTH) return true;
+    if (hasUsablePageTitle() && cleanText(pageData.h1).length >= 5 && pageData.headings.length >= 1) return true;
+    return false;
   }
 
   function hasUsableAnalyticsContext() {
@@ -796,7 +833,8 @@
   }
 
   function getAnalyticsPageUrl() {
-    if (hasUsablePageUrl()) return cleanText(pageData.pageUrl);
+    var url = cleanText(pageData.canonicalUrl || pageData.pageUrl);
+    if (/^https?:\/\//i.test(url)) return url;
     return "";
   }
 
@@ -968,7 +1006,7 @@
       var savedAt = Number(parsed.savedAt || 0);
       var history = Array.isArray(parsed.history) ? parsed.history : [];
 
-      if (!savedAt || (Date.now() - savedAt > HISTORY_EXPIRY_MS)) {
+      if (!savedAt || (getNow() - savedAt > HISTORY_EXPIRY_MS)) {
         clearStoredHistory();
         return [];
       }
@@ -985,11 +1023,67 @@
       sessionStorage.setItem(
         getHistoryPayloadKey(),
         JSON.stringify({
-          savedAt: Date.now(),
+          savedAt: getNow(),
           history: normalizeHistory(history)
         })
       );
     } catch (e) {}
+  }
+
+  function loadConversationMeta() {
+    try {
+      var raw = sessionStorage.getItem(getConversationMetaKey());
+      if (!raw) return;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return;
+
+      if (!parsed.updatedAt || getNow() - Number(parsed.updatedAt) > FOLLOW_UP_EXPIRY_MS) {
+        return;
+      }
+
+      lastConversationMeta = {
+        lastUserMessage: truncateText(parsed.lastUserMessage || "", 600),
+        lastAssistantMessage: truncateText(parsed.lastAssistantMessage || "", 1200),
+        lastResolvedQuery: truncateText(parsed.lastResolvedQuery || "", 300),
+        lastActiveTopic: truncateText(parsed.lastActiveTopic || "", 250),
+        lastPageUrl: truncateText(parsed.lastPageUrl || "", 500),
+        updatedAt: Number(parsed.updatedAt || 0)
+      };
+    } catch (e) {}
+  }
+
+  function saveConversationMeta() {
+    try {
+      sessionStorage.setItem(getConversationMetaKey(), JSON.stringify(lastConversationMeta));
+    } catch (e) {}
+  }
+
+  function updateConversationMeta(userMessage, assistantMessage) {
+    var history = getStoredHistory();
+    var recentUser = "";
+    var previousUser = "";
+
+    for (var i = history.length - 1; i >= 0; i--) {
+      if (history[i].role === "user") {
+        if (!recentUser) {
+          recentUser = history[i].content;
+        } else {
+          previousUser = history[i].content;
+          break;
+        }
+      }
+    }
+
+    lastConversationMeta = {
+      lastUserMessage: truncateText(userMessage || recentUser || "", 600),
+      lastAssistantMessage: truncateText(assistantMessage || "", 1200),
+      lastResolvedQuery: truncateText(resolveFollowUpQuery(userMessage || "", previousUser || recentUser || ""), 300),
+      lastActiveTopic: truncateText(detectActiveTopicFromContext(userMessage || "", assistantMessage || ""), 250),
+      lastPageUrl: truncateText(getAnalyticsPageUrl(), 500),
+      updatedAt: getNow()
+    };
+
+    saveConversationMeta();
   }
 
   function addMessage(role, text) {
@@ -1116,6 +1210,81 @@
     };
   }
 
+  function isLikelyShortFollowUp(message) {
+    var text = cleanText(message).toLowerCase();
+    if (!text) return false;
+
+    var words = text.split(" ").filter(Boolean);
+    if (words.length > SHORT_QUERY_MAX_WORDS || text.length > SHORT_QUERY_MAX_LENGTH) {
+      return false;
+    }
+
+    if (/[?!.]/.test(text) && words.length > 4) {
+      return false;
+    }
+
+    var followWords = [
+      "glavni likovi", "sporedni likovi", "likovi", "tema", "ideja", "analiza", "pouka",
+      "kratak sadržaj", "sadržaj", "redoslijed događanja", "vrijeme radnje", "mjesto radnje",
+      "objasni", "nastavi", "još", "a tko", "a koji", "koji", "koja", "koje",
+      "figuren", "thema", "idee", "analyse", "inhalt", "kurz", "weiter",
+      "characters", "main characters", "summary", "theme", "idea", "analysis", "continue"
+    ];
+
+    for (var i = 0; i < followWords.length; i++) {
+      if (text === followWords[i] || text.indexOf(followWords[i]) === 0) {
+        return true;
+      }
+    }
+
+    return words.length <= 3;
+  }
+
+  function detectActiveTopicFromContext(userMessage, assistantMessage) {
+    var blob = [pageData.pageTitle, pageData.h1, userMessage, assistantMessage].join(" ");
+    blob = cleanText(blob);
+    return truncateText(blob, 250);
+  }
+
+  function resolveFollowUpQuery(message, previousUserMessage) {
+    var current = cleanText(message);
+    var previous = cleanText(previousUserMessage || lastConversationMeta.lastUserMessage || "");
+
+    if (!current) return previous;
+    if (!isLikelyShortFollowUp(current)) return current;
+    if (!previous) return current;
+
+    return (previous + " -> " + current).slice(0, 300);
+  }
+
+  function buildConversationSignals(userMessage) {
+    var history = getStoredHistory();
+    var previousUserMessage = "";
+    var previousAssistantMessage = "";
+
+    for (var i = history.length - 1; i >= 0; i--) {
+      if (!previousAssistantMessage && history[i].role === "assistant") {
+        previousAssistantMessage = history[i].content;
+      }
+      if (!previousUserMessage && history[i].role === "user") {
+        previousUserMessage = history[i].content;
+      }
+      if (previousUserMessage && previousAssistantMessage) break;
+    }
+
+    var resolvedQuery = resolveFollowUpQuery(userMessage, previousUserMessage);
+    var activeTopic = detectActiveTopicFromContext(previousUserMessage || userMessage, previousAssistantMessage);
+    var isShortFollowUp = isLikelyShortFollowUp(userMessage);
+
+    return {
+      previousUserMessage: truncateText(previousUserMessage || lastConversationMeta.lastUserMessage || "", 600),
+      previousAssistantMessage: truncateText(previousAssistantMessage || lastConversationMeta.lastAssistantMessage || "", 1200),
+      resolvedQuery: truncateText(resolvedQuery || userMessage, 300),
+      activeTopic: truncateText(activeTopic || lastConversationMeta.lastActiveTopic || "", 250),
+      isShortFollowUp: !!isShortFollowUp
+    };
+  }
+
   async function sendMessageToApi(userMessage, onChunk) {
     var history = getStoredHistory();
     history.push({ role: "user", content: userMessage });
@@ -1131,6 +1300,8 @@
       try { activeController.abort(); } catch (e) {}
     }, REQUEST_TIMEOUT);
 
+    var conversationSignals = buildConversationSignals(userMessage);
+
     try {
       var response = await fetch(API_BASE, {
         method: "POST",
@@ -1142,12 +1313,21 @@
           language: getLang(),
           pageTypeHint: pageData.pageTypeHint || "general",
           message: userMessage,
+          resolvedQuery: conversationSignals.resolvedQuery,
+          activeTopic: conversationSignals.activeTopic,
+          previousUserMessage: conversationSignals.previousUserMessage,
+          previousAssistantMessage: conversationSignals.previousAssistantMessage,
+          isShortFollowUp: conversationSignals.isShortFollowUp,
           history: history,
           pageTitle: pageData.pageTitle,
           pageDescription: pageData.pageDescription,
           pageUrl: pageData.pageUrl,
+          canonicalUrl: pageData.canonicalUrl,
           pageContext: pageData.pageContext,
           pageText: pageData.pageText,
+          pageTextPreview: pageData.pageTextPreview,
+          pageTextLength: pageData.pageTextLength,
+          pageContextReady: pageData.pageContextReady,
           h1: pageData.h1,
           headings: pageData.headings
         })
@@ -1186,7 +1366,10 @@
         throw new Error("No reply received.");
       }
 
-      return fullText;
+      return {
+        text: fullText,
+        signals: conversationSignals
+      };
     } finally {
       clearTimeout(timeoutId);
       activeController = null;
@@ -1210,18 +1393,24 @@
     var finalAnswer = "";
 
     try {
+      if (!isContextReadyForAnswering()) {
+        requestPageContextRefresh();
+      }
+
       setStatus(t("streaming"));
 
-      finalAnswer = await sendMessageToApi(userMessage, function (partialText) {
+      var apiResult = await sendMessageToApi(userMessage, function (partialText) {
         typer.push(partialText || t("loading"));
       });
 
+      finalAnswer = apiResult && apiResult.text ? apiResult.text : "";
       typer.finish(finalAnswer);
 
       var history = getStoredHistory();
       history.push({ role: "user", content: userMessage });
       history.push({ role: "assistant", content: normalizeResponseText(finalAnswer) });
       saveStoredHistory(history);
+      updateConversationMeta(userMessage, normalizeResponseText(finalAnswer));
     } catch (error) {
       var msg = t("errorGeneric");
 
@@ -1245,8 +1434,12 @@
       pageData.pageTitle = truncateText(event.data.pageTitle || "", 300);
       pageData.pageDescription = truncateText(event.data.pageDescription || "", 500);
       pageData.pageUrl = truncateText(event.data.pageUrl || "", 500);
+      pageData.canonicalUrl = truncateText(event.data.canonicalUrl || event.data.pageUrl || "", 500);
       pageData.pageContext = truncateText(event.data.pageContext || "", 5000);
       pageData.pageText = truncateText(event.data.pageText || event.data.pageContext || "", 7000);
+      pageData.pageTextPreview = truncateText(event.data.pageTextPreview || event.data.pageText || event.data.pageContext || "", 1200);
+      pageData.pageTextLength = Number(event.data.pageTextLength || cleanText(event.data.pageText || event.data.pageContext || "").length || 0);
+      pageData.pageContextReady = !!event.data.pageContextReady || pageData.pageTextLength >= CONTEXT_READY_MIN_LENGTH;
       pageData.h1 = truncateText(event.data.h1 || "", 300);
       pageData.language = normalizeLang(event.data.language || initialLang || "en");
       pageData.pageTypeHint = truncateText(event.data.pageTypeHint || "general", 50);
@@ -1300,6 +1493,7 @@
     flushAnalyticsContext(true);
   });
 
+  loadConversationMeta();
   renderStoredHistory();
   updateUiLanguage();
   applyAgentData();
