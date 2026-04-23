@@ -2095,6 +2095,43 @@ function looksLikeCurrentPageQuestion(message, pageTitle, h1, headings) {
   );
 }
 
+function detectCrossPageIntent(message, pageTitle, h1, headings) {
+  const msg = normalizeStringForTopic(message || '');
+  if (!msg) return false;
+
+  const currentSignals = [
+    normalizeStringForTopic(pageTitle || ''),
+    normalizeStringForTopic(h1 || ''),
+    normalizeStringForTopic(Array.isArray(headings) ? headings.join(' | ') : (headings || ''))
+  ].filter(Boolean);
+
+  const currentTokens = new Set(
+    filterSignificantTokens(
+      uniqueItems(
+        currentSignals.flatMap((value) => tokenizeTopic(value))
+      )
+    )
+  );
+
+  const messageTokens = filterSignificantTokens(uniqueItems(tokenizeTopic(msg)));
+  if (!messageTokens.length || !currentTokens.size) return false;
+
+  const foreignTokens = messageTokens.filter((token) => !currentTokens.has(token));
+  const overlapTokens = messageTokens.filter((token) => currentTokens.has(token));
+
+  const quotedOrNamedEntityPattern = /["“”'„][^"“”'„]{3,}["“”'„]|([A-ZČĆŽŠĐ][\p{L}\-]+(?:\s+[A-ZČĆŽŠĐ][\p{L}\-]+){1,6})/u;
+  const hasNamedEntitySignal = quotedOrNamedEntityPattern.test(String(message || ''));
+  const mentionsCurrentTitleDirectly = currentSignals.some((signal) => signal && msg.includes(signal));
+
+  if (mentionsCurrentTitleDirectly) return false;
+
+  if (foreignTokens.length >= 3 && overlapTokens.length <= 1) return true;
+  if (foreignTokens.length >= 2 && overlapTokens.length === 0) return true;
+  if (hasNamedEntitySignal && foreignTokens.length >= 2) return true;
+
+  return false;
+}
+
 function shouldUseOnlyCurrentPageMode(params) {
   const hasStrongCurrentPageContent =
     !!params.pageContextReady &&
@@ -2113,6 +2150,15 @@ function shouldUseOnlyCurrentPageMode(params) {
     params.h1,
     params.headings
   );
+
+  const crossPageIntent = detectCrossPageIntent(
+    params.message,
+    params.pageTitle,
+    params.h1,
+    params.headings
+  );
+
+  if (crossPageIntent) return false;
 
   return hasStrongCurrentPageContent && hasMatchedCurrentPage && questionLooksLocal;
 }
@@ -2297,6 +2343,7 @@ async function handleChat(req, res, body) {
     isShortFollowUp: computedIsShortFollowUp,
     includeCurrentPageContent,
     currentPageOnlyMode,
+    crossPageIntent: detectCrossPageIntent(message, pageTitle, h1, headings),
     pageContextReady,
     pageTextLength,
     currentPageMatch: currentPageMatch ? {
