@@ -2057,6 +2057,66 @@ function getPreviousHistoryMessages(history) {
   };
 }
 
+
+function looksLikeCurrentPageQuestion(message, pageTitle, h1, headings) {
+  const msg = normalizeStringForTopic(message || '');
+  if (!msg) return false;
+
+  if (isShortFollowUpQuestion(msg)) return true;
+
+  const pageSignals = [
+    normalizeStringForTopic(pageTitle || ''),
+    normalizeStringForTopic(h1 || ''),
+    normalizeStringForTopic(Array.isArray(headings) ? headings.join(' | ') : '')
+  ].filter(Boolean);
+
+  const intentHints = [
+    'who', 'what', 'where', 'when', 'why', 'how',
+    'tko', 'ko', 'sto', 'šta', 'sta', 'gdje', 'gde', 'kada', 'kad', 'zasto', 'zašto', 'kako',
+    'wer', 'was', 'wo', 'wann', 'warum', 'wie',
+    'chi', 'che', 'dove', 'quando', 'perche', 'perché', 'come',
+    'summary', 'overview', 'details', 'about', 'faq',
+    'price', 'pricing', 'cost', 'contact', 'hours', 'location', 'address',
+    'services', 'features', 'process', 'steps', 'policy', 'terms', 'returns', 'refund',
+    'likovi', 'glavni likovi', 'sporedni likovi', 'tema', 'pouka', 'analiza',
+    'radnja', 'sadržaj', 'sadrzaj', 'redoslijed', 'opis', 'karakteristike',
+    'opis proizvoda', 'opis usluge', 'informacije', 'info'
+  ];
+
+  if (intentHints.some((hint) => msg.includes(hint))) {
+    return true;
+  }
+
+  const msgTokens = filterSignificantTokens(tokenizeTopic(msg));
+  if (!msgTokens.length) return false;
+
+  return pageSignals.some((field) =>
+    msgTokens.some((token) => field.includes(token))
+  );
+}
+
+function shouldUseOnlyCurrentPageMode(params) {
+  const hasStrongCurrentPageContent =
+    !!params.pageContextReady &&
+    (
+      String(params.pageText || '').trim().length > 1200 ||
+      String(params.pageContext || '').trim().length > 1200 ||
+      String(params.pageTextPreview || '').trim().length > 220 ||
+      Number(params.pageTextLength || 0) > 1200
+    );
+
+  const hasMatchedCurrentPage = !!(params.currentPageMatch && params.currentPageMatch.row);
+
+  const questionLooksLocal = looksLikeCurrentPageQuestion(
+    params.message,
+    params.pageTitle,
+    params.h1,
+    params.headings
+  );
+
+  return hasStrongCurrentPageContent && hasMatchedCurrentPage && questionLooksLocal;
+}
+
 async function handleChat(req, res, body) {
   const agentId = String(body.agentId || body.agent_id || '').trim();
   const message = String(body.message || '').trim();
@@ -2142,9 +2202,6 @@ async function handleChat(req, res, body) {
 
   relevantPages = mergeCurrentPageIntoRelevantPages(relevantPages, currentPageMatch);
 
-  const linkCandidateData = findRelevantLinkCandidates(crawledRows, computedResolvedQuery || message, history, 3);
-  const linkCandidates = linkCandidateData.candidates || [];
-
   const hasStrongCurrentPageContent =
     pageContextReady &&
     (
@@ -2158,12 +2215,40 @@ async function handleChat(req, res, body) {
     ? String(currentPageMatch.row.content || currentPageMatch.row.text_preview || '')
     : '';
 
-  const hasStrongMatchedCurrentPage = currentPageMatch && currentPageRowContent.trim().length > 180;
+  const hasStrongMatchedCurrentPage = !!(currentPageMatch && currentPageRowContent.trim().length > 180);
 
-  const hasStrongRelevantContent = Array.isArray(relevantPages) && relevantPages.some((row) => {
+  const currentPageOnlyMode = shouldUseOnlyCurrentPageMode({
+    message,
+    pageTitle,
+    h1,
+    headings,
+    pageContext,
+    pageText,
+    pageTextPreview,
+    pageTextLength,
+    pageContextReady,
+    currentPageMatch
+  });
+
+  const pagesForPrompt = currentPageOnlyMode
+    ? (currentPageMatch && currentPageMatch.row ? [
+        {
+          ...currentPageMatch.row,
+          _score: Math.max(Number(currentPageMatch.row._score || 0), Number(currentPageMatch.score || 0))
+        }
+      ] : [])
+    : (Array.isArray(relevantPages) && relevantPages.length ? relevantPages.slice(0, 3) : crawledRows.slice(0, 3));
+
+  const hasStrongRelevantContent = Array.isArray(pagesForPrompt) && pagesForPrompt.some((row) => {
     const content = String(row.content || row.text_preview || '');
     return content.trim().length > 180 && Number(row._score || 0) >= 20;
   });
+
+  const linkCandidateData = currentPageOnlyMode
+    ? { activeTopic: computedActiveTopic, resolvedQuery: computedResolvedQuery, candidates: [] }
+    : findRelevantLinkCandidates(crawledRows, computedResolvedQuery || message, history, 3);
+
+  const linkCandidates = linkCandidateData.candidates || [];
 
   if (!hasStrongCurrentPageContent && !hasStrongMatchedCurrentPage && !hasStrongRelevantContent && linkCandidates.length > 0) {
     return res.status(200).json({
@@ -2174,37 +2259,35 @@ async function handleChat(req, res, body) {
   let crawlContext = '';
 
   try {
-    let rowsToUse = Array.isArray(relevantPages) && relevantPages.length
-      ? relevantPages.slice(0, 3)
-      : crawledRows.slice(0, 3);
+    if (!currentPageOnlyMode) {
+      const rowsToUse = Array.isArray(pagesForPrompt) && pagesForPrompt.length
+        ? pagesForPrompt.slice(0, 3)
+        : crawledRows.slice(0, 3);
 
-    if (currentPageMatch && currentPageMatch.row) {
-      rowsToUse = mergeCurrentPageIntoRelevantPages(rowsToUse, currentPageMatch).slice(0, 3);
-    }
+      if (rowsToUse.length > 0) {
+        const shortRows = rowsToUse.map((row) => {
+          const headingsValue = safeJsonArray(row.headings);
 
-    if (rowsToUse.length > 0) {
-      const shortRows = rowsToUse.map((row) => {
-        const headingsValue = safeJsonArray(row.headings);
+          return {
+            url: row.url || '',
+            page_title: row.page_title || '',
+            meta_description: row.meta_description || '',
+            h1: row.h1 || '',
+            headings: headingsValue.slice(0, 8),
+            text_preview: limitText(row.text_preview || '', 1000),
+            content: limitText(row.content || '', 2500),
+            score: Number(row._score || 0)
+          };
+        });
 
-        return {
-          url: row.url || '',
-          page_title: row.page_title || '',
-          meta_description: row.meta_description || '',
-          h1: row.h1 || '',
-          headings: headingsValue.slice(0, 8),
-          text_preview: limitText(row.text_preview || '', 1000),
-          content: limitText(row.content || '', 2500),
-          score: Number(row._score || 0)
-        };
-      });
-
-      crawlContext = JSON.stringify(shortRows, null, 2);
+        crawlContext = JSON.stringify(shortRows, null, 2);
+      }
     }
   } catch (e) {
     crawlContext = '';
   }
 
-  const includeCurrentPageContent = hasStrongCurrentPageContent || !hasStrongRelevantContent || !!currentPageMatch;
+  const includeCurrentPageContent = hasStrongCurrentPageContent || currentPageOnlyMode || !!currentPageMatch;
 
   console.log('CHAT CONTEXT DEBUG:', {
     agentId,
@@ -2213,6 +2296,7 @@ async function handleChat(req, res, body) {
     resolvedQuery: computedResolvedQuery,
     isShortFollowUp: computedIsShortFollowUp,
     includeCurrentPageContent,
+    currentPageOnlyMode,
     pageContextReady,
     pageTextLength,
     currentPageMatch: currentPageMatch ? {
@@ -2221,6 +2305,7 @@ async function handleChat(req, res, body) {
       title: currentPageMatch.row && currentPageMatch.row.page_title ? currentPageMatch.row.page_title : '',
       h1: currentPageMatch.row && currentPageMatch.row.h1 ? currentPageMatch.row.h1 : ''
     } : null,
+    crawlRowsUsed: currentPageOnlyMode ? 0 : (Array.isArray(pagesForPrompt) ? pagesForPrompt.length : 0),
     topMatches: relevantPages.slice(0, 3).map((row) => ({
       score: row._score || 0,
       url: row.url || '',
