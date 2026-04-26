@@ -652,6 +652,30 @@ function countUniqueVisits(events, startDate, endDate) {
   return unique.size;
 }
 
+async function countVisitEvents(agentId, startDate, endDate) {
+  let query = supabase
+    .from('analytics_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('agent_id', agentId)
+    .eq('event_type', 'visit');
+
+  if (startDate) {
+    query = query.gte('created_at', startDate.toISOString());
+  }
+
+  if (endDate) {
+    query = query.lt('created_at', endDate.toISOString());
+  }
+
+  const { count, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return Number(count || 0);
+}
+
 function buildReferrerRows(events, startDate) {
   const groups = new Map();
 
@@ -738,13 +762,31 @@ async function handleAnalyticsSummary(req, res, body) {
     .eq('agent_id', agentId)
     .gte('created_at', last30Start.toISOString())
     .order('created_at', { ascending: false })
-    .limit(5000);
+    .limit(20000);
 
   if (eventsResult.error) {
     return res.status(500).json({ error: eventsResult.error.message });
   }
 
   const events = Array.isArray(eventsResult.data) ? eventsResult.data : [];
+
+  let totalVisitsToday = 0;
+  let totalVisitsYesterday = 0;
+  let totalVisitsLast30 = 0;
+
+  try {
+    const visitCounts = await Promise.all([
+      countVisitEvents(agentId, todayStart, null),
+      countVisitEvents(agentId, yesterdayStart, todayStart),
+      countVisitEvents(agentId, last30Start, null)
+    ]);
+
+    totalVisitsToday = visitCounts[0];
+    totalVisitsYesterday = visitCounts[1];
+    totalVisitsLast30 = visitCounts[2];
+  } catch (countError) {
+    return res.status(500).json({ error: countError.message || 'Failed to count visit events' });
+  }
 
   const sessionsResult = await supabase
     .from('analytics_session')
@@ -794,9 +836,17 @@ async function handleAnalyticsSummary(req, res, body) {
     success: true,
     summary: {
       active_now: activeSessions.size,
+
+      // Unique visitors/sessions
       visitors_today: countUniqueVisits(events, todayStart, null),
       visitors_yesterday: countUniqueVisits(events, yesterdayStart, todayStart),
       visitors_last_30_days: countUniqueVisits(events, last30Start, null),
+
+      // Total visit events/page visits
+      visits_today: totalVisitsToday,
+      visits_yesterday: totalVisitsYesterday,
+      visits_last_30_days: totalVisitsLast30,
+
       avg_time_spent_seconds: avgTime
     },
     referrers
