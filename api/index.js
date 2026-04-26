@@ -2520,9 +2520,37 @@ function buildSuggestedRelevantLinkEntry(rows, currentPageMatch, explicitCrossPa
   return null;
 }
 
+
+async function insertChatInsight(payload) {
+  const agentId = String(payload.agent_id || '').trim();
+  const userMessage = limitText(payload.user_message || '', 2000);
+
+  if (!agentId || !userMessage) return;
+
+  try {
+    const { error } = await supabase
+      .from('chat_insights')
+      .insert({
+        agent_id: agentId,
+        session_id: payload.session_id || null,
+        page_url: payload.page_url || null,
+        page_title: payload.page_title || null,
+        language: payload.language || null,
+        user_message: userMessage
+      });
+
+    if (error) {
+      console.error('CHAT INSIGHT INSERT ERROR:', error.message);
+    }
+  } catch (err) {
+    console.error('CHAT INSIGHT INSERT FAILED:', err && err.message ? err.message : err);
+  }
+}
+
 async function handleChat(req, res, body) {
   const agentId = String(body.agentId || body.agent_id || '').trim();
   const message = String(body.message || '').trim();
+  const sessionId = limitText(body.sessionId || body.session_id || '', 120);
 
   const language = limitText(body.language || 'en', 20);
   const pageTypeHint = limitText(body.pageTypeHint || 'general', 50);
@@ -2573,6 +2601,15 @@ async function handleChat(req, res, body) {
       message: 'Subscription expired.'
     });
   }
+
+  await insertChatInsight({
+    agent_id: agentId,
+    session_id: sessionId,
+    page_url: pageUrl,
+    page_title: pageTitle,
+    language,
+    user_message: message
+  });
 
   let crawledRows = [];
 
