@@ -572,6 +572,207 @@ async function handleTrackTime(req, res, body) {
   }
 }
 
+
+function getUtcDayStart(date) {
+  return new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
+}
+
+function getEventSessionId(row, fallbackIndex) {
+  const direct = row && row.session_id ? String(row.session_id).trim() : '';
+  if (direct) return direct;
+
+  const metadata = row && row.metadata && typeof row.metadata === 'object'
+    ? row.metadata
+    : {};
+
+  const nested = metadata.session_id || metadata.sessionId || '';
+  const normalizedNested = String(nested || '').trim();
+  if (normalizedNested) return normalizedNested;
+
+  const pageUrl = row && row.page_url ? String(row.page_url).trim() : '';
+  const createdAt = row && row.created_at ? String(row.created_at).trim() : '';
+  return 'event-' + fallbackIndex + '-' + pageUrl + '-' + createdAt;
+}
+
+function normalizeReferrerSource(value) {
+  const raw = String(value || '').trim();
+
+  if (!raw) return 'Direct';
+
+  let host = raw;
+
+  try {
+    const parsed = new URL(raw);
+    host = parsed.hostname || raw;
+  } catch (err) {
+    host = raw
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .split('/')[0]
+      .trim();
+  }
+
+  const lower = host.toLowerCase();
+
+  if (!lower || lower === 'null' || lower === 'undefined') return 'Direct';
+  if (lower.includes('google.')) return 'Google';
+  if (lower.includes('chatgpt.com') || lower.includes('openai.com')) return 'ChatGPT';
+  if (lower.includes('facebook.com') || lower.includes('fb.com')) return 'Facebook';
+  if (lower.includes('instagram.com')) return 'Instagram';
+  if (lower.includes('bing.com')) return 'Bing';
+  if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'YouTube';
+  if (lower.includes('linkedin.com')) return 'LinkedIn';
+  if (lower.includes('t.co') || lower.includes('twitter.com') || lower.includes('x.com')) return 'X / Twitter';
+  if (lower.includes('pinterest.')) return 'Pinterest';
+  if (lower.includes('duckduckgo.com')) return 'DuckDuckGo';
+  if (lower.includes('yahoo.')) return 'Yahoo';
+
+  return host.replace(/^www\./i, '') || 'Direct';
+}
+
+function countUniqueVisits(events, startDate, endDate) {
+  const unique = new Set();
+
+  (events || []).forEach((row, index) => {
+    if (String(row && row.event_type || '').toLowerCase() !== 'visit') return;
+
+    const createdAt = new Date(row.created_at || 0);
+    if (Number.isNaN(createdAt.getTime())) return;
+    if (startDate && createdAt < startDate) return;
+    if (endDate && createdAt >= endDate) return;
+
+    unique.add(getEventSessionId(row, index));
+  });
+
+  return unique.size;
+}
+
+function buildReferrerRows(events, startDate) {
+  const groups = new Map();
+
+  (events || []).forEach((row, index) => {
+    if (String(row && row.event_type || '').toLowerCase() !== 'visit') return;
+
+    const createdAt = new Date(row.created_at || 0);
+    if (Number.isNaN(createdAt.getTime())) return;
+    if (startDate && createdAt < startDate) return;
+
+    const source = normalizeReferrerSource(row.referrer);
+    const sessionId = getEventSessionId(row, index);
+
+    if (!groups.has(source)) {
+      groups.set(source, new Set());
+    }
+
+    groups.get(source).add(sessionId);
+  });
+
+  const total = Array.from(groups.values()).reduce((sum, set) => sum + set.size, 0);
+
+  return Array.from(groups.entries())
+    .map(([source, set]) => ({
+      source,
+      label: source,
+      visitors: set.size,
+      count: set.size,
+      share: total ? Math.round((set.size / total) * 1000) / 10 : 0
+    }))
+    .sort((a, b) => Number(b.visitors || 0) - Number(a.visitors || 0))
+    .slice(0, 25);
+}
+
+async function handleAnalyticsSummary(req, res, body) {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
+  const query = req.query || {};
+  const agentId = normalizeAnalyticsText(body.agentId || body.agent_id || query.agentId || query.agent_id, 100);
+
+  if (!agentId) {
+    return res.status(400).json({ error: 'Missing agentId' });
+  }
+
+  const { data: agent, error: agentError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id')
+    .eq('agent_id', agentId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (agentError || !agent) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
+  const now = new Date();
+  const todayStart = getUtcDayStart(now);
+  const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+  const last7Start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const last30Start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const liveSince = new Date(now.getTime() - 60 * 1000).toISOString();
+
+  const liveResult = await supabase
+    .from('live_presence')
+    .select('session_id')
+    .eq('agent_id', agentId)
+    .gte('last_seen_at', liveSince)
+    .limit(1000);
+
+  if (liveResult.error) {
+    return res.status(500).json({ error: liveResult.error.message });
+  }
+
+  const activeSessions = new Set(
+    (liveResult.data || [])
+      .map((row, index) => String(row.session_id || 'live-' + index).trim())
+      .filter(Boolean)
+  );
+
+  const eventsResult = await supabase
+    .from('analytics_events')
+    .select('id, created_at, event_type, page_url, referrer, duration, metadata')
+    .eq('agent_id', agentId)
+    .gte('created_at', last30Start.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(5000);
+
+  if (eventsResult.error) {
+    return res.status(500).json({ error: eventsResult.error.message });
+  }
+
+  const events = Array.isArray(eventsResult.data) ? eventsResult.data : [];
+  const timeEvents = events.filter((row) => (
+    String(row && row.event_type || '').toLowerCase() === 'time' &&
+    Number(row && row.duration || 0) > 0
+  ));
+
+  const avgTime = timeEvents.length
+    ? Math.round(timeEvents.reduce((sum, row) => sum + Number(row.duration || 0), 0) / timeEvents.length)
+    : 0;
+
+  const referrers = {
+    today: buildReferrerRows(events, todayStart),
+    last7: buildReferrerRows(events, last7Start),
+    last30: buildReferrerRows(events, last30Start)
+  };
+
+  return res.status(200).json({
+    success: true,
+    summary: {
+      active_now: activeSessions.size,
+      visitors_today: countUniqueVisits(events, todayStart, null),
+      visitors_yesterday: countUniqueVisits(events, yesterdayStart, todayStart),
+      visitors_last_30_days: countUniqueVisits(events, last30Start, null),
+      avg_time_spent_seconds: avgTime
+    },
+    referrers
+  });
+}
+
 // ========================================
 // ANALYTICS HELPERS - END
 // ========================================
@@ -2606,6 +2807,10 @@ export default async function handler(req, res) {
 
     if (action === 'track_time') {
       return await handleTrackTime(req, res, body);
+    }
+
+    if (action === 'analytics-summary') {
+      return await handleAnalyticsSummary(req, res, body);
     }
 
     if (action === 'crawl-start') {
