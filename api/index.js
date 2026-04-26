@@ -788,43 +788,37 @@ async function handleAnalyticsSummary(req, res, body) {
     return res.status(500).json({ error: countError.message || 'Failed to count visit events' });
   }
 
-  const sessionsResult = await supabase
-    .from('analytics_session')
-    .select('session_id, started_at, last_seen_at')
+  // Average time is calculated from live_presence because it has the most complete
+  // session activity data in the current tracking setup. We intentionally avoid
+  // analytics_events.duration here because beforeunload/sendBeacon is not reliable
+  // enough on mobile browsers and produced too few rows.
+  const presenceTimeResult = await supabase
+    .from('live_presence')
+    .select('created_at, last_seen_at')
     .eq('agent_id', agentId)
-    .gte('started_at', last30Start.toISOString())
-    .limit(5000);
+    .gte('created_at', last30Start.toISOString())
+    .limit(20000);
 
-  if (sessionsResult.error) {
-    return res.status(500).json({ error: sessionsResult.error.message });
+  if (presenceTimeResult.error) {
+    return res.status(500).json({ error: presenceTimeResult.error.message });
   }
 
-  const timeEvents = events.filter((row) => (
-    String(row && row.event_type || '').toLowerCase() === 'time' &&
-    Number(row && row.duration || 0) > 0
-  ));
-
-  const avgFromTimeEvents = timeEvents.length
-    ? Math.round(timeEvents.reduce((sum, row) => sum + Number(row.duration || 0), 0) / timeEvents.length)
-    : 0;
-
-  const sessionDurations = (sessionsResult.data || [])
+  const presenceDurations = (presenceTimeResult.data || [])
     .map((row) => {
-      const startedAt = new Date(row && row.started_at ? row.started_at : 0);
+      const createdAt = new Date(row && row.created_at ? row.created_at : 0);
       const lastSeenAt = new Date(row && row.last_seen_at ? row.last_seen_at : 0);
 
-      if (Number.isNaN(startedAt.getTime()) || Number.isNaN(lastSeenAt.getTime())) return 0;
+      if (Number.isNaN(createdAt.getTime()) || Number.isNaN(lastSeenAt.getTime())) return 0;
 
-      const seconds = Math.round((lastSeenAt.getTime() - startedAt.getTime()) / 1000);
+      const seconds = Math.round((lastSeenAt.getTime() - createdAt.getTime()) / 1000);
       return Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
     })
-    .filter((seconds) => seconds > 0 && seconds <= 60 * 60 * 6);
+    // Ignore accidental instant hits and abnormal long sessions that distort the average.
+    .filter((seconds) => seconds >= 3 && seconds <= 60 * 60);
 
-  const avgFromSessions = sessionDurations.length
-    ? Math.round(sessionDurations.reduce((sum, seconds) => sum + seconds, 0) / sessionDurations.length)
+  const avgTime = presenceDurations.length
+    ? Math.round(presenceDurations.reduce((sum, seconds) => sum + seconds, 0) / presenceDurations.length)
     : 0;
-
-  const avgTime = avgFromTimeEvents || avgFromSessions || 0;
 
   const referrers = {
     today: buildReferrerRows(events, todayStart),
@@ -847,7 +841,8 @@ async function handleAnalyticsSummary(req, res, body) {
       visits_yesterday: totalVisitsYesterday,
       visits_last_30_days: totalVisitsLast30,
 
-      avg_time_spent_seconds: avgTime
+      avg_time_spent_seconds: avgTime,
+      avg_time_sample_size: presenceDurations.length
     },
     referrers
   });
