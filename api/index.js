@@ -853,6 +853,56 @@ async function handleAnalyticsSummary(req, res, body) {
 // ========================================
 
 // ========================================
+// CHAT INSIGHTS - START
+// ========================================
+
+async function handleChatInsights(req, res, body) {
+  const user = await requireAuthenticatedUser(req, res);
+  if (!user) return;
+
+  const query = req.query || {};
+  const agentId = normalizeAnalyticsText(body.agentId || body.agent_id || query.agentId || query.agent_id, 100);
+  const limitRaw = Number(body.limit || query.limit || 10);
+  const safeLimit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(30, Math.round(limitRaw))) : 10;
+
+  if (!agentId) {
+    return res.status(400).json({ error: 'Missing agentId' });
+  }
+
+  const { data: agent, error: agentError } = await supabase
+    .from('agents')
+    .select('agent_id, user_id')
+    .eq('agent_id', agentId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (agentError || !agent) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
+  const { data, error } = await supabase
+    .from('chat_insights')
+    .select('created_at, agent_id, session_id, page_url, page_title, language, user_message')
+    .eq('agent_id', agentId)
+    .order('created_at', { ascending: false })
+    .limit(safeLimit);
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  return res.status(200).json({
+    success: true,
+    questions: Array.isArray(data) ? data : []
+  });
+}
+
+// ========================================
+// CHAT INSIGHTS - END
+// ========================================
+
+
+// ========================================
 // CRAWL HELPERS - START
 // ========================================
 
@@ -2923,6 +2973,10 @@ export default async function handler(req, res) {
 
     if (action === 'analytics-summary') {
       return await handleAnalyticsSummary(req, res, body);
+    }
+
+    if (action === 'chat-insights') {
+      return await handleChatInsights(req, res, body);
     }
 
     if (action === 'crawl-start') {
