@@ -745,14 +745,44 @@ async function handleAnalyticsSummary(req, res, body) {
   }
 
   const events = Array.isArray(eventsResult.data) ? eventsResult.data : [];
+
+  const sessionsResult = await supabase
+    .from('analytics_session')
+    .select('session_id, started_at, last_seen_at')
+    .eq('agent_id', agentId)
+    .gte('started_at', last30Start.toISOString())
+    .limit(5000);
+
+  if (sessionsResult.error) {
+    return res.status(500).json({ error: sessionsResult.error.message });
+  }
+
   const timeEvents = events.filter((row) => (
     String(row && row.event_type || '').toLowerCase() === 'time' &&
     Number(row && row.duration || 0) > 0
   ));
 
-  const avgTime = timeEvents.length
+  const avgFromTimeEvents = timeEvents.length
     ? Math.round(timeEvents.reduce((sum, row) => sum + Number(row.duration || 0), 0) / timeEvents.length)
     : 0;
+
+  const sessionDurations = (sessionsResult.data || [])
+    .map((row) => {
+      const startedAt = new Date(row && row.started_at ? row.started_at : 0);
+      const lastSeenAt = new Date(row && row.last_seen_at ? row.last_seen_at : 0);
+
+      if (Number.isNaN(startedAt.getTime()) || Number.isNaN(lastSeenAt.getTime())) return 0;
+
+      const seconds = Math.round((lastSeenAt.getTime() - startedAt.getTime()) / 1000);
+      return Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+    })
+    .filter((seconds) => seconds > 0 && seconds <= 60 * 60 * 6);
+
+  const avgFromSessions = sessionDurations.length
+    ? Math.round(sessionDurations.reduce((sum, seconds) => sum + seconds, 0) / sessionDurations.length)
+    : 0;
+
+  const avgTime = avgFromTimeEvents || avgFromSessions || 0;
 
   const referrers = {
     today: buildReferrerRows(events, todayStart),
