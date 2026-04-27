@@ -1,48 +1,21 @@
 // api/restore-photo.js
-// Locked to: https://sitemindai.app/restaurator.html
+// Stable fallback backend without sharp.
+// Use this if the padded/sharp version crashes on Vercel.
 // Required Vercel Environment Variable: OPENAI_API_KEY
-// Required package: sharp  ->  npm install sharp
 
 export const config = {
   runtime: 'nodejs'
 };
 
-const ALLOWED_ORIGINS = new Set([
-  'https://sitemindai.app',
-  'https://www.sitemindai.app',
-  'https://ai-tutor-rouge-theta.vercel.app'
-]);
+const MAX_DATA_URL_LENGTH = 18 * 1024 * 1024;
 
-const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
-
-function getRequestOrigin(req) {
-  return String(req.headers?.origin || req.headers?.Origin || '').trim();
-}
-
-function setCors(req, res) {
-  const origin = getRequestOrigin(req);
-
-  if (ALLOWED_ORIGINS.has(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
-  }
-
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+function setCors(res) {
+  // Temporary broad CORS for debugging/restoring functionality.
+  // Later we can lock it again after the endpoint is confirmed stable.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
   res.setHeader('Cache-Control', 'no-store');
-}
-
-function isAllowedOrigin(req) {
-  const origin = getRequestOrigin(req);
-
-  // Allow the approved public domains.
-  if (ALLOWED_ORIGINS.has(origin)) return true;
-
-  // Allow direct server/no-origin checks, but browsers from other sites still fail CORS.
-  // This helps debugging without opening the endpoint to random browser origins.
-  if (!origin) return true;
-
-  return false;
 }
 
 function readRequestBody(req) {
@@ -52,7 +25,7 @@ function readRequestBody(req) {
     req.on('data', (chunk) => {
       body += chunk.toString('utf8');
 
-      if (body.length > 20 * 1024 * 1024) {
+      if (body.length > MAX_DATA_URL_LENGTH + 2000) {
         reject(new Error('Request body is too large. Please upload a smaller image.'));
         req.destroy();
       }
@@ -78,7 +51,7 @@ function parseDataUrl(dataUrl) {
     throw new Error('Empty image file.');
   }
 
-  if (buffer.length > MAX_IMAGE_BYTES) {
+  if (buffer.length > 12 * 1024 * 1024) {
     throw new Error('Image is too large. Please upload a smaller image.');
   }
 
@@ -94,12 +67,6 @@ function parseDataUrl(dataUrl) {
   };
 }
 
-function selectOutputSize(width, height) {
-  if (width > height * 1.15) return '1536x1024';
-  if (height > width * 1.15) return '1024x1536';
-  return '1024x1024';
-}
-
 function buildRestorationPrompt() {
   return [
     'Carefully restore this old family photograph.',
@@ -107,7 +74,7 @@ function buildRestorationPrompt() {
     'Do not replace faces. Do not beautify aggressively. Do not create a different person.',
     'Remove scratches, dust, stains, cracks, fading, and visible damage where possible.',
     'Improve sharpness, exposure, contrast, and clarity naturally.',
-    'Preserve the full original framing and aspect ratio.',
+    'Preserve the full original framing and aspect ratio as much as possible.',
     'Do not crop the left, right, top, or bottom edges.',
     'Keep the complete photo visible, including the outer areas near the borders.',
     'Keep the original composition, clothing, background, and important details unchanged.',
@@ -116,79 +83,19 @@ function buildRestorationPrompt() {
   ].join(' ');
 }
 
-async function addProtectivePadding(buffer) {
-  let sharp;
-
-  try {
-    const sharpModule = await import('sharp');
-    sharp = sharpModule.default;
-  } catch (error) {
-    throw new Error("Missing dependency 'sharp'. Run: npm install sharp");
-  }
-
-  const meta = await sharp(buffer, { failOn: 'none' }).metadata();
-  const width = meta.width || 0;
-  const height = meta.height || 0;
-
-  if (!width || !height) {
-    throw new Error('Could not read image dimensions.');
-  }
-
-  // Add a small protective border so the AI can "zoom" slightly
-  // without cutting important parts of the real photo.
-  const paddingPct = 0.10;
-  const canvasWidth = Math.max(Math.round(width * (1 + paddingPct * 2)), width + 80);
-  const canvasHeight = Math.max(Math.round(height * (1 + paddingPct * 2)), height + 80);
-
-  // Soft blurred background built from the same image.
-  const background = await sharp(buffer, { failOn: 'none' })
-    .resize(canvasWidth, canvasHeight, { fit: 'cover' })
-    .blur(24)
-    .modulate({ brightness: 1.02, saturation: 0.98 })
-    .jpeg({ quality: 92 })
-    .toBuffer();
-
-  // Foreground photo kept at original size in the center.
-  const foreground = await sharp(buffer, { failOn: 'none' })
-    .jpeg({ quality: 96 })
-    .toBuffer();
-
-  const left = Math.round((canvasWidth - width) / 2);
-  const top = Math.round((canvasHeight - height) / 2);
-
-  const paddedBuffer = await sharp(background, { failOn: 'none' })
-    .composite([{ input: foreground, left, top }])
-    .jpeg({ quality: 94 })
-    .toBuffer();
-
-  return {
-    buffer: paddedBuffer,
-    width,
-    height,
-    filename: 'restore-input-padded.jpg',
-    mimeType: 'image/jpeg',
-    openaiSize: selectOutputSize(width, height)
-  };
-}
-
 export default async function handler(req, res) {
-  setCors(req, res);
+  setCors(res);
 
   if (req.method === 'OPTIONS') {
-    if (!isAllowedOrigin(req)) {
-      return res.status(403).json({
-        success: false,
-        error: 'Forbidden origin.'
-      });
-    }
-
     return res.status(204).end();
   }
 
-  if (!isAllowedOrigin(req)) {
-    return res.status(403).json({
-      success: false,
-      error: 'Forbidden origin.'
+  // Simple browser test:
+  // opening /api/restore-photo should show this JSON, proving the route exists.
+  if (req.method === 'GET') {
+    return res.status(200).json({
+      success: true,
+      message: 'Restore endpoint is online. Use POST from restaurator.html.'
     });
   }
 
@@ -219,18 +126,19 @@ export default async function handler(req, res) {
     }
 
     const parsed = parseDataUrl(imageDataUrl);
-    const prepared = await addProtectivePadding(parsed.buffer);
 
     const form = new FormData();
-    const blob = new Blob([prepared.buffer], { type: prepared.mimeType });
+    const blob = new Blob([parsed.buffer], { type: parsed.mimeType });
 
     form.append('model', 'gpt-image-1.5');
-    form.append('image', blob, prepared.filename);
+    form.append('image', blob, parsed.filename);
     form.append('prompt', buildRestorationPrompt());
     form.append('input_fidelity', 'high');
     form.append('output_format', 'jpeg');
     form.append('quality', 'medium');
-    form.append('size', prepared.openaiSize);
+
+    // Do not force square format. Horizontal photos should have more room.
+    form.append('size', '1536x1024');
     form.append('n', '1');
 
     const openaiResponse = await fetch('https://api.openai.com/v1/images/edits', {
