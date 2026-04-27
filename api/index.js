@@ -2123,6 +2123,7 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
   const reader = openaiRes.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let fullAnswer = '';
 
   while (true) {
     const { done, value } = await reader.read();
@@ -2152,18 +2153,19 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
         const parsed = JSON.parse(payload);
 
         if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+          fullAnswer += parsed.delta;
           writer.write(parsed.delta);
         }
 
         if (parsed.type === 'response.completed') {
           writer.end();
-          return;
+          return fullAnswer;
         }
 
         if (parsed.type === 'response.failed') {
           console.error('OPENAI STREAM FAILED:', parsed);
           writer.end();
-          return;
+          return fullAnswer;
         }
       } catch (err) {
         // ignore partial or malformed event block
@@ -2187,6 +2189,7 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
         const parsed = JSON.parse(payload);
 
         if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+          fullAnswer += parsed.delta;
           writer.write(parsed.delta);
         }
       } catch (err) {
@@ -2196,6 +2199,7 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
   }
 
   writer.end();
+  return fullAnswer;
 }
 
 // ========================================
@@ -2574,6 +2578,7 @@ function buildSuggestedRelevantLinkEntry(rows, currentPageMatch, explicitCrossPa
 async function insertChatInsight(payload) {
   const agentId = String(payload.agent_id || '').trim();
   const userMessage = limitText(payload.user_message || '', 2000);
+  const aiAnswer = limitText(payload.ai_answer || '', 6000);
 
   if (!agentId || !userMessage) return;
 
@@ -2586,7 +2591,8 @@ async function insertChatInsight(payload) {
         page_url: payload.page_url || null,
         page_title: payload.page_title || null,
         language: payload.language || null,
-        user_message: userMessage
+        user_message: userMessage,
+        ai_answer: aiAnswer || null
       });
 
     if (error) {
@@ -2651,15 +2657,6 @@ async function handleChat(req, res, body) {
       message: 'Subscription expired.'
     });
   }
-
-  await insertChatInsight({
-    agent_id: agentId,
-    session_id: sessionId,
-    page_url: pageUrl,
-    page_title: pageTitle,
-    language,
-    user_message: message
-  });
 
   let crawledRows = [];
 
@@ -2752,8 +2749,20 @@ async function handleChat(req, res, body) {
   const linkCandidates = linkCandidateData.candidates || [];
 
   if (!hasStrongCurrentPageContent && !hasStrongMatchedCurrentPage && !hasStrongRelevantContent && linkCandidates.length > 0) {
+    const fallbackReply = buildLinkSuggestionReply(language, linkCandidates);
+
+    await insertChatInsight({
+      agent_id: agentId,
+      session_id: sessionId,
+      page_url: pageUrl,
+      page_title: pageTitle,
+      language,
+      user_message: message,
+      ai_answer: fallbackReply
+    });
+
     return res.status(200).json({
-      reply: buildLinkSuggestionReply(language, linkCandidates)
+      reply: fallbackReply
     });
   }
 
@@ -2893,7 +2902,18 @@ async function handleChat(req, res, body) {
       });
     }
 
-    await streamOpenAIResponseToNodeResponse(openaiRes, res);
+    const aiAnswer = await streamOpenAIResponseToNodeResponse(openaiRes, res);
+
+    await insertChatInsight({
+      agent_id: agentId,
+      session_id: sessionId,
+      page_url: pageUrl,
+      page_title: pageTitle,
+      language,
+      user_message: message,
+      ai_answer: aiAnswer
+    });
+
     return;
   } catch (err) {
     console.error('CHAT STREAM ERROR:', err);
