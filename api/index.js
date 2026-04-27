@@ -2123,7 +2123,7 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
   const reader = openaiRes.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  let fullAnswer = '';
+  let finalAnswer = '';
 
   while (true) {
     const { done, value } = await reader.read();
@@ -2131,14 +2131,11 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
 
     buffer += decoder.decode(value, { stream: true });
 
-    const events = buffer.split('
-
-');
+    const events = buffer.split('\n\n');
     buffer = events.pop() || '';
 
     for (const eventBlock of events) {
-      const lines = eventBlock.split('
-');
+      const lines = eventBlock.split('\n');
       let payload = '';
 
       for (const line of lines) {
@@ -2156,19 +2153,19 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
         const parsed = JSON.parse(payload);
 
         if (parsed.type === 'response.output_text.delta' && parsed.delta) {
-          fullAnswer += parsed.delta;
+          finalAnswer += parsed.delta;
           writer.write(parsed.delta);
         }
 
         if (parsed.type === 'response.completed') {
           writer.end();
-          return fullAnswer;
+          return finalAnswer;
         }
 
         if (parsed.type === 'response.failed') {
           console.error('OPENAI STREAM FAILED:', parsed);
           writer.end();
-          return fullAnswer;
+          return finalAnswer;
         }
       } catch (err) {
         // ignore partial or malformed event block
@@ -2177,8 +2174,7 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
   }
 
   if (buffer.trim()) {
-    const lines = buffer.split('
-');
+    const lines = buffer.split('\n');
     let payload = '';
 
     for (const line of lines) {
@@ -2193,7 +2189,7 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
         const parsed = JSON.parse(payload);
 
         if (parsed.type === 'response.output_text.delta' && parsed.delta) {
-          fullAnswer += parsed.delta;
+          finalAnswer += parsed.delta;
           writer.write(parsed.delta);
         }
       } catch (err) {
@@ -2203,7 +2199,8 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
   }
 
   writer.end();
-  return fullAnswer;
+  return finalAnswer;
+}
 }
 
 // ========================================
@@ -2582,7 +2579,7 @@ function buildSuggestedRelevantLinkEntry(rows, currentPageMatch, explicitCrossPa
 async function insertChatInsight(payload) {
   const agentId = String(payload.agent_id || '').trim();
   const userMessage = limitText(payload.user_message || '', 2000);
-  const aiAnswer = limitText(payload.ai_answer || '', 5000);
+  const aiAnswer = payload.ai_answer === undefined ? null : limitText(payload.ai_answer || '', 6000);
 
   if (!agentId || !userMessage) return;
 
@@ -2753,7 +2750,7 @@ async function handleChat(req, res, body) {
   const linkCandidates = linkCandidateData.candidates || [];
 
   if (!hasStrongCurrentPageContent && !hasStrongMatchedCurrentPage && !hasStrongRelevantContent && linkCandidates.length > 0) {
-    const reply = buildLinkSuggestionReply(language, linkCandidates);
+    const linkSuggestionReply = buildLinkSuggestionReply(language, linkCandidates);
 
     await insertChatInsight({
       agent_id: agentId,
@@ -2762,11 +2759,11 @@ async function handleChat(req, res, body) {
       page_title: pageTitle,
       language,
       user_message: message,
-      ai_answer: reply
+      ai_answer: linkSuggestionReply
     });
 
     return res.status(200).json({
-      reply
+      reply: linkSuggestionReply
     });
   }
 
