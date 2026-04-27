@@ -7,7 +7,10 @@ export const config = {
   runtime: 'nodejs'
 };
 
-const ALLOWED_ORIGIN = 'https://sitemindai.app/restaurator.html';
+const ALLOWED_ORIGIN = 
+https://sitemindai.app
+https://www.sitemindai.app
+https://ai-tutor-rouge-theta.vercel.app
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 function setCors(req, res) {
