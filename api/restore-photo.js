@@ -7,7 +7,7 @@ export const config = {
   runtime: 'nodejs'
 };
 
-const ALLOWED_ORIGIN = 'https://sitemindai.app';
+const ALLOWED_ORIGIN = 'https://sitemindai.app/restaurator.html';
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 function setCors(req, res) {
