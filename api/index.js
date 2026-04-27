@@ -2114,7 +2114,7 @@ function createUtf8StreamWriter(res) {
   };
 }
 
-async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
+async function streamOpenAIResponseToNodeResponse(openaiRes, res, onComplete) {
   if (!openaiRes.body) {
     throw new Error('OpenAI stream body is missing');
   }
@@ -2124,6 +2124,20 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
   const decoder = new TextDecoder();
   let buffer = '';
   let fullAnswer = '';
+  let insightSaved = false;
+
+  async function saveInsightBeforeEnding() {
+    if (insightSaved) return;
+    insightSaved = true;
+
+    if (typeof onComplete !== 'function') return;
+
+    try {
+      await onComplete(fullAnswer);
+    } catch (err) {
+      console.error('CHAT INSIGHT SAVE BEFORE STREAM END FAILED:', err && err.message ? err.message : err);
+    }
+  }
 
   while (true) {
     const { done, value } = await reader.read();
@@ -2158,12 +2172,14 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
         }
 
         if (parsed.type === 'response.completed') {
+          await saveInsightBeforeEnding();
           writer.end();
           return fullAnswer;
         }
 
         if (parsed.type === 'response.failed') {
           console.error('OPENAI STREAM FAILED:', parsed);
+          await saveInsightBeforeEnding();
           writer.end();
           return fullAnswer;
         }
@@ -2198,6 +2214,7 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
     }
   }
 
+  await saveInsightBeforeEnding();
   writer.end();
   return fullAnswer;
 }
@@ -2902,16 +2919,16 @@ async function handleChat(req, res, body) {
       });
     }
 
-    const aiAnswer = await streamOpenAIResponseToNodeResponse(openaiRes, res);
-
-    await insertChatInsight({
-      agent_id: agentId,
-      session_id: sessionId,
-      page_url: pageUrl,
-      page_title: pageTitle,
-      language,
-      user_message: message,
-      ai_answer: aiAnswer
+    await streamOpenAIResponseToNodeResponse(openaiRes, res, async (aiAnswer) => {
+      await insertChatInsight({
+        agent_id: agentId,
+        session_id: sessionId,
+        page_url: pageUrl,
+        page_title: pageTitle,
+        language,
+        user_message: message,
+        ai_answer: aiAnswer
+      });
     });
 
     return;
