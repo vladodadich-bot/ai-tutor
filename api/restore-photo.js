@@ -7,21 +7,23 @@ export const config = {
   runtime: 'nodejs'
 };
 
-const allowedOrigins = [
-    'https://sitemindai.app',
-    'https://www.sitemindai.app',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:5500',
-    'http://127.0.0.1:5500'
-  ];
+const ALLOWED_ORIGINS = new Set([
+  'https://sitemindai.app',
+  'https://www.sitemindai.app',
+  'https://ai-tutor-rouge-theta.vercel.app'
+]);
+
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
-function setCors(req, res) {
-  const origin = req.headers?.origin || '';
+function getRequestOrigin(req) {
+  return String(req.headers?.origin || req.headers?.Origin || '').trim();
+}
 
-  if (origin === ALLOWED_ORIGIN) {
-    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+function setCors(req, res) {
+  const origin = getRequestOrigin(req);
+
+  if (ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
 
@@ -31,8 +33,16 @@ function setCors(req, res) {
 }
 
 function isAllowedOrigin(req) {
-  const origin = req.headers?.origin || '';
-  return origin === ALLOWED_ORIGIN;
+  const origin = getRequestOrigin(req);
+
+  // Allow the approved public domains.
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+
+  // Allow direct server/no-origin checks, but browsers from other sites still fail CORS.
+  // This helps debugging without opening the endpoint to random browser origins.
+  if (!origin) return true;
+
+  return false;
 }
 
 function readRequestBody(req) {
