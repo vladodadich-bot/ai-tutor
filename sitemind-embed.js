@@ -486,8 +486,8 @@ function __sitemindTrackTime(BASE_URL, agentId) {
       text = bodyClone ? cleanText(bodyClone.innerText || bodyClone.textContent || "") : text;
     }
 
-    if (text.length > 9000) {
-      text = text.slice(0, 9000);
+    if (text.length > 19000) {
+      text = text.slice(0, 19000);
     }
 
     return text;
