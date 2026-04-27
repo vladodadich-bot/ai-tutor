@@ -7,10 +7,14 @@ export const config = {
   runtime: 'nodejs'
 };
 
-const ALLOWED_ORIGIN = 
-https://sitemindai.app
-https://www.sitemindai.app
-https://ai-tutor-rouge-theta.vercel.app
+const allowedOrigins = [
+    'https://sitemindai.app',
+    'https://www.sitemindai.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500'
+  ];
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 function setCors(req, res) {
