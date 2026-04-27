@@ -1,21 +1,21 @@
 // api/restore-photo.js
-// Stable fallback backend without sharp.
-// Use this if the padded/sharp version crashes on Vercel.
+// Vercel serverless endpoint for the Restaurator photo restoration frontend.
 // Required Vercel Environment Variable: OPENAI_API_KEY
+//
+// Important:
+// Do NOT paste your API key into this file.
+// Add it in Vercel → Project Settings → Environment Variables → OPENAI_API_KEY
 
 export const config = {
   runtime: 'nodejs'
 };
 
-const MAX_DATA_URL_LENGTH = 18 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 function setCors(res) {
-  // Temporary broad CORS for debugging/restoring functionality.
-  // Later we can lock it again after the endpoint is confirmed stable.
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
-  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
 function readRequestBody(req) {
@@ -25,7 +25,7 @@ function readRequestBody(req) {
     req.on('data', (chunk) => {
       body += chunk.toString('utf8');
 
-      if (body.length > MAX_DATA_URL_LENGTH + 2000) {
+      if (body.length > 20 * 1024 * 1024) {
         reject(new Error('Request body is too large. Please upload a smaller image.'));
         req.destroy();
       }
@@ -51,7 +51,7 @@ function parseDataUrl(dataUrl) {
     throw new Error('Empty image file.');
   }
 
-  if (buffer.length > 12 * 1024 * 1024) {
+  if (buffer.length > MAX_IMAGE_BYTES) {
     throw new Error('Image is too large. Please upload a smaller image.');
   }
 
@@ -74,9 +74,6 @@ function buildRestorationPrompt() {
     'Do not replace faces. Do not beautify aggressively. Do not create a different person.',
     'Remove scratches, dust, stains, cracks, fading, and visible damage where possible.',
     'Improve sharpness, exposure, contrast, and clarity naturally.',
-    'Preserve the full original framing and aspect ratio as much as possible.',
-    'Do not crop the left, right, top, or bottom edges.',
-    'Keep the complete photo visible, including the outer areas near the borders.',
     'Keep the original composition, clothing, background, and important details unchanged.',
     'If adding color, use only subtle realistic color. Keep skin tones natural and conservative.',
     'The result should look like a realistic restored photograph, not a painting, cartoon, or modern fake portrait.'
@@ -88,15 +85,6 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
-  }
-
-  // Simple browser test:
-  // opening /api/restore-photo should show this JSON, proving the route exists.
-  if (req.method === 'GET') {
-    return res.status(200).json({
-      success: true,
-      message: 'Restore endpoint is online. Use POST from restaurator.html.'
-    });
   }
 
   if (req.method !== 'POST') {
@@ -136,15 +124,15 @@ export default async function handler(req, res) {
     form.append('input_fidelity', 'high');
     form.append('output_format', 'jpeg');
     form.append('quality', 'medium');
-
-    // Do not force square format. Horizontal photos should have more room.
-    form.append('size', '1536x1024');
+    form.append('size', '1024x1024');
     form.append('n', '1');
 
     const openaiResponse = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        // Do not set Content-Type manually with FormData.
+        // fetch will set multipart/form-data boundary automatically.
       },
       body: form
     });
@@ -181,7 +169,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      restoredImageDataUrl: `data:image/jpeg;base64,${b64}`
+      restoredImageDataUrl: `data:image/jpeg;base64,${b64}`,
+      watermarkRequired: true
     });
   } catch (error) {
     return res.status(500).json({
