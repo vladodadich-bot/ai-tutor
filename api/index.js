@@ -676,6 +676,29 @@ async function countVisitEvents(agentId, startDate, endDate) {
   return Number(count || 0);
 }
 
+async function countUniqueAnalyticsSessions(agentId, startDate, endDate) {
+  let query = supabase
+    .from('analytics_session')
+    .select('session_id', { count: 'exact', head: true })
+    .eq('agent_id', agentId);
+
+  if (startDate) {
+    query = query.gte('started_at', startDate.toISOString());
+  }
+
+  if (endDate) {
+    query = query.lt('started_at', endDate.toISOString());
+  }
+
+  const { count, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return Number(count || 0);
+}
+
 function buildReferrerRows(events, startDate) {
   const groups = new Map();
 
@@ -772,20 +795,35 @@ async function handleAnalyticsSummary(req, res, body) {
 
   let totalVisitsToday = 0;
   let totalVisitsYesterday = 0;
+  let totalVisitsLast7 = 0;
   let totalVisitsLast30 = 0;
+  let uniqueVisitorsToday = 0;
+  let uniqueVisitorsYesterday = 0;
+  let uniqueVisitorsLast7 = 0;
+  let uniqueVisitorsLast30 = 0;
 
   try {
-    const visitCounts = await Promise.all([
+    const metricCounts = await Promise.all([
       countVisitEvents(agentId, todayStart, null),
       countVisitEvents(agentId, yesterdayStart, todayStart),
-      countVisitEvents(agentId, last30Start, null)
+      countVisitEvents(agentId, last7Start, null),
+      countVisitEvents(agentId, last30Start, null),
+      countUniqueAnalyticsSessions(agentId, todayStart, null),
+      countUniqueAnalyticsSessions(agentId, yesterdayStart, todayStart),
+      countUniqueAnalyticsSessions(agentId, last7Start, null),
+      countUniqueAnalyticsSessions(agentId, last30Start, null)
     ]);
 
-    totalVisitsToday = visitCounts[0];
-    totalVisitsYesterday = visitCounts[1];
-    totalVisitsLast30 = visitCounts[2];
+    totalVisitsToday = metricCounts[0];
+    totalVisitsYesterday = metricCounts[1];
+    totalVisitsLast7 = metricCounts[2];
+    totalVisitsLast30 = metricCounts[3];
+    uniqueVisitorsToday = metricCounts[4];
+    uniqueVisitorsYesterday = metricCounts[5];
+    uniqueVisitorsLast7 = metricCounts[6];
+    uniqueVisitorsLast30 = metricCounts[7];
   } catch (countError) {
-    return res.status(500).json({ error: countError.message || 'Failed to count visit events' });
+    return res.status(500).json({ error: countError.message || 'Failed to count analytics metrics' });
   }
 
   // Average time is calculated from live_presence because it has the most complete
@@ -832,13 +870,16 @@ async function handleAnalyticsSummary(req, res, body) {
       active_now: activeSessions.size,
 
       // Unique visitors/sessions
-      visitors_today: countUniqueVisits(events, todayStart, null),
-      visitors_yesterday: countUniqueVisits(events, yesterdayStart, todayStart),
-      visitors_last_30_days: countUniqueVisits(events, last30Start, null),
+      // Counted from analytics_session with exact head counts, not from a limited analytics_events sample.
+      visitors_today: uniqueVisitorsToday,
+      visitors_yesterday: uniqueVisitorsYesterday,
+      visitors_last_7_days: uniqueVisitorsLast7,
+      visitors_last_30_days: uniqueVisitorsLast30,
 
       // Total visit events/page visits
       visits_today: totalVisitsToday,
       visits_yesterday: totalVisitsYesterday,
+      visits_last_7_days: totalVisitsLast7,
       visits_last_30_days: totalVisitsLast30,
 
       avg_time_spent_seconds: avgTime,
