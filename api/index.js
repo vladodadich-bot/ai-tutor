@@ -882,7 +882,7 @@ async function handleChatInsights(req, res, body) {
 
   const { data, error } = await supabase
     .from('chat_insights')
-    .select('created_at, agent_id, session_id, page_url, page_title, language, user_message')
+    .select('created_at, agent_id, session_id, page_url, page_title, language, user_message, ai_answer')
     .eq('agent_id', agentId)
     .order('created_at', { ascending: false })
     .limit(safeLimit);
