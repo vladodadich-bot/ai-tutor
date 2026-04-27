@@ -1,10 +1,10 @@
-// api/restore-photo.js
-// Vercel serverless endpoint for the Restaurator photo restoration frontend.
-// Required Vercel Environment Variable: OPENAI_API_KEY
-//
-// Important:
-// Do NOT paste your API key into this file.
-// Add it in Vercel → Project Settings → Environment Variables → OPENAI_API_KEY
+export default async function handler(req, res) {
+  const allowedOrigins = [
+    "https://sitemindai.app/restaurator.html
+  ];
+
+  const origin = req.headers.origin || "";
+  const referer = req.headers.referer || "";
 
 export const config = {
   runtime: 'nodejs'
