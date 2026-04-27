@@ -882,7 +882,7 @@ async function handleChatInsights(req, res, body) {
 
   const { data, error } = await supabase
     .from('chat_insights')
-    .select('created_at, agent_id, session_id, page_url, page_title, language, user_message, ai_answer')
+    .select('created_at, agent_id, session_id, page_url, page_title, language, user_message')
     .eq('agent_id', agentId)
     .order('created_at', { ascending: false })
     .limit(safeLimit);
@@ -2123,7 +2123,6 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
   const reader = openaiRes.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  let finalAnswer = '';
 
   while (true) {
     const { done, value } = await reader.read();
@@ -2153,19 +2152,18 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
         const parsed = JSON.parse(payload);
 
         if (parsed.type === 'response.output_text.delta' && parsed.delta) {
-          finalAnswer += parsed.delta;
           writer.write(parsed.delta);
         }
 
         if (parsed.type === 'response.completed') {
           writer.end();
-          return finalAnswer;
+          return;
         }
 
         if (parsed.type === 'response.failed') {
           console.error('OPENAI STREAM FAILED:', parsed);
           writer.end();
-          return finalAnswer;
+          return;
         }
       } catch (err) {
         // ignore partial or malformed event block
@@ -2189,7 +2187,6 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
         const parsed = JSON.parse(payload);
 
         if (parsed.type === 'response.output_text.delta' && parsed.delta) {
-          finalAnswer += parsed.delta;
           writer.write(parsed.delta);
         }
       } catch (err) {
@@ -2199,8 +2196,6 @@ async function streamOpenAIResponseToNodeResponse(openaiRes, res) {
   }
 
   writer.end();
-  return finalAnswer;
-}
 }
 
 // ========================================
@@ -2579,7 +2574,6 @@ function buildSuggestedRelevantLinkEntry(rows, currentPageMatch, explicitCrossPa
 async function insertChatInsight(payload) {
   const agentId = String(payload.agent_id || '').trim();
   const userMessage = limitText(payload.user_message || '', 2000);
-  const aiAnswer = payload.ai_answer === undefined ? null : limitText(payload.ai_answer || '', 6000);
 
   if (!agentId || !userMessage) return;
 
@@ -2592,8 +2586,7 @@ async function insertChatInsight(payload) {
         page_url: payload.page_url || null,
         page_title: payload.page_title || null,
         language: payload.language || null,
-        user_message: userMessage,
-        ai_answer: aiAnswer || null
+        user_message: userMessage
       });
 
     if (error) {
@@ -2658,6 +2651,15 @@ async function handleChat(req, res, body) {
       message: 'Subscription expired.'
     });
   }
+
+  await insertChatInsight({
+    agent_id: agentId,
+    session_id: sessionId,
+    page_url: pageUrl,
+    page_title: pageTitle,
+    language,
+    user_message: message
+  });
 
   let crawledRows = [];
 
@@ -2750,20 +2752,8 @@ async function handleChat(req, res, body) {
   const linkCandidates = linkCandidateData.candidates || [];
 
   if (!hasStrongCurrentPageContent && !hasStrongMatchedCurrentPage && !hasStrongRelevantContent && linkCandidates.length > 0) {
-    const linkSuggestionReply = buildLinkSuggestionReply(language, linkCandidates);
-
-    await insertChatInsight({
-      agent_id: agentId,
-      session_id: sessionId,
-      page_url: pageUrl,
-      page_title: pageTitle,
-      language,
-      user_message: message,
-      ai_answer: linkSuggestionReply
-    });
-
     return res.status(200).json({
-      reply: linkSuggestionReply
+      reply: buildLinkSuggestionReply(language, linkCandidates)
     });
   }
 
@@ -2903,18 +2893,7 @@ async function handleChat(req, res, body) {
       });
     }
 
-    const finalAnswer = await streamOpenAIResponseToNodeResponse(openaiRes, res);
-
-    await insertChatInsight({
-      agent_id: agentId,
-      session_id: sessionId,
-      page_url: pageUrl,
-      page_title: pageTitle,
-      language,
-      user_message: message,
-      ai_answer: finalAnswer
-    });
-
+    await streamOpenAIResponseToNodeResponse(openaiRes, res);
     return;
   } catch (err) {
     console.error('CHAT STREAM ERROR:', err);
