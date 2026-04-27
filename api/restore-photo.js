@@ -1,21 +1,31 @@
 // api/restore-photo.js
-// Vercel serverless endpoint for the Restaurator photo restoration frontend.
+// Locked to: https://sitemindai.app/restaurator.html
 // Required Vercel Environment Variable: OPENAI_API_KEY
-//
-// Important:
-// Do NOT paste your API key into this file.
-// Add it in Vercel → Project Settings → Environment Variables → OPENAI_API_KEY
+// Required package: sharp  ->  npm install sharp
 
 export const config = {
   runtime: 'nodejs'
 };
 
+const ALLOWED_ORIGIN = 'https://sitemindai.app';
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
-function setCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+function setCors(req, res) {
+  const origin = req.headers?.origin || '';
+
+  if (origin === ALLOWED_ORIGIN) {
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+    res.setHeader('Vary', 'Origin');
+  }
+
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+  res.setHeader('Cache-Control', 'no-store');
+}
+
+function isAllowedOrigin(req) {
+  const origin = req.headers?.origin || '';
+  return origin === ALLOWED_ORIGIN;
 }
 
 function readRequestBody(req) {
@@ -67,6 +77,12 @@ function parseDataUrl(dataUrl) {
   };
 }
 
+function selectOutputSize(width, height) {
+  if (width > height * 1.15) return '1536x1024';
+  if (height > width * 1.15) return '1024x1536';
+  return '1024x1024';
+}
+
 function buildRestorationPrompt() {
   return [
     'Carefully restore this old family photograph.',
@@ -74,17 +90,89 @@ function buildRestorationPrompt() {
     'Do not replace faces. Do not beautify aggressively. Do not create a different person.',
     'Remove scratches, dust, stains, cracks, fading, and visible damage where possible.',
     'Improve sharpness, exposure, contrast, and clarity naturally.',
+    'Preserve the full original framing and aspect ratio.',
+    'Do not crop the left, right, top, or bottom edges.',
+    'Keep the complete photo visible, including the outer areas near the borders.',
     'Keep the original composition, clothing, background, and important details unchanged.',
     'If adding color, use only subtle realistic color. Keep skin tones natural and conservative.',
     'The result should look like a realistic restored photograph, not a painting, cartoon, or modern fake portrait.'
   ].join(' ');
 }
 
+async function addProtectivePadding(buffer) {
+  let sharp;
+
+  try {
+    const sharpModule = await import('sharp');
+    sharp = sharpModule.default;
+  } catch (error) {
+    throw new Error("Missing dependency 'sharp'. Run: npm install sharp");
+  }
+
+  const meta = await sharp(buffer, { failOn: 'none' }).metadata();
+  const width = meta.width || 0;
+  const height = meta.height || 0;
+
+  if (!width || !height) {
+    throw new Error('Could not read image dimensions.');
+  }
+
+  // Add a small protective border so the AI can "zoom" slightly
+  // without cutting important parts of the real photo.
+  const paddingPct = 0.10;
+  const canvasWidth = Math.max(Math.round(width * (1 + paddingPct * 2)), width + 80);
+  const canvasHeight = Math.max(Math.round(height * (1 + paddingPct * 2)), height + 80);
+
+  // Soft blurred background built from the same image.
+  const background = await sharp(buffer, { failOn: 'none' })
+    .resize(canvasWidth, canvasHeight, { fit: 'cover' })
+    .blur(24)
+    .modulate({ brightness: 1.02, saturation: 0.98 })
+    .jpeg({ quality: 92 })
+    .toBuffer();
+
+  // Foreground photo kept at original size in the center.
+  const foreground = await sharp(buffer, { failOn: 'none' })
+    .jpeg({ quality: 96 })
+    .toBuffer();
+
+  const left = Math.round((canvasWidth - width) / 2);
+  const top = Math.round((canvasHeight - height) / 2);
+
+  const paddedBuffer = await sharp(background, { failOn: 'none' })
+    .composite([{ input: foreground, left, top }])
+    .jpeg({ quality: 94 })
+    .toBuffer();
+
+  return {
+    buffer: paddedBuffer,
+    width,
+    height,
+    filename: 'restore-input-padded.jpg',
+    mimeType: 'image/jpeg',
+    openaiSize: selectOutputSize(width, height)
+  };
+}
+
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
 
   if (req.method === 'OPTIONS') {
+    if (!isAllowedOrigin(req)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden origin.'
+      });
+    }
+
     return res.status(204).end();
+  }
+
+  if (!isAllowedOrigin(req)) {
+    return res.status(403).json({
+      success: false,
+      error: 'Forbidden origin.'
+    });
   }
 
   if (req.method !== 'POST') {
@@ -114,25 +202,24 @@ export default async function handler(req, res) {
     }
 
     const parsed = parseDataUrl(imageDataUrl);
+    const prepared = await addProtectivePadding(parsed.buffer);
 
     const form = new FormData();
-    const blob = new Blob([parsed.buffer], { type: parsed.mimeType });
+    const blob = new Blob([prepared.buffer], { type: prepared.mimeType });
 
     form.append('model', 'gpt-image-1.5');
-    form.append('image', blob, parsed.filename);
+    form.append('image', blob, prepared.filename);
     form.append('prompt', buildRestorationPrompt());
     form.append('input_fidelity', 'high');
     form.append('output_format', 'jpeg');
     form.append('quality', 'medium');
-    form.append('size', '1024x1024');
+    form.append('size', prepared.openaiSize);
     form.append('n', '1');
 
     const openaiResponse = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-        // Do not set Content-Type manually with FormData.
-        // fetch will set multipart/form-data boundary automatically.
       },
       body: form
     });
@@ -169,8 +256,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      restoredImageDataUrl: `data:image/jpeg;base64,${b64}`,
-      watermarkRequired: true
+      restoredImageDataUrl: `data:image/jpeg;base64,${b64}`
     });
   } catch (error) {
     return res.status(500).json({
