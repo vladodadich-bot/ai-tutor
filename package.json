@@ -1,10 +1,10 @@
-{
-  "name": "ai-tutor",
-  "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
-    "openai": "^4.0.0",
-    "@supabase/supabase-js": "^2.39.0",
-    "sharp": "^0.33.5"
-  }
+{ 
+  "name": "ai-tutor", 
+  "version": "1.0.0", 
+  "type": "module", 
+  "dependencies": { 
+  "openai": "^4.0.0", 
+  "@supabase/supabase-js"
+  : "^2.39.0" 
+  } 
 }
