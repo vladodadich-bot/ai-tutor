@@ -1,12 +1,16 @@
 // api/restore-photo.js
 // Vercel serverless endpoint for the Restaurator photo restoration frontend.
-// Required env variable in Vercel: OPENAI_API_KEY
+// Required Vercel Environment Variable: OPENAI_API_KEY
+//
+// Important:
+// Do NOT paste your API key into this file.
+// Add it in Vercel → Project Settings → Environment Variables → OPENAI_API_KEY
 
 export const config = {
   runtime: 'nodejs'
 };
 
-const MAX_DATA_URL_LENGTH = 20 * 1024 * 1024; // keep below OpenAI image_url max and Vercel payload limits
+const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,8 +25,8 @@ function readRequestBody(req) {
     req.on('data', (chunk) => {
       body += chunk.toString('utf8');
 
-      if (body.length > MAX_DATA_URL_LENGTH + 2000) {
-        reject(new Error('Request body is too large.'));
+      if (body.length > 20 * 1024 * 1024) {
+        reject(new Error('Request body is too large. Please upload a smaller image.'));
         req.destroy();
       }
     });
@@ -32,25 +36,46 @@ function readRequestBody(req) {
   });
 }
 
-function isAllowedImageDataUrl(value) {
-  const text = String(value || '');
-  return (
-    text.startsWith('data:image/jpeg;base64,') ||
-    text.startsWith('data:image/jpg;base64,') ||
-    text.startsWith('data:image/png;base64,') ||
-    text.startsWith('data:image/webp;base64,')
-  );
+function parseDataUrl(dataUrl) {
+  const match = String(dataUrl || '').match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,(.+)$/i);
+
+  if (!match) {
+    throw new Error('Unsupported image format. Please use JPG, PNG or WEBP.');
+  }
+
+  const mimeType = match[1].toLowerCase().replace('image/jpg', 'image/jpeg');
+  const base64 = match[2];
+  const buffer = Buffer.from(base64, 'base64');
+
+  if (!buffer.length) {
+    throw new Error('Empty image file.');
+  }
+
+  if (buffer.length > MAX_IMAGE_BYTES) {
+    throw new Error('Image is too large. Please upload a smaller image.');
+  }
+
+  const extension =
+    mimeType === 'image/png' ? 'png' :
+    mimeType === 'image/webp' ? 'webp' :
+    'jpg';
+
+  return {
+    buffer,
+    mimeType,
+    filename: `restore-input.${extension}`
+  };
 }
 
 function buildRestorationPrompt() {
   return [
-    'Restore this old family photo carefully.',
-    'Preserve the exact identity, facial structure, expression, age, and natural look of every person.',
-    'Do not replace the face, do not beautify aggressively, do not invent new facial details.',
+    'Carefully restore this old family photograph.',
+    'Preserve the exact identity, facial structure, expression, age, hairstyle shape, pose, and natural look of every person.',
+    'Do not replace faces. Do not beautify aggressively. Do not create a different person.',
     'Remove scratches, dust, stains, cracks, fading, and visible damage where possible.',
-    'Improve sharpness, contrast, exposure, and clarity naturally.',
-    'Add only subtle realistic color if appropriate, mainly to clothing and background, while keeping faces natural.',
-    'Keep the composition and important original details unchanged.',
+    'Improve sharpness, exposure, contrast, and clarity naturally.',
+    'Keep the original composition, clothing, background, and important details unchanged.',
+    'If adding color, use only subtle realistic color. Keep skin tones natural and conservative.',
     'The result should look like a realistic restored photograph, not a painting, cartoon, or modern fake portrait.'
   ].join(' ');
 }
@@ -72,14 +97,13 @@ export default async function handler(req, res) {
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({
       success: false,
-      error: 'Missing OPENAI_API_KEY environment variable.'
+      error: 'Missing OPENAI_API_KEY in Vercel Environment Variables.'
     });
   }
 
   try {
     const rawBody = await readRequestBody(req);
     const body = JSON.parse(rawBody || '{}');
-
     const imageDataUrl = String(body.imageDataUrl || body.image_data_url || '').trim();
 
     if (!imageDataUrl) {
@@ -89,40 +113,28 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!isAllowedImageDataUrl(imageDataUrl)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Unsupported image format. Use JPG, PNG or WEBP.'
-      });
-    }
+    const parsed = parseDataUrl(imageDataUrl);
 
-    if (imageDataUrl.length > MAX_DATA_URL_LENGTH) {
-      return res.status(413).json({
-        success: false,
-        error: 'Image is too large. Please upload a smaller file.'
-      });
-    }
+    const form = new FormData();
+    const blob = new Blob([parsed.buffer], { type: parsed.mimeType });
+
+    form.append('model', 'gpt-image-1.5');
+    form.append('image', blob, parsed.filename);
+    form.append('prompt', buildRestorationPrompt());
+    form.append('input_fidelity', 'high');
+    form.append('output_format', 'jpeg');
+    form.append('quality', 'medium');
+    form.append('size', '1024x1024');
+    form.append('n', '1');
 
     const openaiResponse = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        // Do not set Content-Type manually with FormData.
+        // fetch will set multipart/form-data boundary automatically.
       },
-      body: JSON.stringify({
-        model: 'gpt-image-1.5',
-        images: [
-          {
-            image_url: imageDataUrl
-          }
-        ],
-        prompt: buildRestorationPrompt(),
-        input_fidelity: 'high',
-        output_format: 'jpeg',
-        quality: 'medium',
-        size: '1024x1024',
-        n: 1
-      })
+      body: form
     });
 
     const resultText = await openaiResponse.text();
@@ -140,25 +152,24 @@ export default async function handler(req, res) {
         error:
           resultJson?.error?.message ||
           resultJson?.message ||
+          resultText ||
           'OpenAI image restoration failed.'
       });
     }
 
     const firstImage = Array.isArray(resultJson.data) ? resultJson.data[0] : null;
     const b64 = firstImage?.b64_json || '';
-    const url = firstImage?.url || '';
 
-    if (!b64 && !url) {
+    if (!b64) {
       return res.status(500).json({
         success: false,
-        error: 'No restored image returned.'
+        error: 'No restored image returned from OpenAI.'
       });
     }
 
     return res.status(200).json({
       success: true,
-      restoredImageDataUrl: b64 ? `data:image/jpeg;base64,${b64}` : '',
-      restoredImageUrl: url || '',
+      restoredImageDataUrl: `data:image/jpeg;base64,${b64}`,
       watermarkRequired: true
     });
   } catch (error) {
