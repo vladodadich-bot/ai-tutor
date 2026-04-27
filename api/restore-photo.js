@@ -123,7 +123,7 @@ export default async function handler(req, res) {
     form.append('input_fidelity', 'high');
     form.append('output_format', 'jpeg');
     form.append('quality', 'medium');
-    form.append('size', '1536x1024');
+    form.append('size', 'auto');
     form.append('n', '1');
 
     const openaiResponse = await fetch('https://api.openai.com/v1/images/edits', {
