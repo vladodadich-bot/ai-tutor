@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         .eq('agent_id', agentId)
         .gte('last_seen_at', cutoffIso)
         .order('last_seen_at', { ascending: false })
-        .limit(12);
+        .limit(50);
 
       if (error) {
         console.error('Presence GET error:', error);
