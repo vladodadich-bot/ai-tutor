@@ -2322,6 +2322,52 @@ function normalizeComparableUrl(value) {
   }
 }
 
+
+function normalizeAgentDomainHost(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    const url = raw.startsWith('http://') || raw.startsWith('https://')
+      ? new URL(raw)
+      : new URL('https://' + raw);
+
+    return String(url.hostname || '')
+      .toLowerCase()
+      .replace(/^www./, '')
+      .trim();
+  } catch (err) {
+    return raw
+      .toLowerCase()
+      .replace(/^https?:///i, '')
+      .replace(/^www./i, '')
+      .split('/')[0]
+      .split('?')[0]
+      .split('#')[0]
+      .trim();
+  }
+}
+
+function isPageUrlAllowedForAgent(pageUrl, agentSiteDomain) {
+  const pageHost = normalizeAgentDomainHost(pageUrl);
+  const agentHost = normalizeAgentDomainHost(agentSiteDomain);
+
+  if (!pageHost || !agentHost) return false;
+
+  return pageHost === agentHost || pageHost.endsWith('.' + agentHost);
+}
+
+function buildDomainMismatchPayload(agentId, pageUrl, agentSiteDomain) {
+  return {
+    error: 'AGENT_DOMAIN_MISMATCH',
+    code: 'AGENT_DOMAIN_MISMATCH',
+    message: 'This SiteMind AI agent is not configured for this website.',
+    agentId,
+    pageHost: normalizeAgentDomainHost(pageUrl),
+    agentHost: normalizeAgentDomainHost(agentSiteDomain)
+  };
+}
+
 function findCurrentPageRow(rows, pageUrl, pageTitle, h1) {
   const safeRows = Array.isArray(rows) ? rows : [];
   const normalizedPageUrl = normalizeComparableUrl(pageUrl);
@@ -2663,8 +2709,23 @@ async function handleChat(req, res, body) {
 
   if (!accessCheck.agent) {
     return res.status(404).json({
-      error: 'Agent not found'
+      error: 'Agent not found',
+      code: 'AGENT_NOT_FOUND'
     });
+  }
+
+  const agentSiteDomain = String(accessCheck.agent.site_domain || '').trim();
+
+  if (!pageUrl) {
+    return res.status(403).json({
+      error: 'MISSING_PAGE_URL',
+      code: 'MISSING_PAGE_URL',
+      message: 'This SiteMind AI agent can only answer from the configured website.'
+    });
+  }
+
+  if (!isPageUrlAllowedForAgent(pageUrl, agentSiteDomain)) {
+    return res.status(403).json(buildDomainMismatchPayload(agentId, pageUrl, agentSiteDomain));
   }
 
   if (!accessCheck.accessAllowed) {
