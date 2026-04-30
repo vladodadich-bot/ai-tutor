@@ -2304,6 +2304,56 @@ async function getAgentWithAccess(agentId) {
   };
 }
 
+
+function normalizeAgentHost(value) {
+  const raw = String(value || '').trim();
+
+  if (!raw) return '';
+
+  try {
+    const withProtocol = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
+    const parsed = new URL(withProtocol);
+
+    return String(parsed.hostname || '')
+      .toLowerCase()
+      .replace(/^www\./, '')
+      .trim();
+  } catch (err) {
+    return raw
+      .toLowerCase()
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./, '')
+      .split('/')[0]
+      .split(':')[0]
+      .trim();
+  }
+}
+
+function isDevelopmentHost(host) {
+  const value = String(host || '').toLowerCase().trim();
+  return (
+    value === 'localhost' ||
+    value === '127.0.0.1' ||
+    value.endsWith('.localhost') ||
+    value.endsWith('.vercel.app')
+  );
+}
+
+function agentDomainMatchesPage(agentSiteDomain, pageUrl) {
+  const agentHost = normalizeAgentHost(agentSiteDomain);
+  const pageHost = normalizeAgentHost(pageUrl);
+
+  if (!agentHost || !pageHost) {
+    return false;
+  }
+
+  if (isDevelopmentHost(pageHost)) {
+    return true;
+  }
+
+  return pageHost === agentHost;
+}
+
 function normalizeComparableUrl(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -2320,52 +2370,6 @@ function normalizeComparableUrl(value) {
       .replace(/\/+$/, '')
       .toLowerCase();
   }
-}
-
-
-function normalizeAgentDomainHost(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-
-  try {
-    const url = raw.startsWith('http://') || raw.startsWith('https://')
-      ? new URL(raw)
-      : new URL('https://' + raw);
-
-    return String(url.hostname || '')
-      .toLowerCase()
-      .replace(/^www./, '')
-      .trim();
-  } catch (err) {
-    return raw
-      .toLowerCase()
-      .replace(/^https?:///i, '')
-      .replace(/^www./i, '')
-      .split('/')[0]
-      .split('?')[0]
-      .split('#')[0]
-      .trim();
-  }
-}
-
-function isPageUrlAllowedForAgent(pageUrl, agentSiteDomain) {
-  const pageHost = normalizeAgentDomainHost(pageUrl);
-  const agentHost = normalizeAgentDomainHost(agentSiteDomain);
-
-  if (!pageHost || !agentHost) return false;
-
-  return pageHost === agentHost || pageHost.endsWith('.' + agentHost);
-}
-
-function buildDomainMismatchPayload(agentId, pageUrl, agentSiteDomain) {
-  return {
-    error: 'AGENT_DOMAIN_MISMATCH',
-    code: 'AGENT_DOMAIN_MISMATCH',
-    message: 'This SiteMind AI agent is not configured for this website.',
-    agentId,
-    pageHost: normalizeAgentDomainHost(pageUrl),
-    agentHost: normalizeAgentDomainHost(agentSiteDomain)
-  };
 }
 
 function findCurrentPageRow(rows, pageUrl, pageTitle, h1) {
@@ -2709,23 +2713,8 @@ async function handleChat(req, res, body) {
 
   if (!accessCheck.agent) {
     return res.status(404).json({
-      error: 'Agent not found',
-      code: 'AGENT_NOT_FOUND'
+      error: 'Agent not found'
     });
-  }
-
-  const agentSiteDomain = String(accessCheck.agent.site_domain || '').trim();
-
-  if (!pageUrl) {
-    return res.status(403).json({
-      error: 'MISSING_PAGE_URL',
-      code: 'MISSING_PAGE_URL',
-      message: 'This SiteMind AI agent can only answer from the configured website.'
-    });
-  }
-
-  if (!isPageUrlAllowedForAgent(pageUrl, agentSiteDomain)) {
-    return res.status(403).json(buildDomainMismatchPayload(agentId, pageUrl, agentSiteDomain));
   }
 
   if (!accessCheck.accessAllowed) {
@@ -2733,6 +2722,16 @@ async function handleChat(req, res, body) {
       error: 'TRIAL_EXPIRED',
       code: accessCheck.reason || 'ACCESS_DENIED',
       message: 'Subscription expired.'
+    });
+  }
+
+  const agentSiteDomain = String(accessCheck.agent.site_domain || '').trim();
+
+  if (!agentDomainMatchesPage(agentSiteDomain, pageUrl)) {
+    return res.status(403).json({
+      error: 'AGENT_DOMAIN_MISMATCH',
+      code: 'AGENT_DOMAIN_MISMATCH',
+      message: 'This SiteMind AI agent is not configured for this website.'
     });
   }
 
